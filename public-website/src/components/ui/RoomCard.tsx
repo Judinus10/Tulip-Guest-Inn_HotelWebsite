@@ -9,8 +9,6 @@ interface RoomCardProps {
 }
 
 export default function RoomCard({ room, index = 0 }: RoomCardProps) {
-  const priceLabel = room.currency ? `${room.currency} ${room.price}` : `$${room.price}`;
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 40 }}
@@ -35,7 +33,7 @@ export default function RoomCard({ room, index = 0 }: RoomCardProps) {
         </div>
         <div className="absolute top-4 right-4">
           <span className="bg-white/95 text-dark text-xs font-medium px-3 py-1.5">
-            From {priceLabel}<span className="text-gray-400 text-[10px]">/night</span>
+            From {room.currency ? `${room.currency} ` : '$'}{room.price}<span className="text-gray-400 text-[10px]">/night</span>
           </span>
         </div>
       </div>

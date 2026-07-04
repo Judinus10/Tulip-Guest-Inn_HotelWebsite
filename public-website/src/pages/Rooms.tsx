@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageHero from '../components/ui/PageHero';
 import RoomCard from '../components/ui/RoomCard';
 import CTASection from '../components/ui/CTASection';
-import { rooms } from '../data/rooms';
+import { rooms as fallbackRooms } from '../data/rooms';
 import type { Room } from '../data/rooms';
+import { fetchPublicRooms } from '../services/publicApi';
 
 type Category = 'all' | Room['category'];
 
@@ -27,8 +28,25 @@ const amenitiesHighlight = [
 
 export default function Rooms() {
   const [active, setActive] = useState<Category>('all');
+  const [roomList, setRoomList] = useState<Room[]>(fallbackRooms);
 
-  const filtered = active === 'all' ? rooms : rooms.filter((r) => r.category === active);
+  useEffect(() => {
+    let mounted = true;
+
+    fetchPublicRooms()
+      .then((backendRooms) => {
+        if (mounted && backendRooms.length > 0) setRoomList(backendRooms);
+      })
+      .catch(() => {
+        if (mounted) setRoomList(fallbackRooms);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const filtered = active === 'all' ? roomList : roomList.filter((r) => r.category === active);
 
   return (
     <main>

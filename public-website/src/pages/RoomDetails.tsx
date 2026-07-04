@@ -1,20 +1,56 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Users, BedDouble, Maximize, Bath, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import RoomCard from '../components/ui/RoomCard';
 import AnimatedSection from '../components/ui/AnimatedSection';
-import { rooms } from '../data/rooms';
+import { rooms as fallbackRooms } from '../data/rooms';
+import type { Room } from '../data/rooms';
+import { fetchPublicRoom, fetchPublicRooms } from '../services/publicApi';
 
 export default function RoomDetails() {
   const { id } = useParams<{ id: string }>();
-  const room = rooms.find((r) => r.slug === id);
+  const fallbackRoom = fallbackRooms.find((r) => r.slug === id || r.id === id);
+  const [room, setRoom] = useState<Room | undefined>(fallbackRoom);
+  const [roomList, setRoomList] = useState<Room[]>(fallbackRooms);
+  const [loading, setLoading] = useState(!fallbackRoom);
 
   const [activeImg, setActiveImg] = useState(0);
 
+  useEffect(() => {
+    if (!id) return;
+
+    let mounted = true;
+    setLoading(true);
+    setActiveImg(0);
+
+    Promise.allSettled([fetchPublicRoom(id), fetchPublicRooms()]).then(([roomResult, roomsResult]) => {
+      if (!mounted) return;
+
+      if (roomResult.status === 'fulfilled') {
+        setRoom(roomResult.value);
+      } else {
+        setRoom(fallbackRooms.find((r) => r.slug === id || r.id === id));
+      }
+
+      if (roomsResult.status === 'fulfilled' && roomsResult.value.length > 0) {
+        setRoomList(roomsResult.value);
+      } else {
+        setRoomList(fallbackRooms);
+      }
+
+      setLoading(false);
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
+
+  if (!room && loading) return <main className="pt-20" />;
   if (!room) return <Navigate to="/rooms" replace />;
 
-  const relatedRooms = rooms.filter((r) => r.id !== room.id).slice(0, 3);
+  const relatedRooms = roomList.filter((r) => r.id !== room.id).slice(0, 3);
 
   const prevImg = () => setActiveImg((i) => (i - 1 + room.images.length) % room.images.length);
   const nextImg = () => setActiveImg((i) => (i + 1) % room.images.length);
@@ -146,7 +182,7 @@ export default function RoomDetails() {
               <div className="bg-white border border-border shadow-luxury p-8 sticky top-28">
                 <p className="text-[9px] tracking-[0.25em] uppercase text-gold font-medium mb-2">Rate From</p>
                 <p className="font-serif text-4xl font-light text-dark mb-1">
-                  ${room.price}
+                  {room.currency ? `${room.currency} ` : '$'}{room.price}
                   <span className="text-gray-400 text-base font-sans"> / night</span>
                 </p>
                 <div className="w-8 h-[1px] bg-gold my-5" />
