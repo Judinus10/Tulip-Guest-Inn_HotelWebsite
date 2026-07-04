@@ -110,14 +110,15 @@ export default function Attractions() {
               </div>
             </div>
 
-            {/* Distance Info */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-x divide-border bg-white border-t border-border">
-              {attractions.map((a) => (
-                <div key={a.id} className="p-5 text-center">
-                  <p className="font-serif text-lg font-light text-dark mb-1">{a.distance}</p>
-                  <p className="text-[9px] tracking-[0.15em] uppercase text-gray-400 leading-tight">{a.name}</p>
-                </div>
-              ))}
+            {/* Location Note */}
+            <div className="bg-white border-t border-border px-6 py-5 text-center">
+              <p className="text-[10px] tracking-[0.25em] uppercase text-gold font-medium mb-2">
+                Nearby Highlights
+              </p>
+              <p className="text-sm text-gray-500 leading-relaxed max-w-3xl mx-auto">
+                Explore temples, beaches, historic landmarks and island routes from Tulip Guest Inn.
+                Attraction distances are shown inside each attraction card where available.
+              </p>
             </div>
           </AnimatedSection>
         </div>
