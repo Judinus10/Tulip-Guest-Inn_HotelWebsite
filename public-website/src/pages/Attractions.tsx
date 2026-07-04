@@ -1,13 +1,36 @@
-import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
 import { MapPin } from 'lucide-react';
 import PageHero from '../components/ui/PageHero';
 import SectionTitle from '../components/ui/SectionTitle';
 import AttractionCard from '../components/ui/AttractionCard';
 import CTASection from '../components/ui/CTASection';
 import AnimatedSection from '../components/ui/AnimatedSection';
-import { attractions } from '../data/attractions';
+import { attractions as fallbackAttractions } from '../data/attractions';
+import { getPublicAttractions } from '../services/publicApi';
 
 export default function Attractions() {
+  const [attractions, setAttractions] = useState(fallbackAttractions);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getPublicAttractions()
+      .then((items) => {
+        if (isMounted && items.length > 0) {
+          setAttractions(items);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setAttractions(fallbackAttractions);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return (
     <main>
       <PageHero

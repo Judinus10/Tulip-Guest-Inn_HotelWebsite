@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import PageHero from '../components/ui/PageHero';
 import { galleryImages } from '../data/gallery';
+import { getPublicGalleryImages } from '../services/publicApi';
 import type { GalleryCategory } from '../data/gallery';
 
 const categories: { value: GalleryCategory; label: string }[] = [
@@ -17,9 +18,30 @@ const categories: { value: GalleryCategory; label: string }[] = [
 export default function Gallery() {
   const [active, setActive] = useState<GalleryCategory>('all');
   const [lightbox, setLightbox] = useState<number | null>(null);
+  const [images, setImages] = useState(galleryImages);
+
+  useEffect(() => {
+    let mounted = true;
+
+    getPublicGalleryImages()
+      .then((apiImages) => {
+        if (mounted && apiImages.length > 0) {
+          setImages(apiImages);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setImages(galleryImages);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const filtered =
-    active === 'all' ? galleryImages : galleryImages.filter((img) => img.category === active);
+    active === 'all' ? images : images.filter((img) => img.category === active);
 
   const openLightbox = (index: number) => setLightbox(index);
   const closeLightbox = () => setLightbox(null);

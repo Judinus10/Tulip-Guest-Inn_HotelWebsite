@@ -95,8 +95,18 @@ export function normalizeRoom(room: BackendRoom, index = 0): Room {
   };
 }
 
+function galleryCategory(value: unknown): GalleryCategory {
+  const source = asString(value, 'facilities').toLowerCase();
+
+  if (source.includes('room') || source.includes('bed')) return 'rooms';
+  if (source.includes('pool') || source.includes('swim')) return 'pool';
+  if (source.includes('garden') || source.includes('yard')) return 'garden';
+  if (source.includes('exterior') || source.includes('outside') || source.includes('building')) return 'exterior';
+  return 'facilities';
+}
+
 function normalizeGalleryImage(image: BackendGalleryImage, index: number): GalleryImage {
-  const category = asString(image.folder_slug, asString(image.folder_name, 'facilities')).toLowerCase() as GalleryCategory;
+  const category = galleryCategory(image.folder_slug ?? image.folder_name);
 
   return {
     id: String(image.id ?? index + 1),
