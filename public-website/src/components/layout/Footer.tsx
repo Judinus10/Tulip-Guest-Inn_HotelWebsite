@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Phone, Mail, MapPin, Instagram, Facebook, Twitter } from 'lucide-react';
+import { Phone, Mail, MapPin, Instagram, Facebook } from 'lucide-react';
+import { getPublicContactSettings, fetchPublicRooms, type ContactSettings } from '../../services/publicApi';
 
 const quickLinks = [
   { label: 'Home', path: '/' },
@@ -11,14 +13,86 @@ const quickLinks = [
   { label: 'Contact', path: '/contact' },
 ];
 
-const roomLinks = [
+const fallbackRoomLinks = [
   { label: 'Standard Room', path: '/rooms/standard-room' },
   { label: 'Deluxe Room', path: '/rooms/deluxe-room' },
   { label: 'Family Room', path: '/rooms/family-room' },
   { label: 'Garden Suite', path: '/rooms/garden-suite' },
 ];
 
+const fallbackContactSettings: ContactSettings = {
+  business_name: 'Tulip Guest Inn',
+  address: 'V.M Road 189\nPoint Pedro\nNorthern Sri Lanka',
+  phone: '0212 261 186',
+  reception_contact_number: '0212 261 186',
+  whatsapp_reservation_number: '',
+  email: 'info@tulipguestinn.com',
+  business_hours: 'Reception: 24 Hours, 7 Days',
+  facebook_link: '#',
+  instagram_link: '#',
+  map_embed_url: '',
+};
+
+function telephoneHref(phone: string): string {
+  const normalized = phone.replace(/[^+\d]/g, '');
+  return normalized ? `tel:${normalized}` : '#';
+}
+
+function mailHref(email: string): string {
+  return email ? `mailto:${email}` : '#';
+}
+
+function addressLines(address: string): string[] {
+  return address
+    .split(/\r?\n|,/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
 export default function Footer() {
+  const [contactSettings, setContactSettings] = useState<ContactSettings>(fallbackContactSettings);
+  const [footerRoomLinks, setFooterRoomLinks] = useState(fallbackRoomLinks);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getPublicContactSettings()
+      .then((settings) => {
+        if (isMounted && settings) {
+          setContactSettings({ ...fallbackContactSettings, ...settings });
+        }
+      })
+      .catch(() => {
+        if (isMounted) setContactSettings(fallbackContactSettings);
+      });
+
+    fetchPublicRooms()
+      .then((rooms) => {
+        if (!isMounted || rooms.length === 0) return;
+
+        setFooterRoomLinks(
+          rooms.slice(0, 4).map((room) => ({
+            label: room.name,
+            path: `/rooms/${room.slug}`,
+          }))
+        );
+      })
+      .catch(() => {
+        if (isMounted) setFooterRoomLinks(fallbackRoomLinks);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const businessName = contactSettings.business_name || fallbackContactSettings.business_name;
+  const displayPhone = contactSettings.reception_contact_number || contactSettings.phone || fallbackContactSettings.phone;
+  const displayEmail = contactSettings.email || fallbackContactSettings.email;
+  const displayAddress = contactSettings.address || fallbackContactSettings.address;
+  const openingHours = contactSettings.business_hours || fallbackContactSettings.business_hours;
+  const footerLocation = addressLines(displayAddress).slice(-2).join(', ') || 'Point Pedro, Northern Sri Lanka';
+
   return (
     <footer className="bg-dark text-white">
       {/* Hero Strip */}
@@ -33,7 +107,7 @@ export default function Footer() {
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <p className="text-[10px] tracking-[0.35em] uppercase text-gold mb-3">Boutique Luxury</p>
           <h2 className="font-serif text-4xl lg:text-5xl text-white font-light text-center">
-            Tulip Guest Inn
+            {businessName}
           </h2>
         </div>
       </div>
@@ -52,25 +126,22 @@ export default function Footer() {
             </p>
             <div className="flex items-center gap-3">
               <a
-                href="#"
+                href={contactSettings.instagram_link || "#"}
                 className="w-9 h-9 border border-white/20 flex items-center justify-center text-gray-400 hover:border-gold hover:text-gold transition-all duration-300"
                 aria-label="Instagram"
+                target={contactSettings.instagram_link ? "_blank" : undefined}
+                rel={contactSettings.instagram_link ? "noreferrer" : undefined}
               >
                 <Instagram size={15} />
               </a>
               <a
-                href="#"
+                href={contactSettings.facebook_link || "#"}
                 className="w-9 h-9 border border-white/20 flex items-center justify-center text-gray-400 hover:border-gold hover:text-gold transition-all duration-300"
                 aria-label="Facebook"
+                target={contactSettings.facebook_link ? "_blank" : undefined}
+                rel={contactSettings.facebook_link ? "noreferrer" : undefined}
               >
                 <Facebook size={15} />
-              </a>
-              <a
-                href="#"
-                className="w-9 h-9 border border-white/20 flex items-center justify-center text-gray-400 hover:border-gold hover:text-gold transition-all duration-300"
-                aria-label="Twitter"
-              >
-                <Twitter size={15} />
               </a>
             </div>
           </div>
@@ -101,7 +172,7 @@ export default function Footer() {
               Our Rooms
             </h3>
             <ul className="space-y-3">
-              {roomLinks.map((link) => (
+              {footerRoomLinks.map((link) => (
                 <li key={link.path}>
                   <Link
                     to={link.path}
@@ -140,32 +211,37 @@ export default function Footer() {
               <li className="flex items-start gap-3">
                 <MapPin size={15} className="text-gold mt-0.5 shrink-0" />
                 <span className="text-sm text-gray-400 leading-relaxed">
-                  V.M Road 189<br />Point Pedro<br />Northern Sri Lanka
+                  {addressLines(displayAddress).map((line, index) => (
+                    <span key={line}>
+                      {line}
+                      {index < addressLines(displayAddress).length - 1 && <br />}
+                    </span>
+                  ))}
                 </span>
               </li>
               <li className="flex items-center gap-3">
                 <Phone size={15} className="text-gold shrink-0" />
                 <a
-                  href="tel:+94212261186"
+                  href={telephoneHref(displayPhone)}
                   className="text-sm text-gray-400 hover:text-white transition-colors duration-200"
                 >
-                  0212 261 186
+                  {displayPhone}
                 </a>
               </li>
               <li className="flex items-center gap-3">
                 <Mail size={15} className="text-gold shrink-0" />
                 <a
-                  href="mailto:info@tulipguestinn.com"
+                  href={mailHref(displayEmail)}
                   className="text-sm text-gray-400 hover:text-white transition-colors duration-200"
                 >
-                  info@tulipguestinn.com
+                  {displayEmail}
                 </a>
               </li>
             </ul>
 
             <div className="mt-8 pt-6 border-t border-white/10">
               <p className="text-[10px] tracking-[0.15em] uppercase text-gray-500 mb-2">Opening Hours</p>
-              <p className="text-sm text-gray-400">Reception: 24 Hours, 7 Days</p>
+              <p className="text-sm text-gray-400">{openingHours}</p>
             </div>
           </div>
         </div>
@@ -173,12 +249,27 @@ export default function Footer() {
 
       {/* Bottom Bar */}
       <div className="border-t border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 relative flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-gray-500">
             &copy; {new Date().getFullYear()} Tulip Guest Inn. All Rights Reserved.
           </p>
+
+          <a
+            href="#"
+            className="sm:absolute sm:left-1/2 sm:-translate-x-1/2 flex items-center gap-3 text-[11px] text-gray-500 hover:text-gray-300 transition-colors duration-200"
+            aria-label="Designed and developed by CompyX"
+          >
+            <span className="tracking-[0.08em]  whitespace-nowrap">Designed & Developed by</span>
+            <img
+              src="/assets/company_logo.png"
+              alt="CompyX"
+              className="h-9 sm:h-10 w-auto object-contain opacity-90"
+              loading="lazy"
+            />
+          </a>
+
           <p className="text-xs text-gray-600">
-            Point Pedro, Northern Sri Lanka
+            {footerLocation}
           </p>
         </div>
       </div>
