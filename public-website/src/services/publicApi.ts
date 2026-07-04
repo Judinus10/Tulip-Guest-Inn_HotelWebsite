@@ -12,6 +12,27 @@ export type ApiResponse<T> = {
   room?: T;
 };
 
+export type ContactSettings = {
+  business_name: string;
+  address: string;
+  phone: string;
+  reception_contact_number: string;
+  whatsapp_reservation_number: string;
+  email: string;
+  business_hours: string;
+  facebook_link: string;
+  instagram_link: string;
+  map_embed_url: string;
+};
+
+export type ContactFormPayload = {
+  name: string;
+  email: string;
+  phone?: string;
+  subject?: string;
+  message: string;
+};
+
 type BackendRoom = Record<string, unknown>;
 type BackendGalleryImage = Record<string, unknown>;
 type BackendExperienceItem = Record<string, unknown>;
@@ -19,9 +40,14 @@ type BackendExperienceItem = Record<string, unknown>;
 const fallbackRoomImage = 'https://images.unsplash.com/photo-1611892440506-42a832e657fb?w=1200&q=80';
 const fallbackAttractionImage = 'https://images.pexels.com/photos/1032650/pexels-photo-1032650.jpeg?auto=compress&cs=tinysrgb&w=1200';
 
-async function requestJson<T>(path: string): Promise<T> {
+async function requestJson<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { Accept: 'application/json' },
+    ...options,
+    headers: {
+      Accept: 'application/json',
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...options.headers,
+    },
   });
 
   const payload = (await response.json()) as ApiResponse<T>;
@@ -159,4 +185,16 @@ export async function getPublicGalleryImages(): Promise<GalleryImage[]> {
 export async function getPublicAttractions(): Promise<Attraction[]> {
   const rows = await requestJson<BackendExperienceItem[]>('/experience/public-list.php');
   return Array.isArray(rows) ? rows.map(normalizeAttraction).filter((item) => item.image !== '') : [];
+}
+
+
+export async function getPublicContactSettings(): Promise<ContactSettings> {
+  return requestJson<ContactSettings>('/settings/get-contact.php');
+}
+
+export async function submitContactMessage(payload: ContactFormPayload): Promise<{ inquiry_id?: string }> {
+  return requestJson<{ inquiry_id?: string }>('/contact/submit_contact.php', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }

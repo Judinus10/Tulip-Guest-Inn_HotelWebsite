@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Phone, Mail, MapPin, Clock, Send, Instagram, Facebook, Twitter } from 'lucide-react';
 import PageHero from '../components/ui/PageHero';
 import SectionTitle from '../components/ui/SectionTitle';
 import AnimatedSection from '../components/ui/AnimatedSection';
+import { getPublicContactSettings, submitContactMessage, type ContactSettings } from '../services/publicApi';
 
 const contactCards = [
   {
@@ -38,6 +39,23 @@ const openingHours = [
   { day: 'Sunday', time: 'Open 24 Hours' },
 ];
 
+const fallbackContactSettings: ContactSettings = {
+  business_name: 'Tulip Guest Inn',
+  address: 'V.M Road 189, Point Pedro, Northern Sri Lanka',
+  phone: '+94 212 261 186',
+  reception_contact_number: '+94 212 261 186',
+  whatsapp_reservation_number: '+94 212 261 186',
+  email: 'info@tulipguestinn.com',
+  business_hours: 'Open 24 Hours',
+  facebook_link: '',
+  instagram_link: '',
+  map_embed_url: '',
+};
+
+function cleanPhoneForLink(phone: string) {
+  return phone.replace(/[^+0-9]/g, '');
+}
+
 export default function Contact() {
   const [form, setForm] = useState({
     name: '',
@@ -47,14 +65,70 @@ export default function Contact() {
     message: '',
   });
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [settings, setSettings] = useState<ContactSettings>(fallbackContactSettings);
+
+  useEffect(() => {
+    let active = true;
+
+    getPublicContactSettings()
+      .then((data) => {
+        if (!active) return;
+        setSettings({ ...fallbackContactSettings, ...data });
+      })
+      .catch(() => {
+        if (!active) return;
+        setSettings(fallbackContactSettings);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const activePhone = settings.reception_contact_number || settings.phone || fallbackContactSettings.phone;
+  const activeEmail = settings.email || fallbackContactSettings.email;
+  const activeAddress = settings.address || fallbackContactSettings.address;
+  const activeHours = settings.business_hours || fallbackContactSettings.business_hours;
+  const phoneHref = `tel:${cleanPhoneForLink(activePhone)}`;
+  const emailHref = `mailto:${activeEmail}`;
+  const mapHref = settings.map_embed_url || `https://maps.google.com/?q=${encodeURIComponent(activeAddress)}`;
+
+  const dynamicContactCards = contactCards.map((card) => {
+    if (card.label === 'Phone') {
+      return { ...card, value: activePhone, subValue: settings.phone || undefined, href: phoneHref };
+    }
+    if (card.label === 'Email') {
+      return { ...card, value: activeEmail, href: emailHref };
+    }
+    if (card.label === 'Address') {
+      return { ...card, value: activeAddress, subValue: settings.business_name || undefined };
+    }
+    if (card.label === 'Reception') {
+      return { ...card, value: activeHours, subValue: '7 Days a Week' };
+    }
+    return card;
+  });
+
+  const dynamicOpeningHours = openingHours.map((item) => ({ ...item, time: activeHours }));
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    setIsSubmitting(true);
+
+    try {
+      await submitContactMessage(form);
+      setSubmitted(true);
+      setForm({ name: '', email: '', phone: '', subject: '', message: '' });
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Could not send your message. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -70,7 +144,7 @@ export default function Contact() {
       <section className="section-padding bg-background">
         <div className="container-custom">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {contactCards.map((card, i) => (
+            {dynamicContactCards.map((card, i) => (
               <AnimatedSection
                 key={card.label}
                 delay={i * 0.1}
@@ -201,9 +275,9 @@ export default function Contact() {
                       />
                     </div>
 
-                    <button type="submit" className="btn-primary">
+                    <button type="submit" className="btn-primary" disabled={isSubmitting}>
                       <Send size={14} />
-                      Send Message
+                      {isSubmitting ? 'Sending...' : 'Send Message'}
                     </button>
                   </form>
                 )}
@@ -218,7 +292,7 @@ export default function Contact() {
                   <h3 className="font-serif text-xl font-light text-dark mb-4">Opening Hours</h3>
                   <div className="w-8 h-[1px] bg-gold mb-5" />
                   <div className="space-y-3">
-                    {openingHours.map((h) => (
+                    {dynamicOpeningHours.map((h) => (
                       <div key={h.day} className="flex items-center justify-between text-sm">
                         <span className="text-gray-500">{h.day}</span>
                         <span className="text-gold font-medium text-xs">{h.time}</span>
@@ -240,10 +314,10 @@ export default function Contact() {
                     Stay connected and follow our latest updates on social media.
                   </p>
                   <div className="flex gap-3">
-                    <a href="#" className="w-10 h-10 border border-white/20 flex items-center justify-center text-gray-400 hover:border-gold hover:text-gold transition-all duration-300" aria-label="Instagram">
+                    <a href={settings.instagram_link || "#"} className="w-10 h-10 border border-white/20 flex items-center justify-center text-gray-400 hover:border-gold hover:text-gold transition-all duration-300" aria-label="Instagram">
                       <Instagram size={16} />
                     </a>
-                    <a href="#" className="w-10 h-10 border border-white/20 flex items-center justify-center text-gray-400 hover:border-gold hover:text-gold transition-all duration-300" aria-label="Facebook">
+                    <a href={settings.facebook_link || "#"} className="w-10 h-10 border border-white/20 flex items-center justify-center text-gray-400 hover:border-gold hover:text-gold transition-all duration-300" aria-label="Facebook">
                       <Facebook size={16} />
                     </a>
                     <a href="#" className="w-10 h-10 border border-white/20 flex items-center justify-center text-gray-400 hover:border-gold hover:text-gold transition-all duration-300" aria-label="Twitter">
@@ -259,7 +333,7 @@ export default function Contact() {
                   <p className="text-sm text-gray-500 mb-5">
                     Call us directly or use our online booking form for the fastest response.
                   </p>
-                  <a href="tel:+94212261186" className="btn-dark w-full justify-center mb-3">
+                  <a href={phoneHref} className="btn-dark w-full justify-center mb-3">
                     <Phone size={14} />
                     Call Now
                   </a>
@@ -276,9 +350,9 @@ export default function Contact() {
           <div className="text-center">
             <MapPin size={32} className="text-gold mx-auto mb-3" />
             <p className="font-serif text-xl font-light text-dark mb-1">Find Us Here</p>
-            <p className="text-sm text-gray-500">V.M Road 189, Point Pedro, Northern Sri Lanka</p>
+            <p className="text-sm text-gray-500">{activeAddress}</p>
             <a
-              href="https://maps.google.com/?q=Point+Pedro+Sri+Lanka"
+              href={mapHref}
               target="_blank"
               rel="noopener noreferrer"
               className="btn-outline mt-4 inline-flex"
