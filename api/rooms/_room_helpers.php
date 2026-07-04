@@ -1,0 +1,191 @@
+<?php
+declare(strict_types=1);
+
+require_once __DIR__ . '/../helpers.php';
+
+function rooms_upload_url(string $relativePath): string
+{
+    $relativePath = ltrim($relativePath, '/');
+    $base = defined('API_BASE_URL') && API_BASE_URL !== '' ? rtrim(API_BASE_URL, '/') : '';
+
+    if ($base === '') {
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $scriptDir = str_replace('\\', '/', dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/api/rooms/index.php')));
+        $base = $scheme . '://' . $host . rtrim($scriptDir, '/');
+    }
+
+    return $base . '/' . $relativePath;
+}
+
+function ensure_room_images_table(PDO $pdo): void
+{
+    $pdo->exec("CREATE TABLE IF NOT EXISTS room_images (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+        room_id INT UNSIGNED NOT NULL,
+        image_path VARCHAR(255) NOT NULL,
+        is_main TINYINT(1) NOT NULL DEFAULT 0,
+        sort_order INT UNSIGNED NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY idx_room_images_room (room_id),
+        CONSTRAINT fk_room_images_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+}
+
+function slugify_room(string $text): string
+{
+    $slug = strtolower(trim($text));
+    $slug = preg_replace('/[^a-z0-9]+/i', '-', $slug) ?? '';
+    $slug = trim($slug, '-');
+    return $slug !== '' ? $slug : 'room-' . time();
+}
+
+function infer_room_type(array $room): string
+{
+    $value = strtolower(($room['room_name'] ?? '') . ' ' . ($room['slug'] ?? ''));
+    if (str_contains($value, 'private') || str_contains($value, 'cottage')) return 'Private Cottage';
+    if (str_contains($value, 'family')) return 'Family Room';
+    if (str_contains($value, 'first')) return 'First Floor';
+    if (str_contains($value, 'ground')) return 'Ground Floor';
+    return 'Rooms';
+}
+
+function decode_amenities(mixed $value): array
+{
+    if (is_array($value)) return array_values(array_filter($value));
+    $decoded = json_decode((string) $value, true);
+    if (is_array($decoded)) return array_values(array_filter(array_map('strval', $decoded)));
+    if (trim((string) $value) === '') return [];
+    return array_values(array_filter(array_map('trim', explode(',', (string) $value))));
+}
+
+function fetch_room_images(PDO $pdo, array $roomIds): array
+{
+    ensure_room_images_table($pdo);
+    if ($roomIds === []) return [];
+    $placeholders = implode(',', array_fill(0, count($roomIds), '?'));
+    $stmt = $pdo->prepare("SELECT * FROM room_images WHERE room_id IN ($placeholders) ORDER BY is_main DESC, sort_order ASC, id ASC");
+    $stmt->execute($roomIds);
+    $grouped = [];
+    foreach ($stmt->fetchAll() as $image) {
+        $image['image_url'] = rooms_upload_url($image['image_path']);
+        $grouped[(int) $image['room_id']][] = $image;
+    }
+    return $grouped;
+}
+
+function normalize_room(array $room, array $images = []): array
+{
+    $amenities = decode_amenities($room['amenities'] ?? '[]');
+    $imageUrls = array_map(static fn(array $image): string => $image['image_url'] ?? rooms_upload_url($image['image_path']), $images);
+    $fallbackImage = 'https://images.unsplash.com/photo-1611892440506-42a832e657fb?w=1200&q=80';
+    if ($imageUrls === []) $imageUrls = [$fallbackImage];
+
+    $type = infer_room_type($room);
+    $price = (float) ($room['base_price'] ?? 0);
+    $currency = (string) ($room['currency'] ?? 'LKR');
+    $guests = (int) ($room['max_guests'] ?? 2);
+    $bedType = (string) ($room['bed_type'] ?? 'Double Bed');
+
+    return [
+        'id' => (int) $room['id'],
+        'slug' => (string) ($room['slug'] ?? ''),
+        'name' => (string) ($room['room_name'] ?? ''),
+        'room_name' => (string) ($room['room_name'] ?? ''),
+        'type' => $type,
+        'room_type' => $type,
+        'description' => (string) ($room['description'] ?? ''),
+        'longDescription' => (string) ($room['description'] ?? ''),
+        'guests' => $guests,
+        'max_guests' => $guests,
+        'capacity' => $guests,
+        'beds' => $bedType,
+        'bed_type' => $bedType,
+        'size' => $guests > 3 ? 'Family space' : 'Comfortable room',
+        'price' => $price,
+        'base_price' => $price,
+        'price_per_night' => $price,
+        'currency' => $currency,
+        'amenities' => $amenities,
+        'amenities_summary' => implode(', ', $amenities),
+        'status' => (string) ($room['status'] ?? 'Available'),
+        'sort_order' => (int) ($room['sort_order'] ?? 0),
+        'images' => $imageUrls,
+        'main_image' => $imageUrls[0] ?? $fallbackImage,
+        'image' => $images[0] ?? null,
+        'image_records' => $images,
+        'created_at' => $room['created_at'] ?? null,
+        'updated_at' => $room['updated_at'] ?? null,
+    ];
+}
+
+function get_room_payload(PDO $pdo, bool $publicOnly = false): array
+{
+    ensure_room_images_table($pdo);
+    $sql = 'SELECT * FROM rooms';
+    if ($publicOnly) $sql .= " WHERE status = 'Available'";
+    $sql .= ' ORDER BY sort_order ASC, id ASC';
+    $rooms = $pdo->query($sql)->fetchAll();
+    $images = fetch_room_images($pdo, array_map(static fn($room) => (int) $room['id'], $rooms));
+    return array_map(static fn($room): array => normalize_room($room, $images[(int) $room['id']] ?? []), $rooms);
+}
+
+function save_room_images(PDO $pdo, int $roomId, array $files): void
+{
+    ensure_room_images_table($pdo);
+    if (!isset($files['name']) || $files['name'] === []) return;
+
+    $uploadDir = __DIR__ . '/../uploads/rooms';
+    if (!is_dir($uploadDir)) mkdir($uploadDir, 0775, true);
+
+    $names = is_array($files['name']) ? $files['name'] : [$files['name']];
+    $tmpNames = is_array($files['tmp_name']) ? $files['tmp_name'] : [$files['tmp_name']];
+    $errors = is_array($files['error']) ? $files['error'] : [$files['error']];
+
+    $sortStmt = $pdo->prepare('SELECT COALESCE(MAX(sort_order), 0) FROM room_images WHERE room_id = :room_id');
+    $sortStmt->execute([':room_id' => $roomId]);
+    $sortOrder = (int) $sortStmt->fetchColumn();
+
+    $hasMainStmt = $pdo->prepare('SELECT COUNT(*) FROM room_images WHERE room_id = :room_id AND is_main = 1');
+    $hasMainStmt->execute([':room_id' => $roomId]);
+    $hasMain = (int) $hasMainStmt->fetchColumn() > 0;
+
+    foreach ($names as $index => $originalName) {
+        if (($errors[$index] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) continue;
+        $tmpName = $tmpNames[$index] ?? '';
+        if (!is_uploaded_file($tmpName)) continue;
+
+        $extension = strtolower(pathinfo((string) $originalName, PATHINFO_EXTENSION));
+        if (!in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true)) continue;
+
+        $filename = 'room_' . $roomId . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $extension;
+        $target = $uploadDir . '/' . $filename;
+        if (!move_uploaded_file($tmpName, $target)) continue;
+
+        $relativePath = 'uploads/rooms/' . $filename;
+        $sortOrder++;
+        $insert = $pdo->prepare('INSERT INTO room_images (room_id, image_path, is_main, sort_order) VALUES (:room_id, :image_path, :is_main, :sort_order)');
+        $insert->execute([
+            ':room_id' => $roomId,
+            ':image_path' => $relativePath,
+            ':is_main' => $hasMain ? 0 : 1,
+            ':sort_order' => $sortOrder,
+        ]);
+        $hasMain = true;
+    }
+}
+
+function room_input_data(): array
+{
+    if (str_starts_with($_SERVER['CONTENT_TYPE'] ?? '', 'multipart/form-data')) return $_POST;
+    return read_request_data();
+}
+
+function parse_amenities_input(mixed $value): array
+{
+    if (is_array($value)) return array_values(array_filter(array_map('trim', array_map('strval', $value))));
+    $decoded = json_decode((string) $value, true);
+    if (is_array($decoded)) return array_values(array_filter(array_map('trim', array_map('strval', $decoded))));
+    return array_values(array_filter(array_map('trim', explode(',', (string) $value))));
+}

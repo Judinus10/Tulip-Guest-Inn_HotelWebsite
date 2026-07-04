@@ -1,0 +1,225 @@
+import { useState } from 'react';
+import { useParams, Link, Navigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Users, BedDouble, Maximize, Bath, Check, ChevronLeft, ChevronRight } from 'lucide-react';
+import RoomCard from '../components/ui/RoomCard';
+import AnimatedSection from '../components/ui/AnimatedSection';
+import { rooms } from '../data/rooms';
+
+export default function RoomDetails() {
+  const { id } = useParams<{ id: string }>();
+  const room = rooms.find((r) => r.slug === id);
+
+  const [activeImg, setActiveImg] = useState(0);
+
+  if (!room) return <Navigate to="/rooms" replace />;
+
+  const relatedRooms = rooms.filter((r) => r.id !== room.id).slice(0, 3);
+
+  const prevImg = () => setActiveImg((i) => (i - 1 + room.images.length) % room.images.length);
+  const nextImg = () => setActiveImg((i) => (i + 1) % room.images.length);
+
+  return (
+    <main className="pt-20">
+      {/* Gallery Slider */}
+      <section className="relative h-[70vh] min-h-[480px] overflow-hidden bg-dark">
+        {room.images.map((src, i) => (
+          <motion.div
+            key={src}
+            className="absolute inset-0"
+            animate={{ opacity: i === activeImg ? 1 : 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <img src={src} alt={`${room.name} ${i + 1}`} className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+          </motion.div>
+        ))}
+
+        {/* Navigation */}
+        <button
+          onClick={prevImg}
+          className="absolute left-6 top-1/2 -translate-y-1/2 w-11 h-11 bg-white/20 hover:bg-gold flex items-center justify-center text-white transition-colors duration-300"
+          aria-label="Previous image"
+        >
+          <ChevronLeft size={22} />
+        </button>
+        <button
+          onClick={nextImg}
+          className="absolute right-6 top-1/2 -translate-y-1/2 w-11 h-11 bg-white/20 hover:bg-gold flex items-center justify-center text-white transition-colors duration-300"
+          aria-label="Next image"
+        >
+          <ChevronRight size={22} />
+        </button>
+
+        {/* Dots */}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
+          {room.images.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setActiveImg(i)}
+              className={`transition-all duration-300 ${
+                i === activeImg ? 'w-8 h-1.5 bg-gold' : 'w-1.5 h-1.5 rounded-full bg-white/50'
+              }`}
+              aria-label={`Image ${i + 1}`}
+            />
+          ))}
+        </div>
+
+        {/* Room Badge */}
+        <div className="absolute top-8 left-8">
+          <span className="bg-gold text-white text-[9px] tracking-[0.2em] uppercase px-4 py-2">
+            {room.category}
+          </span>
+        </div>
+
+        {/* Thumbs */}
+        <div className="absolute bottom-6 right-6 hidden md:flex gap-2">
+          {room.images.map((src, i) => (
+            <button
+              key={i}
+              onClick={() => setActiveImg(i)}
+              className={`w-16 h-12 overflow-hidden border-2 transition-colors duration-200 ${
+                i === activeImg ? 'border-gold' : 'border-transparent opacity-60 hover:opacity-100'
+              }`}
+            >
+              <img src={src} alt="" className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* Room Info */}
+      <section className="section-padding bg-background">
+        <div className="container-custom">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+            {/* Main Info */}
+            <div className="lg:col-span-2">
+              <AnimatedSection>
+                <Link
+                  to="/rooms"
+                  className="inline-flex items-center gap-2 text-[10px] tracking-[0.18em] uppercase text-gray-400 hover:text-gold transition-colors duration-200 mb-6"
+                >
+                  <ChevronLeft size={12} />
+                  All Rooms
+                </Link>
+                <h1 className="font-serif text-4xl lg:text-5xl font-light text-dark mb-4">{room.name}</h1>
+                <div className="w-12 h-[1px] bg-gold mb-6" />
+
+                {/* Stats Row */}
+                <div className="flex flex-wrap gap-8 py-6 border-y border-border mb-8">
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Users size={16} className="text-gold" />
+                    <span className="text-sm">{room.guests} Guests</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <BedDouble size={16} className="text-gold" />
+                    <span className="text-sm">{room.beds}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Bath size={16} className="text-gold" />
+                    <span className="text-sm">{room.bathrooms} Bathroom{room.bathrooms > 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Maximize size={16} className="text-gold" />
+                    <span className="text-sm">{room.size} m²</span>
+                  </div>
+                </div>
+
+                <h3 className="font-serif text-xl text-dark font-light mb-4">About This Room</h3>
+                <p className="text-sm text-gray-500 leading-relaxed mb-8">{room.longDescription}</p>
+
+                {/* Amenities */}
+                <h3 className="font-serif text-xl text-dark font-light mb-5">Room Amenities</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {room.amenities.map((amenity) => (
+                    <div key={amenity} className="flex items-center gap-2.5">
+                      <Check size={13} className="text-gold shrink-0" />
+                      <span className="text-sm text-gray-600">{amenity}</span>
+                    </div>
+                  ))}
+                </div>
+              </AnimatedSection>
+            </div>
+
+            {/* Booking Card */}
+            <AnimatedSection direction="right" className="lg:col-span-1">
+              <div className="bg-white border border-border shadow-luxury p-8 sticky top-28">
+                <p className="text-[9px] tracking-[0.25em] uppercase text-gold font-medium mb-2">Rate From</p>
+                <p className="font-serif text-4xl font-light text-dark mb-1">
+                  ${room.price}
+                  <span className="text-gray-400 text-base font-sans"> / night</span>
+                </p>
+                <div className="w-8 h-[1px] bg-gold my-5" />
+
+                <div className="space-y-4 mb-6">
+                  <div className="flex flex-col">
+                    <label className="text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-1.5">Check In</label>
+                    <input
+                      type="date"
+                      className="border border-border px-4 py-2.5 text-sm text-dark outline-none focus:border-gold transition-colors duration-200 bg-background"
+                      min={new Date().toISOString().split('T')[0]}
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-1.5">Check Out</label>
+                    <input
+                      type="date"
+                      className="border border-border px-4 py-2.5 text-sm text-dark outline-none focus:border-gold transition-colors duration-200 bg-background"
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-1.5">Guests</label>
+                    <select className="border border-border px-4 py-2.5 text-sm text-dark outline-none focus:border-gold transition-colors duration-200 bg-background">
+                      {Array.from({ length: room.guests }, (_, i) => i + 1).map((n) => (
+                        <option key={n} value={n}>{n} {n === 1 ? 'Guest' : 'Guests'}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <Link
+                  to={`/booking?room=${room.slug}`}
+                  className="btn-primary w-full justify-center mb-3"
+                >
+                  Book This Room
+                </Link>
+                <Link
+                  to="/contact"
+                  className="btn-outline w-full justify-center text-[9px]"
+                >
+                  Enquire Now
+                </Link>
+
+                <div className="mt-6 pt-6 border-t border-border">
+                  <div className="flex items-start gap-2.5 mb-3">
+                    <Check size={13} className="text-gold mt-0.5 shrink-0" />
+                    <span className="text-xs text-gray-500">Free cancellation available</span>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <Check size={13} className="text-gold mt-0.5 shrink-0" />
+                    <span className="text-xs text-gray-500">Direct booking — best rate guaranteed</span>
+                  </div>
+                </div>
+              </div>
+            </AnimatedSection>
+          </div>
+        </div>
+      </section>
+
+      {/* Related Rooms */}
+      {relatedRooms.length > 0 && (
+        <section className="section-padding bg-white">
+          <div className="container-custom">
+            <h2 className="font-serif text-3xl font-light text-dark mb-2">You May Also Like</h2>
+            <div className="w-10 h-[1px] bg-gold mb-10" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {relatedRooms.map((room, i) => (
+                <RoomCard key={room.id} room={room} index={i} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+    </main>
+  );
+}

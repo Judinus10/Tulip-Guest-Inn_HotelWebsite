@@ -1,0 +1,143 @@
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  --color-primary: #1e3a8a;
+  --color-primary-600: #2563eb;
+  --color-accent: #60a5fa;
+  --color-app-bg: #f8fafc;
+  --color-card-bg: #ffffff;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #64748b;
+  --color-border: #e2e8f0;
+  --color-gold: #c9a962;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply overflow-x-hidden bg-app-bg font-sans;
+  }
+
+  body {
+    @apply overflow-x-hidden bg-app-bg text-text-primary font-sans antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  h1 {
+    @apply font-sans font-bold tracking-tight text-text-primary;
+  }
+
+  h2,
+  h3,
+  h4 {
+    @apply font-sans font-semibold tracking-tight text-text-primary;
+  }
+
+  p,
+  span,
+  button,
+  input,
+  textarea,
+  select,
+  table {
+    @apply font-sans;
+  }
+}
+
+@layer utilities {
+  .brand-gradient {
+    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 55%, #60a5fa 100%);
+  }
+
+  .sidebar-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #334155 transparent;
+  }
+
+  .sidebar-scroll::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .sidebar-scroll::-webkit-scrollbar-thumb {
+    background-color: #334155;
+    border-radius: 9999px;
+  }
+}
+
+@keyframes case-blink-pulse {
+  0%, 100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+  50% {
+    background-color: rgba(148, 163, 184, 0.22);
+    box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.35);
+  }
+}
+
+.case-blink {
+  animation: case-blink-pulse 0.45s ease-in-out 3;
+}
+
+@keyframes dashboardFocusFlash {
+  0%, 100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+  20%, 65% {
+    background-color: rgba(148, 163, 184, 0.28);
+    box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.35);
+  }
+}
+
+.dashboard-focus-flash {
+  animation: dashboardFocusFlash 1.35s ease-in-out;
+}
+
+.dashboard-focus-flash > td {
+  animation: dashboardFocusFlash 1.35s ease-in-out;
+}
+
+@keyframes dashboardPaymentFocusFlash {
+  0%, 100% {
+    background-color: transparent;
+  }
+  18%, 70% {
+    background-color: rgba(148, 163, 184, 0.20);
+  }
+}
+
+.dashboard-payment-focus-row {
+  animation: dashboardPaymentFocusFlash 1.35s ease-in-out;
+}
+
+.dashboard-payment-focus-row > td {
+  animation: dashboardPaymentFocusFlash 1.35s ease-in-out;
+}
+
+
+@keyframes dashboardMessageFocusFlash {
+  0%, 100% {
+    background-color: transparent;
+  }
+  18%, 70% {
+    background-color: rgba(148, 163, 184, 0.20);
+  }
+}
+
+.dashboard-message-focus-row {
+  animation: dashboardMessageFocusFlash 1.35s ease-in-out;
+}
+
+.dashboard-message-focus-row > td {
+  animation: dashboardMessageFocusFlash 1.35s ease-in-out;
+}

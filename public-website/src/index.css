@@ -1,0 +1,104 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background-color: #FAF8F4;
+    color: #1A1A1A;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Cormorant Garamond', serif;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #FAF8F4;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #C7A86B;
+    border-radius: 3px;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center gap-2 bg-[#C7A86B] text-white px-8 py-3 text-xs font-medium tracking-[0.2em] uppercase transition-all duration-300 hover:bg-[#19352B] hover:shadow-lg;
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center gap-2 border border-[#C7A86B] text-[#C7A86B] px-8 py-3 text-xs font-medium tracking-[0.2em] uppercase transition-all duration-300 hover:bg-[#C7A86B] hover:text-white;
+  }
+
+  .btn-dark {
+    @apply inline-flex items-center gap-2 bg-[#19352B] text-white px-8 py-3 text-xs font-medium tracking-[0.2em] uppercase transition-all duration-300 hover:bg-[#C7A86B] hover:shadow-lg;
+  }
+
+  .btn-white {
+    @apply inline-flex items-center gap-2 bg-white text-[#19352B] px-8 py-3 text-xs font-medium tracking-[0.2em] uppercase transition-all duration-300 hover:bg-[#C7A86B] hover:text-white hover:shadow-lg;
+  }
+
+  .section-padding {
+    @apply py-20 lg:py-28;
+  }
+
+  .container-custom {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .gold-line {
+    @apply w-12 h-[1px] bg-[#C7A86B] mx-auto mb-4;
+  }
+
+  .gold-line-left {
+    @apply w-12 h-[1px] bg-[#C7A86B] mb-4;
+  }
+
+  .image-hover {
+    @apply overflow-hidden;
+  }
+
+  .image-hover img {
+    @apply transition-transform duration-700 ease-out;
+  }
+
+  .image-hover:hover img {
+    @apply scale-110;
+  }
+}
+
+@layer utilities {
+  .text-shadow {
+    text-shadow: 0 2px 20px rgba(0,0,0,0.5);
+  }
+
+  .glass {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  .glass-dark {
+    background: rgba(25, 53, 43, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+}

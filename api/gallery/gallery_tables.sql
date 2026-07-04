@@ -1,0 +1,28 @@
+CREATE TABLE IF NOT EXISTS gallery_folders (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name VARCHAR(120) NOT NULL,
+  slug VARCHAR(150) NOT NULL,
+  status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  sort_order INT UNSIGNED NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_gallery_folders_slug (slug)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS gallery_images (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  folder_id INT UNSIGNED NOT NULL,
+  title VARCHAR(180) NOT NULL,
+  image_path VARCHAR(255) NOT NULL,
+  image_file_name VARCHAR(255) NULL,
+  status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  sort_order INT UNSIGNED NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_gallery_images_folder (folder_id),
+  CONSTRAINT fk_gallery_images_folder
+    FOREIGN KEY (folder_id) REFERENCES gallery_folders(id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

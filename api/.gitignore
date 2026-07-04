@@ -1,0 +1,12 @@
+.env
+.env_server
+admin-dashboard/.env
+admin-dashboard/vite.config.js
+public-website/.env
+public-website/vite.config.js
+public-website/src/App.jsx
+public-website/src/components/layout/Navbar.jsx
+public-website/src/services/galleryApi.js 
+/vendor/
+/uploads/
+mail/assets/
