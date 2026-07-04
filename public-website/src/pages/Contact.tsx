@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
-import { Phone, Mail, MapPin, Clock, Send, Instagram, Facebook, Twitter } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Phone, Mail, MapPin, Clock, Send, Instagram, Facebook } from 'lucide-react';
 import PageHero from '../components/ui/PageHero';
-import SectionTitle from '../components/ui/SectionTitle';
 import AnimatedSection from '../components/ui/AnimatedSection';
 import { getPublicContactSettings, submitContactMessage, type ContactSettings } from '../services/publicApi';
 
@@ -56,6 +55,51 @@ function cleanPhoneForLink(phone: string) {
   return phone.replace(/[^+0-9]/g, '');
 }
 
+function isValidUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function getMapOpenUrl(address: string, mapUrl: string) {
+  const cleanMapUrl = mapUrl.trim();
+  return isValidUrl(cleanMapUrl) ? cleanMapUrl : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+}
+
+function getMapEmbedUrl(address: string, mapUrl: string) {
+  const cleanMapUrl = mapUrl.trim();
+
+  if (!isValidUrl(cleanMapUrl)) {
+    return `https://www.google.com/maps?q=${encodeURIComponent(address)}&output=embed`;
+  }
+
+  try {
+    const parsed = new URL(cleanMapUrl);
+    const url = parsed.toString();
+
+    if (url.includes('/maps/embed') || parsed.searchParams.get('output') === 'embed') {
+      return url;
+    }
+
+    if (parsed.hostname.includes('google') && parsed.pathname.includes('/maps')) {
+      parsed.searchParams.set('output', 'embed');
+      return parsed.toString();
+    }
+
+    const query = parsed.searchParams.get('q') || parsed.searchParams.get('query');
+    if (query) {
+      return `https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed`;
+    }
+
+    return `https://www.google.com/maps?q=${encodeURIComponent(address)}&output=embed`;
+  } catch {
+    return `https://www.google.com/maps?q=${encodeURIComponent(address)}&output=embed`;
+  }
+}
+
 export default function Contact() {
   const [form, setForm] = useState({
     name: '',
@@ -86,17 +130,34 @@ export default function Contact() {
     };
   }, []);
 
-  const activePhone = settings.reception_contact_number || settings.phone || fallbackContactSettings.phone;
+  const activePhone = settings.phone || settings.reception_contact_number || fallbackContactSettings.phone;
   const activeEmail = settings.email || fallbackContactSettings.email;
   const activeAddress = settings.address || fallbackContactSettings.address;
   const activeHours = settings.business_hours || fallbackContactSettings.business_hours;
   const phoneHref = `tel:${cleanPhoneForLink(activePhone)}`;
   const emailHref = `mailto:${activeEmail}`;
-  const mapHref = settings.map_embed_url || `https://maps.google.com/?q=${encodeURIComponent(activeAddress)}`;
+  const mapHref = getMapOpenUrl(activeAddress, settings.map_embed_url || '');
+  const mapEmbedUrl = getMapEmbedUrl(activeAddress, settings.map_embed_url || '');
+
+  const socialLinks = useMemo(
+    () => [
+      {
+        label: 'Instagram',
+        href: settings.instagram_link,
+        icon: Instagram,
+      },
+      {
+        label: 'Facebook',
+        href: settings.facebook_link,
+        icon: Facebook,
+      },
+    ].filter((item) => isValidUrl(item.href || '')),
+    [settings.facebook_link, settings.instagram_link],
+  );
 
   const dynamicContactCards = contactCards.map((card) => {
     if (card.label === 'Phone') {
-      return { ...card, value: activePhone, subValue: settings.phone || undefined, href: phoneHref };
+      return { ...card, value: activePhone, subValue: settings.reception_contact_number || undefined, href: phoneHref };
     }
     if (card.label === 'Email') {
       return { ...card, value: activeEmail, href: emailHref };
@@ -313,17 +374,27 @@ export default function Contact() {
                   <p className="text-gray-400 text-sm mb-6">
                     Stay connected and follow our latest updates on social media.
                   </p>
-                  <div className="flex gap-3">
-                    <a href={settings.instagram_link || "#"} className="w-10 h-10 border border-white/20 flex items-center justify-center text-gray-400 hover:border-gold hover:text-gold transition-all duration-300" aria-label="Instagram">
-                      <Instagram size={16} />
-                    </a>
-                    <a href={settings.facebook_link || "#"} className="w-10 h-10 border border-white/20 flex items-center justify-center text-gray-400 hover:border-gold hover:text-gold transition-all duration-300" aria-label="Facebook">
-                      <Facebook size={16} />
-                    </a>
-                    <a href="#" className="w-10 h-10 border border-white/20 flex items-center justify-center text-gray-400 hover:border-gold hover:text-gold transition-all duration-300" aria-label="Twitter">
-                      <Twitter size={16} />
-                    </a>
-                  </div>
+                  {socialLinks.length > 0 ? (
+                    <div className="flex gap-3">
+                      {socialLinks.map((social) => {
+                        const Icon = social.icon;
+                        return (
+                          <a
+                            key={social.label}
+                            href={social.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-10 h-10 border border-white/20 flex items-center justify-center text-gray-400 hover:border-gold hover:text-gold transition-all duration-300"
+                            aria-label={social.label}
+                          >
+                            <Icon size={16} />
+                          </a>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500">Social links are not available yet.</p>
+                  )}
                 </div>
 
                 {/* Direct Book */}
@@ -333,7 +404,7 @@ export default function Contact() {
                   <p className="text-sm text-gray-500 mb-5">
                     Call us directly or use our online booking form for the fastest response.
                   </p>
-                  <a href={phoneHref} className="btn-dark w-full justify-center mb-3">
+                  <a href={phoneHref} className="btn-dark w-full justify-center mb-3" aria-label={`Call ${activePhone}`}>
                     <Phone size={14} />
                     Call Now
                   </a>
@@ -345,17 +416,45 @@ export default function Contact() {
       </section>
 
       {/* Map */}
-      <section className="bg-background h-80 relative overflow-hidden border-t border-border">
-        <div className="absolute inset-0 bg-[#F0EDE8] flex items-center justify-center">
-          <div className="text-center">
-            <MapPin size={32} className="text-gold mx-auto mb-3" />
-            <p className="font-serif text-xl font-light text-dark mb-1">Find Us Here</p>
-            <p className="text-sm text-gray-500">{activeAddress}</p>
+      <section className="relative h-[430px] lg:h-[480px] overflow-hidden border-t border-border bg-background">
+        <iframe
+          src={mapEmbedUrl}
+          title={`${settings.business_name || fallbackContactSettings.business_name} location map`}
+          className="absolute inset-0 h-full w-full border-0"
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          allowFullScreen
+        />
+
+        <div className="absolute inset-0 flex items-center justify-center px-6 pointer-events-none">
+          <div
+            className="
+              bg-white/[0.001] backdrop-blur-[1px] backdrop-saturate-100
+              border border-white/10 shadow-none
+              ring-1 ring-white/5
+              shadow-none
+              px-10 py-10
+              text-center
+              max-w-md
+              w-full
+              pointer-events-auto
+            "
+            >
+            <MapPin size={32} className="text-gold mx-auto mb-4" />
+
+            <p className="font-serif text-2xl font-light text-white mb-2 drop-shadow-lg">
+              Find Us Here
+            </p>
+
+            <p className="text-white/90 text-sm mb-6 drop-shadow">
+              {activeAddress}
+            </p>
+
             <a
               href={mapHref}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-outline mt-4 inline-flex"
+              className="btn-outline inline-flex"
             >
               Open in Google Maps
             </a>
