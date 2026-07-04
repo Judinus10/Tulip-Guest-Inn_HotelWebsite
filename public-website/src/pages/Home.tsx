@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ChevronDown, Wifi, Car, Waves, Users, Shield, Coffee } from 'lucide-react';
@@ -18,6 +18,7 @@ import { galleryImages } from '../data/gallery';
 import { offers } from '../data/offers';
 import { statistics } from '../data/statistics';
 import { attractions } from '../data/attractions';
+import { getPublicAttractions, getPublicGalleryImages, getPublicRooms } from '../services/publicApi';
 
 const heroImages = [
   'https://images.pexels.com/photos/338504/pexels-photo-338504.jpeg?auto=compress&cs=tinysrgb&w=1920',
@@ -37,21 +38,58 @@ const welcomeFeatures = [
 export default function Home() {
   const [heroIndex, setHeroIndex] = useState(0);
   const [lightbox, setLightbox] = useState<string | null>(null);
-  const previewImages = galleryImages.slice(0, 8);
-  const featuredRooms = rooms.filter((r) => r.featured);
+  const [homeRooms, setHomeRooms] = useState(rooms);
+  const [homeGalleryImages, setHomeGalleryImages] = useState(galleryImages);
+  const [homeAttractions, setHomeAttractions] = useState(attractions);
+
+  const previewImages = homeGalleryImages.slice(0, 8);
+  const featuredRooms = homeRooms.filter((r) => r.featured).slice(0, 3);
+  const activeHeroImages = homeGalleryImages.length >= 3 ? homeGalleryImages.slice(0, 3).map((img) => img.src) : heroImages;
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setHeroIndex((prev) => (prev + 1) % heroImages.length);
+      setHeroIndex((prev) => (prev + 1) % activeHeroImages.length);
     }, 7000);
     return () => clearInterval(interval);
+  }, [activeHeroImages.length]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadHomeData() {
+      const [roomsResult, galleryResult, attractionsResult] = await Promise.allSettled([
+        getPublicRooms(),
+        getPublicGalleryImages(),
+        getPublicAttractions(),
+      ]);
+
+      if (!isMounted) return;
+
+      if (roomsResult.status === 'fulfilled' && roomsResult.value.length > 0) {
+        setHomeRooms(roomsResult.value);
+      }
+
+      if (galleryResult.status === 'fulfilled' && galleryResult.value.length > 0) {
+        setHomeGalleryImages(galleryResult.value);
+      }
+
+      if (attractionsResult.status === 'fulfilled' && attractionsResult.value.length > 0) {
+        setHomeAttractions(attractionsResult.value);
+      }
+    }
+
+    loadHomeData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (
     <main>
       {/* ── HERO ─────────────────────────────────────────── */}
       <section className="relative h-screen min-h-[600px] flex items-center justify-center overflow-hidden">
-        {heroImages.map((src, i) => (
+        {activeHeroImages.map((src, i) => (
           <motion.div
             key={src}
             className="absolute inset-0"
@@ -135,7 +173,7 @@ export default function Home() {
 
         {/* Hero Dots */}
         <div className="absolute bottom-8 right-8 flex gap-2">
-          {heroImages.map((_, i) => (
+          {activeHeroImages.map((_, i) => (
             <button
               key={i}
               onClick={() => setHeroIndex(i)}
@@ -354,7 +392,7 @@ export default function Home() {
             subtitle="Point Pedro and the Jaffna Peninsula are rich in natural beauty, history and culture."
           />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {attractions.slice(0, 3).map((attraction, i) => (
+            {homeAttractions.slice(0, 3).map((attraction, i) => (
               <AttractionCard key={attraction.id} attraction={attraction} index={i} />
             ))}
           </div>

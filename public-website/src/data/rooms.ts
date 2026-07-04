@@ -6,6 +6,7 @@ export interface Room {
   description: string;
   longDescription: string;
   price: number;
+  currency?: string;
   guests: number;
   beds: string;
   bathrooms: number;
