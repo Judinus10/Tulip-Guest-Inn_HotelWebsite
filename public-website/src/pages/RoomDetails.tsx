@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useParams, Link, Navigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useParams, Link, Navigate, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Users, BedDouble, Maximize, Bath, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import RoomCard from '../components/ui/RoomCard';
@@ -8,12 +8,34 @@ import { rooms as fallbackRooms } from '../data/rooms';
 import type { Room } from '../data/rooms';
 import { fetchPublicRoom, fetchPublicRooms } from '../services/publicApi';
 
+interface RoomBookingForm {
+  checkIn: string;
+  checkOut: string;
+  guests: string;
+}
+
+type RoomBookingField = keyof RoomBookingForm;
+
+const today = () => new Date().toISOString().split('T')[0];
+
 export default function RoomDetails() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const fallbackRoom = fallbackRooms.find((r) => r.slug === id || r.id === id);
   const [room, setRoom] = useState<Room | undefined>(fallbackRoom);
   const [roomList, setRoomList] = useState<Room[]>(fallbackRooms);
   const [loading, setLoading] = useState(!fallbackRoom);
+  const [bookingForm, setBookingForm] = useState<RoomBookingForm>({
+    checkIn: '',
+    checkOut: '',
+    guests: '1',
+  });
+  const [invalidFields, setInvalidFields] = useState<Partial<Record<RoomBookingField, boolean>>>({});
+  const fieldRefs = useRef<Record<RoomBookingField, HTMLInputElement | HTMLSelectElement | null>>({
+    checkIn: null,
+    checkOut: null,
+    guests: null,
+  });
 
   const [activeImg, setActiveImg] = useState(0);
 
@@ -55,13 +77,84 @@ export default function RoomDetails() {
   const prevImg = () => setActiveImg((i) => (i - 1 + room.images.length) % room.images.length);
   const nextImg = () => setActiveImg((i) => (i + 1) % room.images.length);
 
+  const markInvalid = (field: RoomBookingField, isInvalid: boolean) => {
+    setInvalidFields((prev) => ({ ...prev, [field]: isInvalid }));
+  };
+
+  const validateBookingForm = () => {
+    const nextInvalid: Partial<Record<RoomBookingField, boolean>> = {
+      checkIn: !bookingForm.checkIn,
+      checkOut: !bookingForm.checkOut,
+      guests: !bookingForm.guests,
+    };
+
+    const orderedFields: RoomBookingField[] = ['checkIn', 'checkOut', 'guests'];
+    const firstInvalid = orderedFields.find((field) => nextInvalid[field]);
+
+    setInvalidFields(nextInvalid);
+
+    if (firstInvalid) {
+      fieldRefs.current[firstInvalid]?.focus();
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleBookingChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const field = e.target.name as RoomBookingField;
+    const value = e.target.value;
+
+    setBookingForm((prev) => {
+      const next = { ...prev, [field]: value };
+
+      if (field === 'checkIn' && next.checkOut && next.checkOut < value) {
+        next.checkOut = '';
+      }
+
+      return next;
+    });
+
+    if (value) markInvalid(field, false);
+  };
+
+  const handleBookRoom = () => {
+    if (!validateBookingForm()) return;
+
+    const params = new URLSearchParams({
+      room: room.slug,
+      checkin: bookingForm.checkIn,
+      checkout: bookingForm.checkOut,
+      guests: bookingForm.guests,
+      rooms: '1',
+    });
+
+    navigate(`/booking?${params.toString()}`);
+  };
+
+  const bookingInputClass = (field: RoomBookingField) =>
+    `border px-4 py-2.5 text-sm text-dark outline-none focus:border-gold transition-colors duration-200 bg-background ${
+      invalidFields[field] ? 'booking-field-shake border-red-500 ring-1 ring-red-300' : 'border-border'
+    }`;
+
   return (
     <main>
+      <style>{`
+        @keyframes bookingFieldShake {
+          0%, 100% { transform: translateX(0); }
+          20% { transform: translateX(-5px); }
+          40% { transform: translateX(5px); }
+          60% { transform: translateX(-4px); }
+          80% { transform: translateX(4px); }
+        }
+        .booking-field-shake { animation: bookingFieldShake 0.35s ease-in-out; }
+      `}</style>
+
       {/* Gallery Slider */}
       <section className="relative h-[70vh] min-h-[480px] overflow-hidden bg-dark">
         {room.images.map((src, i) => (
           <motion.div
-            key={`${src}-${i}`}
+            key={src}
             className="absolute inset-0"
             animate={{ opacity: i === activeImg ? 1 : 0 }}
             transition={{ duration: 0.6 }}
@@ -91,7 +184,7 @@ export default function RoomDetails() {
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
           {room.images.map((_, i) => (
             <button
-              key={`dot-${i}`}
+              key={i}
               onClick={() => setActiveImg(i)}
               className={`transition-all duration-300 ${
                 i === activeImg ? 'w-8 h-1.5 bg-gold' : 'w-1.5 h-1.5 rounded-full bg-white/50'
@@ -112,7 +205,7 @@ export default function RoomDetails() {
         <div className="absolute bottom-6 right-6 hidden md:flex gap-2">
           {room.images.map((src, i) => (
             <button
-              key={`thumb-${i}`}
+              key={i}
               onClick={() => setActiveImg(i)}
               className={`w-16 h-12 overflow-hidden border-2 transition-colors duration-200 ${
                 i === activeImg ? 'border-gold' : 'border-transparent opacity-60 hover:opacity-100'
@@ -191,21 +284,36 @@ export default function RoomDetails() {
                   <div className="flex flex-col">
                     <label className="text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-1.5">Check In</label>
                     <input
+                      ref={(node) => { fieldRefs.current.checkIn = node; }}
                       type="date"
-                      className="border border-border px-4 py-2.5 text-sm text-dark outline-none focus:border-gold transition-colors duration-200 bg-background"
-                      min={new Date().toISOString().split('T')[0]}
+                      name="checkIn"
+                      value={bookingForm.checkIn}
+                      onChange={handleBookingChange}
+                      className={bookingInputClass('checkIn')}
+                      min={today()}
                     />
                   </div>
                   <div className="flex flex-col">
                     <label className="text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-1.5">Check Out</label>
                     <input
+                      ref={(node) => { fieldRefs.current.checkOut = node; }}
                       type="date"
-                      className="border border-border px-4 py-2.5 text-sm text-dark outline-none focus:border-gold transition-colors duration-200 bg-background"
+                      name="checkOut"
+                      value={bookingForm.checkOut}
+                      onChange={handleBookingChange}
+                      className={bookingInputClass('checkOut')}
+                      min={bookingForm.checkIn || today()}
                     />
                   </div>
                   <div className="flex flex-col">
                     <label className="text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-1.5">Guests</label>
-                    <select className="border border-border px-4 py-2.5 text-sm text-dark outline-none focus:border-gold transition-colors duration-200 bg-background">
+                    <select
+                      ref={(node) => { fieldRefs.current.guests = node; }}
+                      name="guests"
+                      value={bookingForm.guests}
+                      onChange={handleBookingChange}
+                      className={bookingInputClass('guests')}
+                    >
                       {Array.from({ length: room.guests }, (_, i) => i + 1).map((n) => (
                         <option key={n} value={n}>{n} {n === 1 ? 'Guest' : 'Guests'}</option>
                       ))}
@@ -213,12 +321,13 @@ export default function RoomDetails() {
                   </div>
                 </div>
 
-                <Link
-                  to={`/booking?room=${room.slug}`}
+                <button
+                  type="button"
+                  onClick={handleBookRoom}
                   className="btn-primary w-full justify-center mb-3"
                 >
                   Book This Room
-                </Link>
+                </button>
                 <Link
                   to="/contact"
                   className="btn-outline w-full justify-center text-[9px]"

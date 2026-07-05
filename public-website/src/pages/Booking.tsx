@@ -33,14 +33,17 @@ interface BookingForm {
 
 export default function Booking() {
   const [searchParams] = useSearchParams();
-  const preselectedRoom = searchParams.get('room') || '';
+
+  const readBookingParams = (): Pick<BookingForm, 'checkIn' | 'checkOut' | 'guests' | 'rooms' | 'roomType'> => ({
+    checkIn: searchParams.get('checkin') || searchParams.get('checkIn') || '',
+    checkOut: searchParams.get('checkout') || searchParams.get('checkOut') || '',
+    guests: searchParams.get('guests') || '2',
+    rooms: searchParams.get('rooms') || '1',
+    roomType: searchParams.get('room') || '',
+  });
 
   const [form, setForm] = useState<BookingForm>({
-    checkIn: '',
-    checkOut: '',
-    guests: '2',
-    rooms: '1',
-    roomType: preselectedRoom,
+    ...readBookingParams(),
     firstName: '',
     lastName: '',
     email: '',
@@ -52,6 +55,19 @@ export default function Booking() {
   const [bookingRooms, setBookingRooms] = useState<Room[]>(fallbackRooms);
   const [submitError, setSubmitError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const params = readBookingParams();
+
+    setForm((prev) => ({
+      ...prev,
+      checkIn: params.checkIn || prev.checkIn,
+      checkOut: params.checkOut || prev.checkOut,
+      guests: params.guests || prev.guests,
+      rooms: params.rooms || prev.rooms,
+      roomType: params.roomType || prev.roomType,
+    }));
+  }, [searchParams]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
