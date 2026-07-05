@@ -4,6 +4,7 @@ require_once __DIR__ . '/_room_helpers.php';
 apply_cors_headers();
 try {
     $pdo = get_db_connection();
+    ensure_rooms_schema($pdo);
     ensure_room_images_table($pdo);
     $id = clean_string($_GET['id'] ?? $_GET['slug'] ?? '', 180);
     if ($id === '') json_response(false, 'Room id is required.', 422);

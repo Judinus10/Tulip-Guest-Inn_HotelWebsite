@@ -5,19 +5,21 @@ apply_cors_headers();
 require_admin_auth();
 try {
     $pdo = get_db_connection();
+    ensure_rooms_schema($pdo);
     ensure_room_images_table($pdo);
     $data = room_input_data();
     $roomName = clean_string($data['room_name'] ?? '', 150);
     if ($roomName === '') json_response(false, 'Room name is required.', 422);
     $slug = slugify_room($data['slug'] ?? $roomName);
     $amenities = parse_amenities_input($data['amenities'] ?? $data['amenities_summary'] ?? '');
-    $stmt = $pdo->prepare("INSERT INTO rooms (room_name, slug, description, max_guests, bed_type, base_price, currency, amenities, status, sort_order) VALUES (:room_name, :slug, :description, :max_guests, :bed_type, :base_price, :currency, :amenities, :status, :sort_order)");
+    $stmt = $pdo->prepare("INSERT INTO rooms (room_name, slug, room_category, description, max_guests, bed_type, room_size, base_price, currency, amenities, status, sort_order) VALUES (:room_name, :slug, :room_category, :description, :max_guests, :bed_type, :room_size, :base_price, :currency, :amenities, :status, :sort_order)");
     $stmt->execute([
         ':room_name' => $roomName,
         ':slug' => $slug,
         ':description' => clean_string($data['description'] ?? '', 5000),
         ':max_guests' => max(1, (int) ($data['max_guests'] ?? $data['capacity'] ?? 2)),
-        ':bed_type' => clean_string($data['bed_type'] ?? '', 100),
+        ':bed_type' => clean_string($data['bed_type'] ?? 'Double Bed', 100),
+        ':room_size' => max(1, (float) ($data['room_size'] ?? $data['size'] ?? 24)),
         ':base_price' => max(0, (float) ($data['base_price'] ?? $data['price_per_night'] ?? 0)),
         ':currency' => clean_string($data['currency'] ?? 'LKR', 10),
         ':amenities' => json_encode($amenities, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),

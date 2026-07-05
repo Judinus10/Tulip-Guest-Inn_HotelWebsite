@@ -31,10 +31,12 @@ import { createRoom, deleteRoomById, deleteRoomImage, listRooms, updateRoom } fr
 
 const emptyForm = {
   room_name: '',
-  room_type: 'Standard',
+  room_type: 'Ground Floor',
+  room_category: 'standard',
   price_per_night: '',
   capacity: '',
-  bed_type: '',
+  bed_type: 'Double Bed',
+  room_size: '',
   currency: 'LKR',
   description: '',
   status: 'Available',
@@ -43,6 +45,13 @@ const emptyForm = {
 }
 
 const roomTypes = ['Ground Floor', 'First Floor', 'Family Room', 'Private Cottage']
+const roomCategories = [
+  { value: 'standard', label: 'Standard' },
+  { value: 'deluxe', label: 'Deluxe' },
+  { value: 'family', label: 'Family' },
+  { value: 'suite', label: 'Suite' },
+]
+const bedTypes = ['Single Bed', 'Double Bed', 'Twin Beds', 'King Bed', 'Queen Bed', 'King + Twin Beds']
 const roomStatuses = ['Available', 'Unavailable', 'Maintenance']
 
 const statusVariant = {
@@ -433,10 +442,13 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
     const nextErrors = {}
     if (!form.room_name.trim()) nextErrors.room_name = 'Room name is required.'
     if (!form.room_type.trim()) nextErrors.room_type = 'Room type is required.'
+    if (!form.room_category.trim()) nextErrors.room_category = 'Room category is required.'
     if (!String(form.price_per_night).trim()) nextErrors.price_per_night = 'Price is required.'
     if (Number(form.price_per_night) <= 0) nextErrors.price_per_night = 'Price must be greater than 0.'
     if (!String(form.capacity).trim()) nextErrors.capacity = 'Capacity is required.'
     if (Number(form.capacity) <= 0) nextErrors.capacity = 'Capacity must be greater than 0.'
+    if (!String(form.room_size).trim()) nextErrors.room_size = 'Room size is required.'
+    if (Number(form.room_size) <= 0) nextErrors.room_size = 'Room size must be greater than 0.'
     if (!form.description.trim()) nextErrors.description = 'Description is required.'
     if (!form.status.trim()) nextErrors.status = 'Status is required.'
 
@@ -447,6 +459,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
       ...form,
       price_per_night: Number(form.price_per_night),
       capacity: Number(form.capacity),
+      room_size: Number(form.room_size),
       images: selectedFiles,
     })
   }
@@ -488,6 +501,19 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="room_category">Public category</Label>
+              <select
+                id="room_category"
+                value={form.room_category}
+                onChange={(e) => updateField('room_category', e.target.value)}
+                className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm text-text-primary shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              >
+                {roomCategories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}
+              </select>
+              {errors.room_category && <p className="text-xs font-medium text-red-600">{errors.room_category}</p>}
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="price_per_night">Price per night</Label>
               <Input id="price_per_night" type="number" min="1" value={form.price_per_night} onChange={(e) => updateField('price_per_night', e.target.value)} placeholder="Ex: 380" />
               {errors.price_per_night && <p className="text-xs font-medium text-red-600">{errors.price_per_night}</p>}
@@ -497,6 +523,24 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
               <Label htmlFor="capacity">Capacity</Label>
               <Input id="capacity" type="number" min="1" value={form.capacity} onChange={(e) => updateField('capacity', e.target.value)} placeholder="Ex: 2" />
               {errors.capacity && <p className="text-xs font-medium text-red-600">{errors.capacity}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="bed_type">Bed type</Label>
+              <select
+                id="bed_type"
+                value={form.bed_type}
+                onChange={(e) => updateField('bed_type', e.target.value)}
+                className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm text-text-primary shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              >
+                {bedTypes.map((bedType) => <option key={bedType}>{bedType}</option>)}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="room_size">Room size (m²)</Label>
+              <Input id="room_size" type="number" min="1" value={form.room_size} onChange={(e) => updateField('room_size', e.target.value)} placeholder="Ex: 24" />
+              {errors.room_size && <p className="text-xs font-medium text-red-600">{errors.room_size}</p>}
             </div>
 
             <div className="space-y-2">
@@ -633,7 +677,7 @@ function RoomDetailsModal({ room, amenities, image, onClose }) {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h3 className="break-words text-xl font-bold text-text-primary sm:text-2xl">{room.room_name}</h3>
-                  <p className="mt-1 text-sm font-medium text-text-secondary">{room.room_type} room · {room.capacity} guests</p>
+                  <p className="mt-1 text-sm font-medium text-text-secondary">{room.room_type} room · {room.capacity} guests · {room.bed_type || room.beds} · {room.room_size || room.size} m²</p>
                 </div>
                 <Badge variant={statusVariant[room.status] || 'secondary'}>{room.status}</Badge>
               </div>
@@ -761,6 +805,9 @@ export default function Rooms() {
         room_type: room.room_type || room.type,
         price_per_night: room.price_per_night ?? room.base_price ?? room.price,
         capacity: room.capacity ?? room.max_guests ?? room.guests,
+        room_category: room.room_category || room.category || 'standard',
+        bed_type: room.bed_type || room.beds || 'Double Bed',
+        room_size: room.room_size ?? room.size ?? 24,
         image,
         amenities,
         amenity_ids: amenityIds,
@@ -772,7 +819,7 @@ export default function Rooms() {
     const term = search.trim().toLowerCase()
 
     return enrichedRooms.filter((room) => {
-      const matchesSearch = !term || room.room_name.toLowerCase().includes(term) || room.room_type.toLowerCase().includes(term)
+      const matchesSearch = !term || room.room_name.toLowerCase().includes(term) || room.room_type.toLowerCase().includes(term) || String(room.room_category || '').toLowerCase().includes(term)
       const matchesStatus = statusFilter === 'All' || room.status === statusFilter
       const matchesType = typeFilter === 'All' || room.room_type === typeFilter
       return matchesSearch && matchesStatus && matchesType
@@ -790,9 +837,11 @@ export default function Rooms() {
     setSelectedRoom({
       ...room,
       room_type: room.room_type || room.type || 'Ground Floor',
+      room_category: room.room_category || room.category || 'standard',
       price_per_night: room.price_per_night ?? room.base_price ?? room.price,
       capacity: room.capacity ?? room.max_guests ?? room.guests,
-      bed_type: room.bed_type || room.beds || '',
+      bed_type: room.bed_type || room.beds || 'Double Bed',
+      room_size: room.room_size ?? room.size ?? 24,
       currency: room.currency || 'LKR',
       amenity_ids: room.amenity_ids || [],
     })
@@ -815,7 +864,11 @@ export default function Rooms() {
     payload.append('description', form.description)
     payload.append('max_guests', form.capacity)
     payload.append('capacity', form.capacity)
-    payload.append('bed_type', form.bed_type || form.room_type)
+    payload.append('room_category', form.room_category || 'standard')
+    payload.append('category', form.room_category || 'standard')
+    payload.append('bed_type', form.bed_type || 'Double Bed')
+    payload.append('room_size', form.room_size || 24)
+    payload.append('size', form.room_size || 24)
     payload.append('base_price', form.price_per_night)
     payload.append('price_per_night', form.price_per_night)
     payload.append('currency', form.currency || 'LKR')
@@ -928,9 +981,9 @@ export default function Rooms() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-5 py-4 font-medium text-text-primary">{room.room_type}</td>
+                  <td className="px-5 py-4 font-medium text-text-primary">{room.room_type}<span className="block text-xs font-normal capitalize text-text-secondary">{room.room_category}</span></td>
                   <td className="px-5 py-4 font-semibold text-text-primary">{formatCurrency(room.price_per_night)}</td>
-                  <td className="px-5 py-4 text-text-secondary">{room.capacity} guests</td>
+                  <td className="px-5 py-4 text-text-secondary">{room.capacity} guests<span className="block text-xs">{room.bed_type} · {room.room_size} m²</span></td>
                   <td className="px-5 py-4">
                     <AmenitiesPreview amenities={room.amenities} />
                   </td>

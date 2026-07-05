@@ -45,7 +45,7 @@ export default function Home() {
 
   const previewImages = homeGalleryImages.slice(0, 8);
   const featuredRooms = homeRooms.filter((r) => r.featured).slice(0, 3);
-  const activeHeroImages = homeGalleryImages.length >= 3 ? homeGalleryImages.slice(0, 3).map((img) => img.src) : heroImages;
+  const activeHeroImages = heroImages;
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -72,7 +72,19 @@ export default function Home() {
       }
 
       if (galleryResult.status === 'fulfilled' && galleryResult.value.length > 0) {
-        setHomeGalleryImages(galleryResult.value);
+        const normalizedGalleryImages = galleryResult.value
+          .filter((img) => typeof img.image_path === 'string' && img.image_path.trim() !== '')
+          .map((img, index) => ({
+            id: String(img.id ?? `api-gallery-${index}`),
+            src: img.image_path,
+            alt: img.title || img.folder_name || 'Tulip Guest Inn Gallery',
+            category: 'facilities' as const,
+            width: (index % 5 === 0 ? 'wide' : 'normal') as const,
+          }));
+
+        if (normalizedGalleryImages.length > 0) {
+          setHomeGalleryImages(normalizedGalleryImages);
+        }
       }
 
       if (attractionsResult.status === 'fulfilled' && attractionsResult.value.length > 0) {
@@ -97,7 +109,7 @@ export default function Home() {
       <section className="relative h-screen min-h-[600px] flex items-center justify-center overflow-hidden">
         {activeHeroImages.map((src, i) => (
           <motion.div
-            key={src}
+            key={`${src}-${i}`}
             className="absolute inset-0"
             initial={{ opacity: 0 }}
             animate={{ opacity: i === heroIndex ? 1 : 0 }}
@@ -360,7 +372,7 @@ export default function Home() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {previewImages.map((img, i) => (
               <motion.div
-                key={img.id}
+                key={`${img.id}-${img.src}-${i}`}
                 initial={{ opacity: 0, scale: 0.95 }}
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true, margin: '-40px' }}

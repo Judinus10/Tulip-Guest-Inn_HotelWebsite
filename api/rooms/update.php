@@ -5,6 +5,7 @@ apply_cors_headers();
 require_admin_auth();
 try {
     $pdo = get_db_connection();
+    ensure_rooms_schema($pdo);
     ensure_room_images_table($pdo);
     $data = room_input_data();
     $id = (int) ($data['id'] ?? $_GET['id'] ?? 0);
@@ -12,14 +13,16 @@ try {
     $roomName = clean_string($data['room_name'] ?? '', 150);
     if ($roomName === '') json_response(false, 'Room name is required.', 422);
     $amenities = parse_amenities_input($data['amenities'] ?? $data['amenities_summary'] ?? '');
-    $stmt = $pdo->prepare("UPDATE rooms SET room_name = :room_name, slug = :slug, description = :description, max_guests = :max_guests, bed_type = :bed_type, base_price = :base_price, currency = :currency, amenities = :amenities, status = :status, sort_order = :sort_order WHERE id = :id");
+    $stmt = $pdo->prepare("UPDATE rooms SET room_name = :room_name, slug = :slug, room_category = :room_category, description = :description, max_guests = :max_guests, bed_type = :bed_type, room_size = :room_size, base_price = :base_price, currency = :currency, amenities = :amenities, status = :status, sort_order = :sort_order WHERE id = :id");
     $stmt->execute([
         ':id' => $id,
         ':room_name' => $roomName,
         ':slug' => slugify_room($data['slug'] ?? $roomName),
+        ':room_category' => normalize_room_category($data['room_category'] ?? $data['category'] ?? 'standard'),
         ':description' => clean_string($data['description'] ?? '', 5000),
         ':max_guests' => max(1, (int) ($data['max_guests'] ?? $data['capacity'] ?? 2)),
-        ':bed_type' => clean_string($data['bed_type'] ?? '', 100),
+        ':bed_type' => clean_string($data['bed_type'] ?? 'Double Bed', 100),
+        ':room_size' => max(1, (float) ($data['room_size'] ?? $data['size'] ?? 24)),
         ':base_price' => max(0, (float) ($data['base_price'] ?? $data['price_per_night'] ?? 0)),
         ':currency' => clean_string($data['currency'] ?? 'LKR', 10),
         ':amenities' => json_encode($amenities, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),

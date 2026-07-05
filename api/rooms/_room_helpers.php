@@ -18,6 +18,37 @@ function rooms_upload_url(string $relativePath): string
     return $base . '/' . $relativePath;
 }
 
+
+function ensure_rooms_schema(PDO $pdo): void
+{
+    $columns = [];
+    try {
+        $stmt = $pdo->query('SHOW COLUMNS FROM rooms');
+        foreach ($stmt->fetchAll() as $column) {
+            $columns[strtolower((string) $column['Field'])] = true;
+        }
+    } catch (Throwable $e) {
+        return;
+    }
+
+    if (!isset($columns['room_category'])) {
+        $pdo->exec("ALTER TABLE rooms ADD COLUMN room_category VARCHAR(50) NOT NULL DEFAULT 'standard' AFTER slug");
+    }
+
+    if (!isset($columns['room_size'])) {
+        $pdo->exec("ALTER TABLE rooms ADD COLUMN room_size DECIMAL(8,2) NOT NULL DEFAULT 24 AFTER bed_type");
+    }
+}
+
+function normalize_room_category(mixed $value): string
+{
+    $category = strtolower(trim((string) $value));
+    $category = preg_replace('/[^a-z0-9]+/', '-', $category) ?? '';
+    $category = trim($category, '-');
+
+    return in_array($category, ['standard', 'deluxe', 'family', 'suite'], true) ? $category : 'standard';
+}
+
 function ensure_room_images_table(PDO $pdo): void
 {
     $pdo->exec("CREATE TABLE IF NOT EXISTS room_images (
@@ -83,10 +114,13 @@ function normalize_room(array $room, array $images = []): array
     if ($imageUrls === []) $imageUrls = [$fallbackImage];
 
     $type = infer_room_type($room);
+    $category = normalize_room_category($room['room_category'] ?? '');
     $price = (float) ($room['base_price'] ?? 0);
     $currency = (string) ($room['currency'] ?? 'LKR');
     $guests = (int) ($room['max_guests'] ?? 2);
-    $bedType = (string) ($room['bed_type'] ?? 'Double Bed');
+    $bedType = trim((string) ($room['bed_type'] ?? '')) !== '' ? (string) $room['bed_type'] : 'Double Bed';
+    $roomSize = (float) ($room['room_size'] ?? 24);
+    if ($roomSize <= 0) $roomSize = $guests > 3 ? 45 : 24;
 
     return [
         'id' => (int) $room['id'],
@@ -95,6 +129,8 @@ function normalize_room(array $room, array $images = []): array
         'room_name' => (string) ($room['room_name'] ?? ''),
         'type' => $type,
         'room_type' => $type,
+        'category' => $category,
+        'room_category' => $category,
         'description' => (string) ($room['description'] ?? ''),
         'longDescription' => (string) ($room['description'] ?? ''),
         'guests' => $guests,
@@ -102,7 +138,8 @@ function normalize_room(array $room, array $images = []): array
         'capacity' => $guests,
         'beds' => $bedType,
         'bed_type' => $bedType,
-        'size' => $guests > 3 ? 'Family space' : 'Comfortable room',
+        'size' => $roomSize,
+        'room_size' => $roomSize,
         'price' => $price,
         'base_price' => $price,
         'price_per_night' => $price,
@@ -122,6 +159,7 @@ function normalize_room(array $room, array $images = []): array
 
 function get_room_payload(PDO $pdo, bool $publicOnly = false): array
 {
+    ensure_rooms_schema($pdo);
     ensure_room_images_table($pdo);
     $sql = 'SELECT * FROM rooms';
     if ($publicOnly) $sql .= " WHERE status = 'Available'";
