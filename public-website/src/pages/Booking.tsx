@@ -1,14 +1,21 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Calendar, Users, Home, Check, Phone, Mail } from 'lucide-react';
 import PageHero from '../components/ui/PageHero';
 import AnimatedSection from '../components/ui/AnimatedSection';
-import { rooms } from '../data/rooms';
+import { rooms as fallbackRooms } from '../data/rooms';
+import type { Room } from '../data/rooms';
+import { fetchPublicRooms, submitBookingRequest } from '../services/publicApi';
 
-const roomTypeOptions = [
-  { value: '', label: 'Select Room Type' },
-  ...rooms.map((r) => ({ value: r.slug, label: `${r.name} — From $${r.price}/night` })),
-];
+function buildRoomTypeOptions(roomList: Room[]) {
+  return [
+    { value: '', label: 'Select Room Type' },
+    ...roomList.map((r) => ({
+      value: r.slug,
+      label: `${r.name} — From ${r.currency ? `${r.currency} ` : '$'}${r.price}/night`,
+    })),
+  ];
+}
 
 interface BookingForm {
   checkIn: string;
@@ -42,6 +49,9 @@ export default function Booking() {
     specialRequests: '',
   });
   const [submitted, setSubmitted] = useState(false);
+  const [bookingRooms, setBookingRooms] = useState<Room[]>(fallbackRooms);
+  const [submitError, setSubmitError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -49,7 +59,24 @@ export default function Booking() {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const selectedRoom = rooms.find((r) => r.slug === form.roomType);
+  useEffect(() => {
+    let mounted = true;
+
+    fetchPublicRooms()
+      .then((backendRooms) => {
+        if (mounted && backendRooms.length > 0) setBookingRooms(backendRooms);
+      })
+      .catch(() => {
+        if (mounted) setBookingRooms(fallbackRooms);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const roomTypeOptions = buildRoomTypeOptions(bookingRooms);
+  const selectedRoom = bookingRooms.find((r) => r.slug === form.roomType);
 
   const nights =
     form.checkIn && form.checkOut
@@ -64,9 +91,41 @@ export default function Booking() {
 
   const total = selectedRoom ? selectedRoom.price * nights * Number(form.rooms) : 0;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    setSubmitError('');
+
+    if (!selectedRoom) {
+      setSubmitError('Please select a valid room type.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      await submitBookingRequest({
+        full_name: `${form.firstName} ${form.lastName}`.trim(),
+        email: form.email,
+        phone: form.phone,
+        room_name: selectedRoom.name,
+        check_in_date: form.checkIn,
+        check_out_date: form.checkOut,
+        guests: Number(form.guests),
+        message: [
+          form.specialRequests,
+          form.nationality ? `Nationality: ${form.nationality}` : '',
+          `Rooms requested: ${form.rooms}`,
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      });
+
+      setSubmitted(true);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Unable to submit booking request.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -277,8 +336,14 @@ export default function Booking() {
                   </div>
                 </AnimatedSection>
 
-                <button type="submit" className="btn-primary w-full justify-center py-4 text-xs">
-                  Submit Booking Request
+                {submitError && (
+                  <div className="border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+                    {submitError}
+                  </div>
+                )}
+
+                <button type="submit" className="btn-primary w-full justify-center py-4 text-xs" disabled={isSubmitting}>
+                  {isSubmitting ? 'Submitting...' : 'Submit Booking Request'}
                 </button>
               </form>
 
@@ -303,7 +368,7 @@ export default function Booking() {
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-500">Rate Per Night</span>
                         <span className="text-dark font-medium">
-                          {selectedRoom ? `$${selectedRoom.price}` : '—'}
+                          {selectedRoom ? `${selectedRoom.currency ? `${selectedRoom.currency} ` : '$'}${selectedRoom.price}` : '—'}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">
@@ -324,7 +389,7 @@ export default function Booking() {
                       <div className="flex justify-between items-baseline">
                         <span className="text-[9px] tracking-[0.2em] uppercase text-gray-400">Estimated Total</span>
                         <span className="font-serif text-3xl font-light text-dark">
-                          {total > 0 ? `$${total}` : '—'}
+                          {total > 0 ? `${selectedRoom?.currency ? `${selectedRoom.currency} ` : '$'}${total}` : '—'}
                         </span>
                       </div>
                       {total > 0 && (

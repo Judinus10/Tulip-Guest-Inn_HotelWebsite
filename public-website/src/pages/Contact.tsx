@@ -442,11 +442,11 @@ export default function Contact() {
             >
             <MapPin size={32} className="text-gold mx-auto mb-4" />
 
-            <p className="font-serif text-2xl font-light text-white mb-2 drop-shadow-lg">
+            <p className="font-serif text-2xl font-light text-black mb-2 drop-shadow-lg">
               Find Us Here
             </p>
 
-            <p className="text-white/90 text-sm mb-6 drop-shadow">
+            <p className="text-black/90 text-sm mb-6 drop-shadow">
               {activeAddress}
             </p>
 
