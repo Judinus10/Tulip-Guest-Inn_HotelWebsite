@@ -1,9 +1,13 @@
 <?php
 declare(strict_types=1);
 
-header('Content-Type: application/json');
-
 require_once __DIR__ . '/_gallery_helpers.php';
+
+apply_cors_headers();
+
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    json_response(false, 'Method not allowed.', 405);
+}
 
 try {
     $pdo = get_db_connection();
@@ -58,12 +62,12 @@ try {
             'folders' => $folders,
             'images' => $images,
         ],
-    ]);
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     http_response_code(500);
 
     echo json_encode([
         'success' => false,
         'message' => $e->getMessage(),
-    ]);
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 }
