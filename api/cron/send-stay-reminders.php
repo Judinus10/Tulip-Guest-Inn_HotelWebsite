@@ -118,7 +118,7 @@ function queue_stay_reminder_email(PDO $pdo, string $date, array $checkIns, arra
             stay_reminder_bookings_html($checkIns, 'No check-ins scheduled for today.') .
             '<h2 style="margin:26px 0 10px;font-size:18px;color:#111827;">Today check-outs</h2>' .
             stay_reminder_bookings_html($checkOuts, 'No check-outs scheduled for today.'),
-            'Today check-in and check-out reminders for Jebal Guest House.'
+            'Today check-in and check-out reminders for Tulip Guest Inn.'
         );
 
     return enqueue_email(
@@ -126,7 +126,7 @@ function queue_stay_reminder_email(PDO $pdo, string $date, array $checkIns, arra
         'admin_stay_reminder',
         (int) str_replace('-', '', $date),
         $adminEmail,
-        'Today check-in/check-out reminders - Jebal Guest House - ' . $date,
+        'Today check-in/check-out reminders - Tulip Guest Inn - ' . $date,
         $body,
         'admin_stay_reminder_' . str_replace('-', '', $date),
         null,

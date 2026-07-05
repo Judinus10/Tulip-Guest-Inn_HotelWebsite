@@ -491,8 +491,8 @@ export default function Dashboard() {
 
   const handleDownloadReport = (format) => {
     const payload = {
-      fileName: 'jebal-guest-house-dashboard-report',
-      title: 'Jebal Guest House Dashboard Report',
+      fileName: 'tulip-guest-inn-dashboard-report',
+      title: 'Tulip Guest Inn Dashboard Report',
       rows: buildDashboardReportRows(dashboardData, monthlyBookingTrend, revenueTrend),
     }
 
@@ -505,7 +505,7 @@ export default function Dashboard() {
     <div className="space-y-8">
       <PageHeader
         title="Dashboard"
-        description="Jebal Guest House overview for rooms, reservations, payments, messages, packages, and website content."
+        description="Tulip Guest Inn overview for rooms, reservations, payments, messages, packages, and website content."
       >
         <Dropdown
           trigger={

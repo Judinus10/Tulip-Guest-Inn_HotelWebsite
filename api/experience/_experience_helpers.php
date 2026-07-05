@@ -81,6 +81,24 @@ function experience_image_url(?string $path): string
     return experience_public_base() . '/' . rawurlencode($path);
 }
 
+function experience_ensure_schema(PDO $pdo): void
+{
+    $columns = [];
+    $stmt = $pdo->query("SHOW COLUMNS FROM experience_items");
+
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $column) {
+        $columns[strtolower((string) $column['Field'])] = true;
+    }
+
+    if (!isset($columns['distance'])) {
+        $pdo->exec("ALTER TABLE experience_items ADD COLUMN distance VARCHAR(100) NULL AFTER location");
+    }
+
+    if (!isset($columns['duration'])) {
+        $pdo->exec("ALTER TABLE experience_items ADD COLUMN duration VARCHAR(100) NULL AFTER distance");
+    }
+}
+
 function experience_normalize(array $row): array
 {
     return [
@@ -89,6 +107,7 @@ function experience_normalize(array $row): array
         'category' => (string) $row['category'],
         'location' => (string) ($row['location'] ?? ''),
         'distance' => (string) ($row['distance'] ?? ''),
+        'duration' => (string) ($row['duration'] ?? ''),
         'description' => (string) $row['description'],
         'image_path' => experience_image_url($row['image_path'] ?? ''),
         'stored_path' => (string) ($row['image_path'] ?? ''),

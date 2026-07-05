@@ -1,6 +1,6 @@
 <?php
 /**
- * Premium HTML email automation helper for Jebal Guest House.
+ * Premium HTML email automation helper for Tulip Guest Inn.
  */
 
 declare(strict_types=1);
@@ -85,7 +85,7 @@ function send_html_email(string $to, string $subject, string $htmlBody, ?string 
             : (defined('FROM_EMAIL') ? trim((string) FROM_EMAIL) : '');
         $fromName = $fromNameOverride !== null && trim($fromNameOverride) !== ''
             ? trim($fromNameOverride)
-            : (defined('FROM_NAME') ? trim((string) FROM_NAME) : 'Jebal Guest House');
+            : (defined('FROM_NAME') ? trim((string) FROM_NAME) : 'Tulip Guest Inn');
 
         $smtpProfile = email_smtp_profile_for_from($fromEmail);
         $smtpHost = $smtpProfile['host'];
@@ -240,7 +240,7 @@ function email_env_name(string $constantName, string $fallbackConstant = 'FROM_N
     }
 
     $fallback = defined($fallbackConstant) ? trim((string) constant($fallbackConstant)) : '';
-    return $fallback !== '' ? $fallback : 'Jebal Guest House';
+    return $fallback !== '' ? $fallback : 'Tulip Guest Inn';
 }
 
 function booking_from_email(): string
@@ -358,7 +358,7 @@ function update_booking_email_status(PDO $pdo, int $bookingId, string $status): 
 
 function email_brand_name(): string
 {
-    return 'Jebal Guest House';
+    return 'Tulip Guest Inn';
 }
 
 function email_public_url(): string
@@ -462,8 +462,8 @@ function email_contact_settings(): array
     }
 
     $defaults = function_exists('default_contact_settings') ? default_contact_settings() : [
-        'business_name' => 'Jebal Guest House',
-        'address' => 'Jebal Guest House, Sri Lanka',
+        'business_name' => 'Tulip Guest Inn',
+        'address' => 'Tulip Guest Inn, Sri Lanka',
         'phone' => '+94 77 123 4567',
         'reception_contact_number' => '+94 21 222 4567',
         'whatsapp_reservation_number' => '+94 77 123 4567',
@@ -507,7 +507,7 @@ function email_contact_email(): string
 
 function email_contact_address(): string
 {
-    return email_contact_value('address', 'Jebal Guest House, Sri Lanka');
+    return email_contact_value('address', 'Tulip Guest Inn, Sri Lanka');
 }
 
 function email_contact_website(): string
@@ -951,7 +951,7 @@ function contact_customer_email_html(string $name, string $ref, string $subject)
 
     $content = '<h1 style="margin:0 0 18px;color:#111111;font-size:28px;line-height:1.2;font-weight:800;">Thank you for contacting us</h1>
     <p style="margin:0 0 18px;color:#111111;font-size:16px;line-height:1.6;">Hi ' . email_safe($safeName) . ',</p>
-    <p style="margin:0;color:#111111;font-size:16px;line-height:1.6;">Thank you for getting in touch with Jebal Guest House.<br>We have received your message and our team will<br>reply to you as soon as possible.</p>' .
+    <p style="margin:0;color:#111111;font-size:16px;line-height:1.6;">Thank you for getting in touch with Tulip Guest Inn.<br>We have received your message and our team will<br>reply to you as soon as possible.</p>' .
     contact_reference_pill($ref) .
     contact_email_detail_card([
         ['icon' => 'ref', 'label' => 'Reference ID', 'value' => $ref],
@@ -959,14 +959,14 @@ function contact_customer_email_html(string $name, string $ref, string $subject)
     ]) .
     contact_support_block();
 
-    return contact_email_shell('Thank you for contacting us', $content, 'We received your message at Jebal Guest House.');
+    return contact_email_shell('Thank you for contacting us', $content, 'We received your message at Tulip Guest Inn.');
 }
 
 function contact_admin_email_html(string $name, string $email, string $phone, string $subject, string $message, string $ref): string
 {
     $content = '<h1 style="margin:0 0 18px;color:#111111;font-size:28px;line-height:1.2;font-weight:800;">New contact enquiry received</h1>
     <p style="margin:0 0 18px;color:#111111;font-size:16px;line-height:1.6;">Hi Hotel Team,</p>
-    <p style="margin:0;color:#111111;font-size:16px;line-height:1.6;">A new contact message has been submitted from the<br>Jebal Guest House website. Please review and reply<br>to the guest as soon as possible.</p>' .
+    <p style="margin:0;color:#111111;font-size:16px;line-height:1.6;">A new contact message has been submitted from the<br>Tulip Guest Inn website. Please review and reply<br>to the guest as soon as possible.</p>' .
     contact_reference_pill($ref) .
     contact_email_detail_card([
         ['icon' => 'ref', 'label' => 'Reference ID', 'value' => $ref],
@@ -1052,7 +1052,7 @@ function reminder_email_shell(string $title, string $content, string $preheader 
 <tr><td>' . reminder_email_help_block() . '</td></tr>
 <tr><td style="padding:17px 24px 24px;text-align:center;border-top:1px solid #eee;color:#111;font-size:14px;line-height:1.6;">
     <div>This is an automated email. Please do not reply.</div>
-    <div style="color:#333;">&copy; ' . $year . ' Jebal Guest House. All rights reserved.</div>
+    <div style="color:#333;">&copy; ' . $year . ' Tulip Guest Inn. All rights reserved.</div>
 </td></tr>
 </table>
 </td></tr></table>
@@ -1184,7 +1184,7 @@ function stay_reminder_email_html(string $date, array $checkIns, array $checkOut
 
     $content .= reminder_email_action_block();
 
-    return reminder_email_shell($title, $content, $title . ' for Jebal Guest House.', 'Stay Reminder', $sideSubTitle);
+    return reminder_email_shell($title, $content, $title . ' for Tulip Guest Inn.', 'Stay Reminder', $sideSubTitle);
 }
 
 function otp_email_html(string $title, string $otp, int $validMinutes = 1): string
@@ -1321,7 +1321,7 @@ function otp_email_html(string $title, string $otp, int $validMinutes = 1): stri
           <tr>
             <td align="center" style="background:#ffffff;border-top:1px solid #eee6dc;padding:21px 20px 25px;">
               <div style="font-size:15px;line-height:24px;color:#6b7280;">This is an automated email. Please do not reply.</div>
-              <div style="font-size:15px;line-height:24px;color:#6b7280;">&copy; ' . $year . ' Jebal Guest House. All rights reserved.</div>
+              <div style="font-size:15px;line-height:24px;color:#6b7280;">&copy; ' . $year . ' Tulip Guest Inn. All rights reserved.</div>
             </td>
           </tr>
         </table>
@@ -1476,9 +1476,9 @@ function booking_email_shell(string $content, string $preheader = ''): string
 <tr><td style="padding:34px 58px 26px;">' . $content . '</td></tr>
 <tr><td>' . booking_email_company_block() . '</td></tr>
 <tr><td style="padding:20px 30px 24px;text-align:center;border-top:1px solid #eee;color:#111;font-size:14px;line-height:1.5;">
-    <div>Thank you for choosing Jebal Guest House.</div>
+    <div>Thank you for choosing Tulip Guest Inn.</div>
     <div style="margin:10px auto;color:#987b58;"><span style="display:inline-block;width:34px;border-top:1px solid #c9a77d;vertical-align:middle;margin-right:10px;"></span><span style="display:inline-block;width:34px;border-top:1px solid #c9a77d;vertical-align:middle;margin-left:10px;"></span></div>
-    <div style="color:#333;">&copy; ' . $year . ' Jebal Guest House. All rights reserved.</div>
+    <div style="color:#333;">&copy; ' . $year . ' Tulip Guest Inn. All rights reserved.</div>
 </td></tr>
 </table>
 </td></tr></table>
@@ -1649,7 +1649,7 @@ function booking_staying_guest_intro(array $booking): string
         $bookerName = 'Someone';
     }
 
-    return $bookerName . ' booked a room for you at Jebal Guest House. Your booking details are below.';
+    return $bookerName . ' booked a room for you at Tulip Guest Inn. Your booking details are below.';
 }
 
 function send_staying_guest_booking_email(PDO $pdo, array $booking, string $state, array $payment = [], string $emailType = 'staying_guest_booking_notification', string $subjectPrefix = 'Room booked for you'): bool
@@ -1698,7 +1698,7 @@ function send_staying_guest_booking_email(PDO $pdo, array $booking, string $stat
         'booking',
         $bookingId,
         $guestEmail,
-        $subjectPrefix . ' - Jebal Guest House #' . $bookingId,
+        $subjectPrefix . ' - Tulip Guest Inn #' . $bookingId,
         $body,
         $emailType,
         $bookerEmail !== '' ? $bookerEmail : null
@@ -1747,7 +1747,7 @@ function queue_staying_guest_booking_email(PDO $pdo, array $booking, string $sta
         'booking',
         $bookingId,
         $guestEmail,
-        $subjectPrefix . ' - Jebal Guest House #' . $bookingId,
+        $subjectPrefix . ' - Tulip Guest Inn #' . $bookingId,
         $body,
         $emailType,
         $bookerEmail !== '' ? $bookerEmail : null,
@@ -1760,7 +1760,7 @@ function queue_staying_guest_booking_email(PDO $pdo, array $booking, string $sta
 function send_booking_received_emails(PDO $pdo, array $booking): void
 {
     $bookingId = (int) ($booking['id'] ?? 0);
-    $subjectCustomer = 'Booking inquiry received - Jebal Guest House #' . $bookingId;
+    $subjectCustomer = 'Booking inquiry received - Tulip Guest Inn #' . $bookingId;
 
     $bodyCustomer = booking_email_html('received', $booking);
 
@@ -1774,7 +1774,7 @@ function send_booking_received_emails(PDO $pdo, array $booking): void
         'booking_inquiry_received'
     );
 
-    $subjectAdmin = 'New booking received - Jebal Guest House #' . $bookingId;
+    $subjectAdmin = 'New booking received - Tulip Guest Inn #' . $bookingId;
 
     $bodyAdmin = booking_email_html('received', $booking, [], true);
 
@@ -1802,7 +1802,7 @@ function send_booking_confirmed_email(PDO $pdo, array $booking): void
     $invoiceLink = '';
 
     $bookingId = (int) ($booking['id'] ?? 0);
-    $subject = 'Booking confirmed - Jebal Guest House #' . $bookingId;
+    $subject = 'Booking confirmed - Tulip Guest Inn #' . $bookingId;
 
     $body = booking_email_html('confirmed', $booking, [], false, $invoiceLink);
 
@@ -1878,7 +1878,7 @@ function send_booking_payment_pending_emails_once(PDO $pdo, array $booking, arra
             'booking',
             $bookingId,
             (string) ($booking['email'] ?? ''),
-            'Booking received - payment pending - Jebal Guest House #' . $bookingId,
+            'Booking received - payment pending - Tulip Guest Inn #' . $bookingId,
             $bodyCustomer,
             $customerType
         );
@@ -1894,7 +1894,7 @@ function send_booking_payment_pending_emails_once(PDO $pdo, array $booking, arra
             'booking',
             $bookingId,
             ADMIN_EMAIL,
-            'New booking received - payment pending - Jebal Guest House #' . $bookingId,
+            'New booking received - payment pending - Tulip Guest Inn #' . $bookingId,
             $bodyAdmin,
             $adminType,
             $booking['email'] ?? null
@@ -1927,7 +1927,7 @@ function send_booking_expired_emails_once(PDO $pdo, array $booking): void
             'booking',
             $bookingId,
             (string) ($booking['email'] ?? ''),
-            'Booking hold expired - Jebal Guest House #' . $bookingId,
+            'Booking hold expired - Tulip Guest Inn #' . $bookingId,
             $bodyCustomer,
             $customerType
         );
@@ -1941,7 +1941,7 @@ function send_booking_expired_emails_once(PDO $pdo, array $booking): void
             'booking',
             $bookingId,
             ADMIN_EMAIL,
-            'Pending booking expired - Jebal Guest House #' . $bookingId,
+            'Pending booking expired - Tulip Guest Inn #' . $bookingId,
             $bodyAdmin,
             $adminType,
             $booking['email'] ?? null
@@ -1956,7 +1956,7 @@ function send_booking_expired_emails_once(PDO $pdo, array $booking): void
 function send_booking_cancelled_emails(PDO $pdo, array $booking): void
 {
     $bookingId = (int) ($booking['id'] ?? 0);
-    $subjectCustomer = 'Booking cancelled - Jebal Guest House #' . $bookingId;
+    $subjectCustomer = 'Booking cancelled - Tulip Guest Inn #' . $bookingId;
 
     $bodyCustomer = booking_email_html('cancelled', $booking);
 
@@ -1964,7 +1964,7 @@ function send_booking_cancelled_emails(PDO $pdo, array $booking): void
 
     $bodyAdmin = booking_email_html('cancelled', $booking, [], true);
 
-    send_tracked_email($pdo, 'booking', $bookingId, ADMIN_EMAIL, 'Booking cancelled - Jebal Guest House #' . $bookingId, $bodyAdmin, 'admin_booking_cancelled');
+    send_tracked_email($pdo, 'booking', $bookingId, ADMIN_EMAIL, 'Booking cancelled - Tulip Guest Inn #' . $bookingId, $bodyAdmin, 'admin_booking_cancelled');
 
     if ($bookingId > 0) {
         update_booking_email_status($pdo, $bookingId, $sentCustomer ? 'Sent' : 'Failed');
@@ -1984,7 +1984,7 @@ function send_payment_success_emails(PDO $pdo, array $booking, array $payment): 
     if (!booking_email_sent($pdo, $bookingId, [$customerType])) {
         $bodyCustomer = booking_email_html('paid', $booking, $payment, false, $invoiceLink);
 
-        $sentCustomer = send_tracked_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''), 'Payment successful - Jebal Guest House #' . $bookingId, $bodyCustomer, $customerType);
+        $sentCustomer = send_tracked_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''), 'Payment successful - Tulip Guest Inn #' . $bookingId, $bodyCustomer, $customerType);
         if ($bookingId > 0) {
             update_booking_email_status($pdo, $bookingId, $sentCustomer ? 'Sent' : 'Failed');
         }
@@ -1993,7 +1993,7 @@ function send_payment_success_emails(PDO $pdo, array $booking, array $payment): 
     if (!booking_email_sent($pdo, $bookingId, [$adminType])) {
         $bodyAdmin = booking_email_html('paid', $booking, $payment, true);
 
-        send_tracked_email($pdo, 'booking', $bookingId, ADMIN_EMAIL, 'Payment received - Jebal Guest House #' . $bookingId, $bodyAdmin, $adminType, $booking['email'] ?? null);
+        send_tracked_email($pdo, 'booking', $bookingId, ADMIN_EMAIL, 'Payment received - Tulip Guest Inn #' . $bookingId, $bodyAdmin, $adminType, $booking['email'] ?? null);
     }
 
     send_staying_guest_booking_email($pdo, $booking, 'paid', $payment, 'staying_guest_payment_successful', 'Booking confirmed for you');
@@ -2011,7 +2011,7 @@ function send_payment_failed_email(PDO $pdo, array $booking): void
     if (!booking_email_sent($pdo, $bookingId, ['payment_failed'])) {
         $body = booking_email_html('failed', $booking, [], false, email_button('Retry Payment', latest_booking_bill_url($pdo, $bookingId)));
 
-        $sent = send_tracked_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''), 'Payment failed - Jebal Guest House #' . $bookingId, $body, 'payment_failed');
+        $sent = send_tracked_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''), 'Payment failed - Tulip Guest Inn #' . $bookingId, $body, 'payment_failed');
         update_booking_email_status($pdo, $bookingId, $sent ? 'Sent' : 'Failed');
     }
 
@@ -2023,7 +2023,7 @@ function send_payment_failed_email(PDO $pdo, array $booking): void
             'booking',
             $bookingId,
             ADMIN_EMAIL,
-            'Payment failed - Jebal Guest House #' . $bookingId,
+            'Payment failed - Tulip Guest Inn #' . $bookingId,
             $adminBody,
             'admin_payment_failed',
             $booking['email'] ?? null
@@ -2065,7 +2065,7 @@ function queue_payment_success_emails(PDO $pdo, array $booking, array $payment):
             'booking',
             $bookingId,
             (string) ($booking['email'] ?? ''),
-            'Payment successful - Jebal Guest House #' . $bookingId,
+            'Payment successful - Tulip Guest Inn #' . $bookingId,
             $bodyCustomer,
             $customerType,
             null,
@@ -2086,7 +2086,7 @@ function queue_payment_success_emails(PDO $pdo, array $booking, array $payment):
             'booking',
             $bookingId,
             $adminEmail,
-            'Payment received - Jebal Guest House #' . $bookingId,
+            'Payment received - Tulip Guest Inn #' . $bookingId,
             $bodyAdmin,
             $adminType,
             $booking['email'] ?? null,
@@ -2126,7 +2126,7 @@ function queue_payment_failed_email(PDO $pdo, array $booking): int
             'booking',
             $bookingId,
             (string) ($booking['email'] ?? ''),
-            'Payment failed - Jebal Guest House #' . $bookingId,
+            'Payment failed - Tulip Guest Inn #' . $bookingId,
             $body,
             'payment_failed',
             null,
@@ -2147,7 +2147,7 @@ function queue_payment_failed_email(PDO $pdo, array $booking): int
             'booking',
             $bookingId,
             $adminEmail,
-            'Payment failed - Jebal Guest House #' . $bookingId,
+            'Payment failed - Tulip Guest Inn #' . $bookingId,
             $adminBody,
             'admin_payment_failed',
             $booking['email'] ?? null,
@@ -2177,7 +2177,7 @@ function send_booking_status_changed_email(PDO $pdo, array $booking, string $old
         'New Booking Status' => $label,
     ]);
 
-    $sent = send_tracked_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''), 'Booking status updated - Jebal Guest House #' . $bookingId, $body, 'booking_status_updated');
+    $sent = send_tracked_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''), 'Booking status updated - Tulip Guest Inn #' . $bookingId, $body, 'booking_status_updated');
     if ($bookingId > 0) {
         update_booking_email_status($pdo, $bookingId, $sent ? 'Sent' : 'Failed');
     }
@@ -2195,7 +2195,7 @@ function send_payment_status_changed_email(PDO $pdo, array $booking, array $paym
         'Amount' => $amount,
     ]);
 
-    $sent = send_tracked_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''), 'Payment status updated - Jebal Guest House #' . $bookingId, $body, 'payment_status_updated');
+    $sent = send_tracked_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''), 'Payment status updated - Tulip Guest Inn #' . $bookingId, $body, 'payment_status_updated');
     if ($bookingId > 0) {
         update_booking_email_status($pdo, $bookingId, $sent ? 'Sent' : 'Failed');
     }
@@ -2214,7 +2214,7 @@ function send_combined_status_changed_email(PDO $pdo, array $booking, array $pay
         'Amount' => $amount,
     ]);
 
-    $sent = send_tracked_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''), 'Booking and payment updated - Jebal Guest House #' . $bookingId, $body, 'combined_status_updated');
+    $sent = send_tracked_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''), 'Booking and payment updated - Tulip Guest Inn #' . $bookingId, $body, 'combined_status_updated');
     if ($bookingId > 0) {
         update_booking_email_status($pdo, $bookingId, $sent ? 'Sent' : 'Failed');
     }
@@ -2258,7 +2258,7 @@ function send_contact_enquiry_emails(PDO $pdo, int $enquiryId, string $name, str
             'enquiry',
             $enquiryId,
             $adminEmail,
-            'New contact enquiry - Jebal Guest House ' . $ref,
+            'New contact enquiry - Tulip Guest Inn ' . $ref,
             $adminBody,
             'admin_contact_enquiry',
             $email
@@ -2275,7 +2275,7 @@ function send_contact_enquiry_emails(PDO $pdo, int $enquiryId, string $name, str
             'enquiry',
             $enquiryId,
             $email,
-            'We received your message - Jebal Guest House ' . $ref,
+            'We received your message - Tulip Guest Inn ' . $ref,
             $customerBody,
             'contact_auto_reply'
         );
@@ -2465,7 +2465,7 @@ function queue_contact_enquiry_emails(PDO $pdo, int $enquiryId, string $name, st
             'enquiry',
             $enquiryId,
             $adminEmail,
-            'New contact enquiry - Jebal Guest House ' . $ref,
+            'New contact enquiry - Tulip Guest Inn ' . $ref,
             $adminBody,
             'admin_contact_enquiry',
             $email,
@@ -2487,7 +2487,7 @@ function queue_contact_enquiry_emails(PDO $pdo, int $enquiryId, string $name, st
             'enquiry',
             $enquiryId,
             $email,
-            'We received your message - Jebal Guest House ' . $ref,
+            'We received your message - Tulip Guest Inn ' . $ref,
             $customerBody,
             'contact_auto_reply',
             null,

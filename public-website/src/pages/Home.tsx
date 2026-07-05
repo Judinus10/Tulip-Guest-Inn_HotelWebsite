@@ -18,7 +18,7 @@ import { galleryImages } from '../data/gallery';
 import { offers } from '../data/offers';
 import { statistics } from '../data/statistics';
 import { attractions } from '../data/attractions';
-import { getPublicAttractions, getPublicGalleryImages, getPublicRooms } from '../services/publicApi';
+import { getPublicAttractions, getPublicGalleryImages, getPublicOffers, getPublicRooms } from '../services/publicApi';
 
 const heroImages = [
   'https://images.pexels.com/photos/338504/pexels-photo-338504.jpeg?auto=compress&cs=tinysrgb&w=1920',
@@ -41,6 +41,7 @@ export default function Home() {
   const [homeRooms, setHomeRooms] = useState(rooms);
   const [homeGalleryImages, setHomeGalleryImages] = useState(galleryImages);
   const [homeAttractions, setHomeAttractions] = useState(attractions);
+  const [homeOffers, setHomeOffers] = useState(offers);
 
   const previewImages = homeGalleryImages.slice(0, 8);
   const featuredRooms = homeRooms.filter((r) => r.featured).slice(0, 3);
@@ -57,10 +58,11 @@ export default function Home() {
     let isMounted = true;
 
     async function loadHomeData() {
-      const [roomsResult, galleryResult, attractionsResult] = await Promise.allSettled([
+      const [roomsResult, galleryResult, attractionsResult, offersResult] = await Promise.allSettled([
         getPublicRooms(),
         getPublicGalleryImages(),
         getPublicAttractions(),
+        getPublicOffers(),
       ]);
 
       if (!isMounted) return;
@@ -75,6 +77,10 @@ export default function Home() {
 
       if (attractionsResult.status === 'fulfilled' && attractionsResult.value.length > 0) {
         setHomeAttractions(attractionsResult.value);
+      }
+
+      if (offersResult.status === 'fulfilled' && offersResult.value.length > 0) {
+        setHomeOffers(offersResult.value);
       }
     }
 
@@ -413,7 +419,7 @@ export default function Home() {
             subtitle="Take advantage of our curated offers designed to make your stay even more special."
           />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {offers.map((offer, i) => (
+            {homeOffers.map((offer, i) => (
               <OfferCard key={offer.id} offer={offer} index={i} />
             ))}
           </div>

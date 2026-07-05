@@ -3,60 +3,17 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/_gallery_helpers.php';
 
-/**
+/*
  * Public gallery endpoint only.
- *
- * This endpoint is intentionally NOT protected by require_admin_auth().
- * It can still use the shared db/json helpers, but it must always send
- * public-safe CORS headers before returning JSON to the React public site.
+ * CORS is handled only by api/helpers.php through _gallery_helpers.php.
  */
-function apply_public_gallery_cors_headers(): void
-{
-    apply_cors_headers();
-
-    $origin = rtrim(trim((string) ($_SERVER['HTTP_ORIGIN'] ?? ''), " \t\n\r\0\x0B\"'"), '/');
-    if ($origin === '') {
-        return;
-    }
-
-    $allowed = [];
-
-    foreach (['FRONTEND_URL', 'PUBLIC_APP_URL', 'APP_BASE_URL'] as $constantName) {
-        if (defined($constantName)) {
-            $value = rtrim(trim((string) constant($constantName), " \t\n\r\0\x0B\"'"), '/');
-            if ($value !== '') {
-                $allowed[$value] = true;
-            }
-        }
-    }
-
-    if (defined('ALLOWED_ORIGINS') && is_array(ALLOWED_ORIGINS)) {
-        foreach (ALLOWED_ORIGINS as $allowedOrigin) {
-            $value = rtrim(trim((string) $allowedOrigin, " \t\n\r\0\x0B\"'"), '/');
-            if ($value !== '') {
-                $allowed[$value] = true;
-            }
-        }
-    }
-
-    $host = parse_url($origin, PHP_URL_HOST);
-    $isLocalPublicOrigin = defined('APP_ENV')
-        && APP_ENV === 'local'
-        && in_array($host, ['localhost', '127.0.0.1'], true);
-
-    if (isset($allowed[$origin]) || $isLocalPublicOrigin) {
-        header('Access-Control-Allow-Origin: ' . $origin, true);
-        header('Vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers', true);
-    }
-}
-
 function gallery_public_has_folder_sort_order(PDO $pdo): bool
 {
     $stmt = $pdo->query("SHOW COLUMNS FROM gallery_folders LIKE 'sort_order'");
     return (bool) $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
-apply_public_gallery_cors_headers();
+apply_cors_headers();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     json_response(false, 'Method not allowed.', 405);

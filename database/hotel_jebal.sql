@@ -488,8 +488,8 @@ CREATE TABLE IF NOT EXISTS `website_settings` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `website_settings` (`setting_key`, `setting_value`) VALUES
-('business_name', 'Jebal Guest House'),
-('address', 'Jebal Guest House, Sri Lanka'),
+('business_name', 'Tulip Guest Inn'),
+('address', 'Tulip Guest Inn, Sri Lanka'),
 ('phone', '+94 77 123 4567'),
 ('reception_contact_number', '+94 21 222 4567'),
 ('whatsapp_reservation_number', '+94 77 123 4567'),
@@ -577,3 +577,23 @@ ALTER TABLE email_queue ADD COLUMN IF NOT EXISTS sent_at DATETIME NULL AFTER loc
 
 ALTER TABLE gallery_folders
 ADD COLUMN sort_order INT UNSIGNED NOT NULL DEFAULT 1 AFTER status;
+
+CREATE TABLE IF NOT EXISTS `offers` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `title` varchar(150) NOT NULL,
+  `subtitle` varchar(150) DEFAULT NULL,
+  `description` text NOT NULL,
+  `discount_label` varchar(50) NOT NULL,
+  `validity_label` varchar(150) NOT NULL,
+  `image_path` varchar(500) DEFAULT NULL,
+  `details` json DEFAULT NULL,
+  `status` enum('active','inactive','expired','upcoming') NOT NULL DEFAULT 'active',
+  `start_date` date DEFAULT NULL,
+  `end_date` date DEFAULT NULL,
+  `sort_order` int(11) NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_offers_public` (`status`, `start_date`, `end_date`, `sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

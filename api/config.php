@@ -149,9 +149,9 @@ jebal_define('CONTACT_FROM_EMAIL', (string) jebal_env_value('CONTACT_FROM_EMAIL'
 jebal_define('ADMIN_FROM_EMAIL', (string) jebal_env_value('ADMIN_FROM_EMAIL', jebal_env_value('ADMIN_EMAIL', 'admin@jebalguesthouse.com')));
 
 jebal_define('FROM_NAME', (string) jebal_env_value('FROM_NAME', 'Jebal Homes'));
-jebal_define('BOOKING_FROM_NAME', (string) jebal_env_value('BOOKING_FROM_NAME', 'Jebal Guest House Bookings'));
-jebal_define('CONTACT_FROM_NAME', (string) jebal_env_value('CONTACT_FROM_NAME', 'Jebal Guest House'));
-jebal_define('ADMIN_FROM_NAME', (string) jebal_env_value('ADMIN_FROM_NAME', 'Jebal Guest House Admin'));
+jebal_define('BOOKING_FROM_NAME', (string) jebal_env_value('BOOKING_FROM_NAME', 'Tulip Guest Inn Bookings'));
+jebal_define('CONTACT_FROM_NAME', (string) jebal_env_value('CONTACT_FROM_NAME', 'Tulip Guest Inn'));
+jebal_define('ADMIN_FROM_NAME', (string) jebal_env_value('ADMIN_FROM_NAME', 'Tulip Guest Inn Admin'));
 
 /*
  | Separate SMTP profiles.

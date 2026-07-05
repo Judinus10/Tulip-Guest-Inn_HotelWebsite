@@ -337,8 +337,8 @@ export default function Messages() {
     }
 
     const payload = {
-      fileName: 'jebal-guest-house-inquiries',
-      title: 'Jebal Guest House Inquiry Report',
+      fileName: 'tulip-guest-inn-inquiries',
+      title: 'Tulip Guest Inn Inquiry Report',
       rows,
     }
 

@@ -59,7 +59,8 @@ function get_configured_cors_origins(): array
 
 function is_local_dev_origin(string $origin): bool
 {
-    if (!defined('APP_ENV') || APP_ENV !== 'local') {
+    $appEnv = defined('APP_ENV') ? strtolower((string) APP_ENV) : 'production';
+    if ($appEnv !== 'local') {
         return false;
     }
 
@@ -73,24 +74,37 @@ function is_local_dev_origin(string $origin): bool
     return in_array($host, ['localhost', '127.0.0.1'], true);
 }
 
+function get_request_origin(): string
+{
+    return normalize_cors_origin((string) ($_SERVER['HTTP_ORIGIN'] ?? ''));
+}
+
+function is_cors_origin_allowed(string $origin): bool
+{
+    if ($origin === '') {
+        return false;
+    }
+
+    return in_array($origin, get_configured_cors_origins(), true) || is_local_dev_origin($origin);
+}
+
 function apply_cors_headers(): void
 {
     apply_security_headers();
 
-    $origin = normalize_cors_origin((string) ($_SERVER['HTTP_ORIGIN'] ?? ''));
-    $allowedOrigins = get_configured_cors_origins();
+    $origin = get_request_origin();
 
-    if ($origin !== '' && (in_array($origin, $allowedOrigins, true) || is_local_dev_origin($origin))) {
-        header('Access-Control-Allow-Origin: ' . $origin);
-        header('Vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
+    if ($origin !== '' && is_cors_origin_allowed($origin)) {
+        header('Access-Control-Allow-Origin: ' . $origin, true);
+        header('Vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers', true);
     }
 
-    header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    header('Access-Control-Allow-Headers: Origin, Content-Type, Accept, Authorization, X-Requested-With, Cache-Control, Pragma, X-HTTP-Method-Override');
-    header('Access-Control-Max-Age: 86400');
-    header('Content-Type: application/json; charset=utf-8');
+    header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS', true);
+    header('Access-Control-Allow-Headers: Origin, Content-Type, Accept, Authorization, X-Requested-With, Cache-Control, Pragma, X-HTTP-Method-Override', true);
+    header('Access-Control-Max-Age: 86400', true);
+    header('Content-Type: application/json; charset=utf-8', true);
 
-    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    if (strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'OPTIONS') {
         http_response_code(204);
         exit;
     }
@@ -300,7 +314,7 @@ function send_plain_email(string $to, string $subject, string $message, ?string 
         $smtpPort = defined('SMTP_PORT') ? (int) SMTP_PORT : 0;
         $smtpSecure = defined('SMTP_SECURE') ? strtolower(trim((string) SMTP_SECURE)) : 'tls';
         $fromEmail = defined('FROM_EMAIL') ? trim((string) FROM_EMAIL) : '';
-        $fromName = defined('FROM_NAME') ? trim((string) FROM_NAME) : 'Jebal Guest House';
+        $fromName = defined('FROM_NAME') ? trim((string) FROM_NAME) : 'Tulip Guest Inn';
 
         if (
             $smtpHost === '' ||

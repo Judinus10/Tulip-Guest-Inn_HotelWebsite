@@ -19,7 +19,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input, Label } from '@/components/ui/input'
-import { discountTypes, initialOffers, offerStatuses, packageCategories } from '@/data/offerData'
+import { discountTypes, offerStatuses, packageCategories } from '@/data/offerData'
+import { createOffer, deleteOfferById, fetchOffers, updateOffer } from '@/services/offersApi'
 
 const emptyForm = {
   title: '',
@@ -212,7 +213,7 @@ function OfferFormModal({ mode, offer, onClose, onSubmit }) {
   return (
     <Modal
       title={mode === 'edit' ? 'Edit offer' : 'Add new offer'}
-      description="Manage offer information using frontend mock state."
+      description="Manage offer information stored in the database."
       onClose={onClose}
       size="max-w-3xl"
     >
@@ -451,9 +452,9 @@ function PaginationControls({ currentPage, totalPages, totalItems, pageSize, onP
   const endItem = Math.min(currentPage * pageSize, totalItems)
 
   return (
-    <div className="sticky bottom-0 z-10 flex flex-col gap-3 border-t border-border bg-white/95 px-4 py-4 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-sm font-medium text-text-secondary">Showing {startItem}-{endItem} of {totalItems}</p>
-      <div className="flex items-center gap-2">
+    <div className="sticky bottom-0 z-10 flex flex-row items-center justify-between gap-3 border-t border-border bg-white/95 px-4 py-4 backdrop-blur">
+      <p className="shrink-0 text-sm font-medium text-text-secondary">Showing {startItem}-{endItem} of {totalItems}</p>
+      <div className="ml-auto flex shrink-0 items-center gap-2">
         <Button
           type="button"
           variant="outline"
@@ -518,7 +519,9 @@ function OfferActionsDropdown({ offer, onView, onEdit, onDelete }) {
 }
 
 export default function Offers() {
-  const [offers, setOffers] = useState(initialOffers)
+  const [offers, setOffers] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [discountFilter, setDiscountFilter] = useState('all')
@@ -533,6 +536,24 @@ export default function Offers() {
     setToast(message)
     window.setTimeout(() => setToast(''), 2500)
   }
+
+  const loadOffers = async () => {
+    setIsLoading(true)
+    setLoadError('')
+
+    try {
+      const data = await fetchOffers()
+      setOffers(data)
+    } catch (error) {
+      setLoadError(error.message || 'Unable to load offers.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadOffers()
+  }, [])
 
   const summary = useMemo(() => {
     return {
@@ -590,42 +611,33 @@ export default function Offers() {
     setEditingOffer(null)
   }
 
-  const handleSubmitOffer = (payload) => {
-    const now = new Date().toISOString()
+  const handleSubmitOffer = async (payload) => {
+    try {
+      if (formMode === 'edit' && editingOffer) {
+        const savedOffer = await updateOffer({ ...payload, id: editingOffer.id })
+        setOffers((current) => current.map((offer) => (offer.id === editingOffer.id ? savedOffer : offer)))
+        showToast('Offer updated successfully.')
+      } else {
+        const savedOffer = await createOffer(payload)
+        setOffers((current) => [savedOffer, ...current])
+        showToast('Offer added successfully.')
+      }
 
-    if (formMode === 'edit' && editingOffer) {
-      setOffers((current) =>
-        current.map((offer) =>
-          offer.id === editingOffer.id
-            ? {
-                ...offer,
-                ...payload,
-                updated_at: now,
-              }
-            : offer,
-        ),
-      )
-      showToast('Offer updated successfully.')
-    } else {
-      setOffers((current) => [
-        {
-          id: Date.now(),
-          ...payload,
-          created_at: now,
-          updated_at: now,
-        },
-        ...current,
-      ])
-      showToast('Offer added successfully.')
+      closeFormModal()
+    } catch (error) {
+      showToast(error.message || 'Unable to save offer.')
     }
-
-    closeFormModal()
   }
 
-  const handleDeleteOffer = (id) => {
-    setOffers((current) => current.filter((offer) => offer.id !== id))
-    setDeleteOffer(null)
-    showToast('Offer deleted successfully.')
+  const handleDeleteOffer = async (id) => {
+    try {
+      await deleteOfferById(id)
+      setOffers((current) => current.filter((offer) => offer.id !== id))
+      setDeleteOffer(null)
+      showToast('Offer deleted successfully.')
+    } catch (error) {
+      showToast(error.message || 'Unable to delete offer.')
+    }
   }
 
   return (
@@ -697,6 +709,15 @@ export default function Offers() {
 
       <Card>
         <CardContent className="p-0">
+          {loadError ? (
+            <div className="border-b border-border px-5 py-4 text-sm font-medium text-red-600">{loadError}</div>
+          ) : null}
+
+          {isLoading ? (
+            <div className="px-5 py-10 text-center text-sm font-medium text-text-secondary">Loading offers...</div>
+          ) : null}
+
+          {!isLoading ? (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-border">
               <thead className="sticky top-0 z-10 bg-slate-50">
@@ -740,8 +761,9 @@ export default function Offers() {
               </tbody>
             </table>
           </div>
+          ) : null}
 
-          {filteredOffers.length > 0 ? (
+          {!isLoading && filteredOffers.length > 0 ? (
             <PaginationControls
               currentPage={currentPage}
               totalPages={totalPages}
@@ -751,7 +773,7 @@ export default function Offers() {
             />
           ) : null}
 
-          {filteredOffers.length === 0 ? (
+          {!isLoading && filteredOffers.length === 0 ? (
             <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
               <div className="rounded-full bg-blue-50 p-4 text-blue-700">
                 <Gift className="h-8 w-8" />

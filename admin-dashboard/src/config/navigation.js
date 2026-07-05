@@ -35,7 +35,7 @@ export const navigation = [
       { name: 'Rooms', href: '/rooms', icon: BedDouble },
       { name: 'Gallery', href: '/gallery', icon: Images },
       { name: 'Experience', href: '/experience', icon: Sparkles },
-      // { name: 'Offers & Packages', href: '/offers', icon: Tag },
+      { name: 'Offers & Packages', href: '/offers', icon: Tag },
     ],
   },
   {

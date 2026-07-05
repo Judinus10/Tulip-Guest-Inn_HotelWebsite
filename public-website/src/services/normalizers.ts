@@ -1,10 +1,12 @@
 import type { Room } from '../data/rooms';
 import type { GalleryImage, GalleryCategory } from '../data/gallery';
 import type { Attraction } from '../data/attractions';
+import type { Offer } from '../data/offers';
 
 export type BackendRoom = Record<string, unknown>;
 export type BackendGalleryImage = Record<string, unknown>;
 export type BackendExperienceItem = Record<string, unknown>;
+export type BackendOffer = Record<string, unknown>;
 
 const fallbackRoomImage = 'https://images.unsplash.com/photo-1611892440506-42a832e657fb?w=1200&q=80';
 const fallbackAttractionImage = 'https://images.pexels.com/photos/1032650/pexels-photo-1032650.jpeg?auto=compress&cs=tinysrgb&w=1200';
@@ -99,9 +101,24 @@ export function normalizeAttraction(item: BackendExperienceItem, index: number):
     name: asString(item.title, 'Nearby Attraction'),
     description: asString(item.description),
     longDescription: asString(item.description),
-    distance: asString(item.distance, asString(item.location, 'Nearby')),
-    duration: asString(item.location, 'Explore'),
+    distance: asString(item.distance, 'Nearby'),
+    duration: asString(item.duration, asString(item.time, asString(item.location, 'Explore'))),
     image: asString(item.image_path, fallbackAttractionImage),
     category: asString(item.category, 'Experience'),
+  };
+}
+
+
+export function normalizeOffer(offer: BackendOffer, index = 0): Offer {
+  const name = asString(offer.name, asString(offer.title, 'Special Offer'));
+
+  return {
+    id: String(offer.id ?? index + 1),
+    name,
+    description: asString(offer.description),
+    discount: asString(offer.discount, asString(offer.discount_label, 'Offer')),
+    validity: asString(offer.validity, asString(offer.validity_label, asString(offer.subtitle))),
+    image: asString(offer.image, asString(offer.image_path)),
+    details: asStringArray(offer.details),
   };
 }

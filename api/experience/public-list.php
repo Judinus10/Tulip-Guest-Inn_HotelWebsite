@@ -5,6 +5,7 @@ require_once __DIR__ . '/_experience_helpers.php';
 
 try {
     $pdo = experience_db();
+    experience_ensure_schema($pdo);
 
     $stmt = $pdo->query("
         SELECT *

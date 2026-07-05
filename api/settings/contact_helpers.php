@@ -13,8 +13,8 @@ function ensure_contact_settings_table(PDO $pdo): void
 function default_contact_settings(): array
 {
     return [
-        'business_name' => 'Jebal Guest House',
-        'address' => 'Jebal Guest House, Sri Lanka',
+        'business_name' => 'Tulip Guest Inn',
+        'address' => 'Tulip Guest Inn, Sri Lanka',
         'phone' => '+94 77 123 4567',
         'reception_contact_number' => '+94 21 222 4567',
         'whatsapp_reservation_number' => '+94 77 123 4567',

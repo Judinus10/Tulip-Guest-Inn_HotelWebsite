@@ -89,13 +89,13 @@ export default function Login() {
         <div className="relative z-10 flex items-center gap-4">
           <img
             src={logo}
-            alt="Jebal Guest House"
+            alt="Tulip Guest Inn"
             className="h-16 w-auto rounded-xl bg-white p-2 shadow-lg"
           />
 
           <div>
             <p className="text-2xl font-bold tracking-tight">
-              Jebal Guest House
+              Tulip Guest Inn
             </p>
             <p className="text-xs font-medium uppercase tracking-[0.25em] text-blue-200">
               Admin Dashboard
@@ -117,7 +117,7 @@ export default function Login() {
 
         <div className="relative z-10 flex items-end justify-between gap-6">
           <p className="text-xs text-blue-100/50">
-            © 2026 Jebal Guest House. Admin control panel.
+            © 2026 Tulip Guest Inn. Admin control panel.
           </p>
 
           <div className="flex translate-y-10 flex-col items-end">
@@ -140,7 +140,7 @@ export default function Login() {
             <div className="mx-auto mb-4 lg:hidden">
               <img
                 src={logo}
-                alt="Jebal Guest House"
+                alt="Tulip Guest Inn"
                 className="h-20 w-auto rounded-xl bg-white p-2 shadow-lg"
               />
             </div>
@@ -232,7 +232,7 @@ export default function Login() {
               )}
 
               <p className="text-center text-xs text-slate-500">
-                Use your assigned Jebal Guest House administrator credentials.
+                Use your assigned Tulip Guest Inn administrator credentials.
               </p>
             </form>
           </CardContent>

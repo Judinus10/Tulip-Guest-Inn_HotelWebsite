@@ -85,7 +85,7 @@ try {
     $requestToken = bin2hex(random_bytes(32));
     $expiresAtEpoch = time() + 60;
 
-    $subject = 'Admin password OTP - Jebal Guest House';
+    $subject = 'Admin password OTP - Tulip Guest Inn';
     $message = otp_email_html('Admin password OTP', $otp, 1);
 
     $sent = send_html_email($recipientEmail, $subject, $message);

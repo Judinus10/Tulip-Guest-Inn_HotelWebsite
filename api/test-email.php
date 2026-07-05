@@ -99,7 +99,7 @@ try {
     $mail->addAddress($to);
     $mail->isHTML(false);
     $mail->Subject = 'Jebal SMTP Test - ' . ucfirst($profile);
-    $mail->Body = 'SMTP test successful from Jebal Guest House using ' . $profile . ' profile.';
+    $mail->Body = 'SMTP test successful from Tulip Guest Inn using ' . $profile . ' profile.';
     $mail->send();
 
     echo '<h2 style="color:green;">EMAIL SENT SUCCESSFULLY</h2>';

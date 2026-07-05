@@ -1201,7 +1201,7 @@ export default function Bookings() {
 
     const payload = {
       fileName: 'jebal-guest-house-bookings',
-      title: 'Jebal Guest House Booking Report',
+      title: 'Tulip Guest Inn Booking Report',
       rows,
     }
 
@@ -1214,7 +1214,7 @@ export default function Bookings() {
     <div className="w-full min-w-0 max-w-full space-y-6 overflow-x-hidden">
       <Toast toast={toast} onClose={() => setToast(null)} />
 
-      <PageHeader title="Bookings" description="View, filter, and manage Jebal Guest House reservations.">
+      <PageHeader title="Bookings" description="View, filter, and manage Tulip Guest Inn reservations.">
         <div className="flex max-w-full flex-wrap gap-2 md:flex-nowrap md:items-center">
           <Button variant="outline" onClick={clearFilters}><Filter className="h-4 w-4" />Clear Filters</Button>
           <Dropdown

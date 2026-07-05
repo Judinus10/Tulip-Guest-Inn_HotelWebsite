@@ -18,8 +18,8 @@ import { Input, Label, Textarea } from '@/components/ui/input'
 import { fetchContactSettings, saveContactSettings } from '@/services/settingsApi'
 
 const defaultSettings = {
-  business_name: 'Jebal Guest House',
-  address: 'Jebal Guest House, Sri Lanka',
+  business_name: 'Tulip Guest Inn',
+  address: 'Tulip Guest Inn, Sri Lanka',
   phone: '+94 77 123 4567',
   reception_contact_number: '+94 21 222 4567',
   whatsapp_reservation_number: '+94 77 123 4567',
@@ -193,7 +193,7 @@ export default function WebsiteSettings() {
                   id="business_name"
                   value={settings.business_name}
                   onChange={(event) => updateSetting('business_name', event.target.value)}
-                  placeholder="Jebal Guest House"
+                  placeholder="Tulip Guest Inn"
                   required
                 />
               </div>

@@ -650,7 +650,7 @@ export default function Payments() {
 
     const payload = {
       fileName: 'jebal-guest-house-payments',
-      title: 'Jebal Guest House Payment Report',
+      title: 'Tulip Guest Inn Payment Report',
       rows,
     }
 
@@ -663,7 +663,7 @@ export default function Payments() {
     <div className="space-y-6">
       <Toast message={toast?.message} type={toast?.type} onClose={() => setToast(null)} />
 
-      <PageHeader title="Payments" description="Track Jebal Guest House payment status and payment methods.">
+      <PageHeader title="Payments" description="Track Tulip Guest Inn payment status and payment methods.">
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" onClick={handleResetFilters}>
             <Filter className="h-4 w-4" />

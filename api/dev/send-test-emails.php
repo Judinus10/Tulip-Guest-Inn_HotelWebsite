@@ -1,6 +1,6 @@
 <?php
 /**
- * Jebal Guest House email UI test sender.
+ * Tulip Guest Inn email UI test sender.
  *
  * Purpose:
  * - Send all main booking/contact/reminder email templates with dummy data.
@@ -112,14 +112,14 @@ function test_email_catalog(string $recipient): array
     return [
         'booking_received_customer' => [
             'label' => 'Booking received - customer',
-            'subject' => 'TEST: Booking inquiry received - Jebal Guest House #90001',
+            'subject' => 'TEST: Booking inquiry received - Tulip Guest Inn #90001',
             'body' => booking_email_html('received', $booking),
             'from_email' => booking_from_email(),
             'from_name' => booking_from_name(),
         ],
         'booking_received_admin' => [
             'label' => 'Booking received - admin',
-            'subject' => 'TEST: New booking received - Jebal Guest House #90001',
+            'subject' => 'TEST: New booking received - Tulip Guest Inn #90001',
             'body' => booking_email_html('received', $booking, [], true),
             'from_email' => booking_from_email(),
             'from_name' => booking_from_name(),
@@ -127,7 +127,7 @@ function test_email_catalog(string $recipient): array
         ],
         'booking_payment_pending_customer' => [
             'label' => 'Booking payment pending - customer',
-            'subject' => 'TEST: Booking received - payment pending - Jebal Guest House #90001',
+            'subject' => 'TEST: Booking received - payment pending - Tulip Guest Inn #90001',
             'body' => booking_email_html('pending', $booking, $payment, false, email_button('Resume Payment / View Booking Bill', $payment['bill_url']), [
                 'Order ID' => $payment['order_id'],
                 'Amount Due' => format_money_amount((float) $payment['amount']),
@@ -137,7 +137,7 @@ function test_email_catalog(string $recipient): array
         ],
         'booking_payment_pending_admin' => [
             'label' => 'Booking payment pending - admin',
-            'subject' => 'TEST: New booking received - payment pending - Jebal Guest House #90001',
+            'subject' => 'TEST: New booking received - payment pending - Tulip Guest Inn #90001',
             'body' => booking_email_html('pending', $booking, $payment, true, email_button('View Booking Bill', $payment['bill_url']), [
                 'Order ID' => $payment['order_id'],
             ]),
@@ -147,21 +147,21 @@ function test_email_catalog(string $recipient): array
         ],
         'booking_confirmed' => [
             'label' => 'Booking confirmed',
-            'subject' => 'TEST: Booking confirmed - Jebal Guest House #90001',
+            'subject' => 'TEST: Booking confirmed - Tulip Guest Inn #90001',
             'body' => booking_email_html('confirmed', array_merge($booking, ['status' => 'Confirmed', 'payment_status' => 'Paid']), $payment, false, email_button('Download Invoice', $payment['bill_url'])),
             'from_email' => booking_from_email(),
             'from_name' => booking_from_name(),
         ],
         'payment_success_customer' => [
             'label' => 'Payment successful - customer',
-            'subject' => 'TEST: Payment successful - Jebal Guest House #90001',
+            'subject' => 'TEST: Payment successful - Tulip Guest Inn #90001',
             'body' => booking_email_html('paid', array_merge($booking, ['status' => 'Confirmed', 'payment_status' => 'Paid']), $payment, false, email_button('Download Invoice', $payment['bill_url'])),
             'from_email' => booking_from_email(),
             'from_name' => booking_from_name(),
         ],
         'payment_success_admin' => [
             'label' => 'Payment received - admin',
-            'subject' => 'TEST: Payment received - Jebal Guest House #90001',
+            'subject' => 'TEST: Payment received - Tulip Guest Inn #90001',
             'body' => booking_email_html('paid', array_merge($booking, ['status' => 'Confirmed', 'payment_status' => 'Paid']), $payment, true),
             'from_email' => booking_from_email(),
             'from_name' => booking_from_name(),
@@ -169,14 +169,14 @@ function test_email_catalog(string $recipient): array
         ],
         'booking_cancelled_customer' => [
             'label' => 'Booking cancelled - customer',
-            'subject' => 'TEST: Booking cancelled - Jebal Guest House #90001',
+            'subject' => 'TEST: Booking cancelled - Tulip Guest Inn #90001',
             'body' => booking_email_html('cancelled', array_merge($booking, ['status' => 'Cancelled'])),
             'from_email' => booking_from_email(),
             'from_name' => booking_from_name(),
         ],
         'booking_cancelled_admin' => [
             'label' => 'Booking cancelled - admin',
-            'subject' => 'TEST: Booking cancelled - Jebal Guest House #90001',
+            'subject' => 'TEST: Booking cancelled - Tulip Guest Inn #90001',
             'body' => booking_email_html('cancelled', array_merge($booking, ['status' => 'Cancelled']), [], true),
             'from_email' => booking_from_email(),
             'from_name' => booking_from_name(),
@@ -184,14 +184,14 @@ function test_email_catalog(string $recipient): array
         ],
         'booking_expired_customer' => [
             'label' => 'Booking hold expired - customer',
-            'subject' => 'TEST: Booking hold expired - Jebal Guest House #90001',
+            'subject' => 'TEST: Booking hold expired - Tulip Guest Inn #90001',
             'body' => booking_email_html('expired', array_merge($booking, ['status' => 'Expired', 'payment_status' => 'Expired'])),
             'from_email' => booking_from_email(),
             'from_name' => booking_from_name(),
         ],
         'booking_expired_admin' => [
             'label' => 'Booking hold expired - admin',
-            'subject' => 'TEST: Pending booking expired - Jebal Guest House #90001',
+            'subject' => 'TEST: Pending booking expired - Tulip Guest Inn #90001',
             'body' => booking_email_html('expired', array_merge($booking, ['status' => 'Expired', 'payment_status' => 'Expired']), [], true),
             'from_email' => booking_from_email(),
             'from_name' => booking_from_name(),
@@ -199,21 +199,21 @@ function test_email_catalog(string $recipient): array
         ],
         'booking_reminder' => [
             'label' => 'Admin check-in/check-out reminder',
-            'subject' => 'TEST: Today check-in/check-out reminders - Jebal Guest House - ' . date('Y-m-d'),
+            'subject' => 'TEST: Today check-in/check-out reminders - Tulip Guest Inn - ' . date('Y-m-d'),
             'body' => stay_reminder_email_html(date('Y-m-d'), $checkIns, $checkOuts),
             'from_email' => admin_from_email(),
             'from_name' => admin_from_name(),
         ],
         'contact_customer' => [
             'label' => 'Contact auto reply - customer',
-            'subject' => 'TEST: We received your message - Jebal Guest House ' . $contactRef,
+            'subject' => 'TEST: We received your message - Tulip Guest Inn ' . $contactRef,
             'body' => contact_customer_email_html('Test Guest', $contactRef, 'Room availability question'),
             'from_email' => contact_from_email(),
             'from_name' => contact_from_name(),
         ],
         'contact_admin' => [
             'label' => 'Contact notification - admin',
-            'subject' => 'TEST: New contact enquiry - Jebal Guest House ' . $contactRef,
+            'subject' => 'TEST: New contact enquiry - Tulip Guest Inn ' . $contactRef,
             'body' => contact_admin_email_html('Test Guest', $recipient, '+94 77 123 4567', 'Room availability question', 'This is a dummy contact message for email UI testing.', $contactRef),
             'from_email' => contact_from_email(),
             'from_name' => contact_from_name(),

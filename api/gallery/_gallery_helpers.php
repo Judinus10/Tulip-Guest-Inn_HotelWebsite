@@ -10,13 +10,25 @@ function gallery_slugify(string $value): string
     return trim($value, '-');
 }
 
-function gallery_upload_public_base(): string
+function gallery_public_api_base(): string
 {
     $base = defined('API_BASE_URL') && API_BASE_URL !== ''
-        ? rtrim(API_BASE_URL, '/')
-        : 'http://localhost/HotelWebsite/api';
+        ? rtrim((string) API_BASE_URL, '/')
+        : '';
 
-    return $base . '/uploads/gallery';
+    if ($base === '') {
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $scriptDir = str_replace('\\', '/', dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/api/gallery/index.php')));
+        $base = $scheme . '://' . $host . rtrim($scriptDir, '/');
+    }
+
+    return rtrim($base, '/');
+}
+
+function gallery_upload_public_base(): string
+{
+    return gallery_public_api_base() . '/uploads/gallery';
 }
 
 function gallery_upload_dir(): string
@@ -100,7 +112,22 @@ function gallery_image_url(string $path): string
     $path = trim($path);
     if ($path === '') return '';
     if (preg_match('/^https?:\/\//i', $path)) return $path;
-    return gallery_upload_public_base() . '/' . ltrim($path, '/');
+
+    $path = str_replace('\\', '/', $path);
+    $path = ltrim($path, '/');
+
+    // New uploads store only the filename. Older rows may store uploads/gallery/file.jpg
+    // or /api/uploads/gallery/file.jpg. Return one correct public URL in every case.
+    if (preg_match('#(?:^|/)uploads/gallery/([^/]+)$#i', $path, $matches)) {
+        return gallery_upload_public_base() . '/' . rawurlencode($matches[1]);
+    }
+
+    if (str_contains($path, '/api/uploads/gallery/')) {
+        $filename = basename($path);
+        return gallery_upload_public_base() . '/' . rawurlencode($filename);
+    }
+
+    return gallery_upload_public_base() . '/' . rawurlencode(basename($path));
 }
 
 function gallery_normalize_folder(array $row): array

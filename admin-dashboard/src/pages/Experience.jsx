@@ -3,6 +3,7 @@ import {
   Edit,
   Eye,
   ImagePlus,
+  Clock,
   MapPin,
   Plus,
   Search,
@@ -42,6 +43,7 @@ const emptyForm = {
   category: 'Culture',
   location: '',
   distance: '',
+  duration: '',
   description: '',
   image_path: '',
   image_file: null,
@@ -80,7 +82,9 @@ export default function Experience() {
         return (
           item.title.toLowerCase().includes(query) ||
           item.description.toLowerCase().includes(query) ||
-          item.location.toLowerCase().includes(query)
+          item.location.toLowerCase().includes(query) ||
+          item.distance.toLowerCase().includes(query) ||
+          item.duration.toLowerCase().includes(query)
         )
       })
       .filter((item) => categoryFilter === 'all' || item.category === categoryFilter)
@@ -135,6 +139,7 @@ export default function Experience() {
         ...emptyForm,
         ...item,
         distance: item.distance || '',
+        duration: item.duration || '',
         location: item.location || '',
         description: item.description || '',
         image_file: null,
@@ -342,9 +347,16 @@ export default function Experience() {
                 {item.location || item.distance ? (
                   <p className="mt-3 flex items-center gap-1.5 text-sm text-text-secondary">
                     <MapPin className="h-4 w-4 shrink-0" />
-                    <span>{item.location}</span>
+                    {item.location ? <span>{item.location}</span> : null}
                     {item.location && item.distance ? <span>•</span> : null}
                     {item.distance ? <span>{item.distance}</span> : null}
+                  </p>
+                ) : null}
+
+                {item.duration ? (
+                  <p className="mt-2 flex items-center gap-1.5 text-sm text-text-secondary">
+                    <Clock className="h-4 w-4 shrink-0" />
+                    <span>{item.duration}</span>
                   </p>
                 ) : null}
 
@@ -430,6 +442,15 @@ export default function Experience() {
                     value={modal.form.distance}
                     onChange={(e) => updateForm('distance', e.target.value)}
                     placeholder="5 km"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Time</Label>
+                  <Input
+                    value={modal.form.duration}
+                    onChange={(event) => updateForm('duration', event.target.value)}
+                    placeholder="5 min drive"
                   />
                 </div>
 
