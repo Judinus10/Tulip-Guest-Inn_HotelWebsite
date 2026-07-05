@@ -55,6 +55,18 @@ function appendOfferFormData(payload) {
       return
     }
 
+    if (key === 'details') {
+      const cleanDetails = Array.isArray(value)
+        ? value.map((item) => String(item).trim()).filter(Boolean)
+        : String(value || '')
+            .split(/\r?\n/)
+            .map((item) => item.trim())
+            .filter(Boolean)
+
+      formData.append('details', JSON.stringify(cleanDetails))
+      return
+    }
+
     if (value !== undefined && value !== null) {
       formData.append(key, value)
     }

@@ -25,6 +25,7 @@ import { createOffer, deleteOfferById, fetchOffers, updateOffer } from '@/servic
 const emptyForm = {
   title: '',
   description: '',
+  details: [],
   package_category: 'Family Stay Offer',
   discount_type: 'percentage',
   discount_value: '',
@@ -143,6 +144,18 @@ function OfferFormModal({ mode, offer, onClose, onSubmit }) {
     setErrors((current) => ({ ...current, [field]: '' }))
   }
 
+  const detailsText = Array.isArray(form.details) ? form.details.join('\n') : String(form.details || '')
+
+  const updateDetails = (value) => {
+    setForm((current) => ({
+      ...current,
+      details: value
+        .split(/\r?\n/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    }))
+  }
+
   const handleImageChange = (event) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -236,6 +249,19 @@ function OfferFormModal({ mode, offer, onClose, onSubmit }) {
               className="min-h-28 w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text-primary shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
             />
             {errors.description ? <p className="text-xs font-medium text-red-600">{errors.description}</p> : null}
+          </div>
+
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="details">Offer details / bullet points</Label>
+            <textarea
+              id="details"
+              value={detailsText}
+              onChange={(event) => updateDetails(event.target.value)}
+              rows={4}
+              placeholder={"20% room rate discount\nComplimentary extra bed\nEarly check-in from 10 AM\nPool access included"}
+              className="min-h-28 w-full rounded-xl border border-border bg-white px-4 py-3 text-sm text-text-primary shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+            />
+            <p className="text-xs text-text-secondary">Enter one public offer point per line.</p>
           </div>
 
           <div className="space-y-2">
@@ -389,6 +415,17 @@ function OfferDetailsModal({ offer, onClose }) {
             <Badge variant={statusVariant[offer.status]}>{titleCase(offer.status)}</Badge>
           </div>
         </div>
+
+        {Array.isArray(offer.details) && offer.details.length > 0 ? (
+          <div className="rounded-2xl border border-border p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Offer Details</p>
+            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-text-primary">
+              {offer.details.map((detail, index) => (
+                <li key={`${offer.id || offer.title}-detail-${index}`}>{detail}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-2xl border border-border p-4">

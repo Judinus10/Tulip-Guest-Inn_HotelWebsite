@@ -4,6 +4,65 @@ declare(strict_types=1);
 require_once __DIR__ . '/../helpers.php';
 
 
+
+function offer_column_exists(PDO $pdo, string $column): bool
+{
+    if (!preg_match('/^[a-zA-Z0-9_]+$/', $column)) {
+        throw new RuntimeException('Invalid offer column name.');
+    }
+
+    $stmt = $pdo->query('SHOW COLUMNS FROM `offers`');
+    $columns = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+
+    foreach ($columns as $existingColumn) {
+        if (strcasecmp((string) ($existingColumn['Field'] ?? ''), $column) === 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function offer_add_column_if_missing(PDO $pdo, string $column, string $definition): void
+{
+    if (!preg_match('/^[a-zA-Z0-9_]+$/', $column)) {
+        throw new RuntimeException('Invalid offer column name.');
+    }
+
+    if (offer_column_exists($pdo, $column)) {
+        return;
+    }
+
+    try {
+        $pdo->exec("ALTER TABLE `offers` ADD COLUMN `{$column}` {$definition}");
+    } catch (PDOException $exception) {
+        $errorInfo = $exception->errorInfo ?? [];
+        $driverCode = (int) ($errorInfo[1] ?? 0);
+
+        if ($driverCode === 1060 || stripos($exception->getMessage(), 'Duplicate column') !== false) {
+            return;
+        }
+
+        throw $exception;
+    }
+}
+
+function offer_ensure_schema(PDO $pdo): void
+{
+    offer_add_column_if_missing($pdo, 'subtitle', "VARCHAR(150) NULL DEFAULT ''");
+    offer_add_column_if_missing($pdo, 'package_category', "VARCHAR(150) NULL DEFAULT 'General Package'");
+    offer_add_column_if_missing($pdo, 'discount_type', "VARCHAR(30) NOT NULL DEFAULT 'percentage'");
+    offer_add_column_if_missing($pdo, 'discount_value', "DECIMAL(10,2) NOT NULL DEFAULT 0.00");
+    offer_add_column_if_missing($pdo, 'discount_label', "VARCHAR(100) NULL DEFAULT ''");
+    offer_add_column_if_missing($pdo, 'validity_label', "VARCHAR(150) NULL DEFAULT ''");
+    offer_add_column_if_missing($pdo, 'image_path', "VARCHAR(500) NULL DEFAULT ''");
+    offer_add_column_if_missing($pdo, 'details', "TEXT NULL");
+    offer_add_column_if_missing($pdo, 'status', "VARCHAR(30) NOT NULL DEFAULT 'active'");
+    offer_add_column_if_missing($pdo, 'start_date', "DATE NULL");
+    offer_add_column_if_missing($pdo, 'end_date', "DATE NULL");
+    offer_add_column_if_missing($pdo, 'sort_order', "INT NOT NULL DEFAULT 0");
+}
+
 function offer_bootstrap(bool $requireAuth = true): PDO
 {
     apply_cors_headers();
@@ -12,7 +71,10 @@ function offer_bootstrap(bool $requireAuth = true): PDO
         require_admin_auth();
     }
 
-    return get_db_connection();
+    $pdo = get_db_connection();
+    offer_ensure_schema($pdo);
+
+    return $pdo;
 }
 
 function offer_json(array $payload, int $statusCode = 200): void
