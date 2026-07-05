@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Users, BedDouble, Maximize } from 'lucide-react';
 import type { Room } from '../../data/rooms';
@@ -9,13 +9,29 @@ interface RoomCardProps {
 }
 
 export default function RoomCard({ room, index = 0 }: RoomCardProps) {
+  const navigate = useNavigate();
+  const roomPath = `/rooms/${room.slug}`;
+
+  const openRoom = () => {
+    navigate(roomPath);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 40 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-60px' }}
       transition={{ duration: 0.6, delay: index * 0.1, ease: [0.25, 0.4, 0.25, 1] }}
-      className="group bg-white border border-border shadow-luxury hover:shadow-luxury-lg transition-shadow duration-500"
+      onClick={openRoom}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openRoom();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      className="group bg-white border border-border shadow-luxury hover:shadow-luxury-lg transition-shadow duration-500 cursor-pointer focus:outline-none focus:ring-2 focus:ring-gold/50"
     >
       {/* Image */}
       <div className="relative h-64 overflow-hidden">
@@ -63,13 +79,15 @@ export default function RoomCard({ room, index = 0 }: RoomCardProps) {
         {/* Buttons */}
         <div className="flex gap-3">
           <Link
-            to={`/rooms/${room.slug}`}
+            to={roomPath}
+            onClick={(event) => event.stopPropagation()}
             className="btn-outline flex-1 justify-center text-[9px] py-2.5 px-4"
           >
             View Room
           </Link>
           <Link
             to={`/booking?room=${room.slug}`}
+            onClick={(event) => event.stopPropagation()}
             className="btn-primary flex-1 justify-center text-[9px] py-2.5 px-4"
           >
             Book Now

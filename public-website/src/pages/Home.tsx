@@ -1,39 +1,109 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { ChevronDown, Wifi, Car, Waves, Users, Shield, Coffee } from 'lucide-react';
-import SectionTitle from '../components/ui/SectionTitle';
-import AnimatedSection from '../components/ui/AnimatedSection';
-import BookingBar from '../components/ui/BookingBar';
-import RoomCard from '../components/ui/RoomCard';
-import FacilityCard from '../components/ui/FacilityCard';
-import TestimonialSlider from '../components/ui/TestimonialSlider';
-import OfferCard from '../components/ui/OfferCard';
-import StatCounter from '../components/ui/StatCounter';
-import CTASection from '../components/ui/CTASection';
-import AttractionCard from '../components/ui/AttractionCard';
-import { rooms } from '../data/rooms';
-import { facilities } from '../data/facilities';
-import { galleryImages } from '../data/gallery';
-import { offers } from '../data/offers';
-import { statistics } from '../data/statistics';
-import { attractions } from '../data/attractions';
-import { getPublicAttractions, getPublicGalleryImages, getPublicOffers, getPublicRooms } from '../services/publicApi';
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import {
+  ChevronDown,
+  Wifi,
+  Car,
+  Waves,
+  Users,
+  Shield,
+  Coffee,
+} from "lucide-react";
+import SectionTitle from "../components/ui/SectionTitle";
+import AnimatedSection from "../components/ui/AnimatedSection";
+import BookingBar from "../components/ui/BookingBar";
+import RoomCard from "../components/ui/RoomCard";
+import FacilityCard from "../components/ui/FacilityCard";
+import TestimonialSlider from "../components/ui/TestimonialSlider";
+import OfferCard from "../components/ui/OfferCard";
+import StatCounter from "../components/ui/StatCounter";
+import CTASection from "../components/ui/CTASection";
+import AttractionCard from "../components/ui/AttractionCard";
+import { rooms } from "../data/rooms";
+import { facilities } from "../data/facilities";
+import { galleryImages } from "../data/gallery";
+import { offers } from "../data/offers";
+import { statistics } from "../data/statistics";
+import { attractions } from "../data/attractions";
+import {
+  getPublicAttractions,
+  getPublicGalleryImages,
+  getPublicOffers,
+  getPublicRooms,
+} from "../services/publicApi";
 
 const heroImages = [
-  'https://images.pexels.com/photos/338504/pexels-photo-338504.jpeg?auto=compress&cs=tinysrgb&w=1920',
-  'https://images.pexels.com/photos/261102/pexels-photo-261102.jpeg?auto=compress&cs=tinysrgb&w=1920',
-  'https://images.pexels.com/photos/1838554/pexels-photo-1838554.jpeg?auto=compress&cs=tinysrgb&w=1920',
+  "https://images.pexels.com/photos/338504/pexels-photo-338504.jpeg?auto=compress&cs=tinysrgb&w=1920",
+  "https://images.pexels.com/photos/261102/pexels-photo-261102.jpeg?auto=compress&cs=tinysrgb&w=1920",
+  "https://images.pexels.com/photos/1838554/pexels-photo-1838554.jpeg?auto=compress&cs=tinysrgb&w=1920",
 ];
 
 const welcomeFeatures = [
-  { icon: Waves, label: 'Swimming Pool' },
-  { icon: Wifi, label: 'Free WiFi' },
-  { icon: Car, label: 'Free Parking' },
-  { icon: Users, label: 'Family Friendly' },
-  { icon: Shield, label: '24-Hr Security' },
-  { icon: Coffee, label: 'Peaceful Garden' },
+  { icon: Waves, label: "Swimming Pool" },
+  { icon: Wifi, label: "Free WiFi" },
+  { icon: Car, label: "Free Parking" },
+  { icon: Users, label: "Family Friendly" },
+  { icon: Shield, label: "24-Hr Security" },
+  { icon: Coffee, label: "Peaceful Garden" },
 ];
+
+const galleryCategoryOrder = [
+  "rooms",
+  "pool",
+  "garden",
+  "exterior",
+  "facilities",
+] as const;
+
+type HomeGalleryImage = (typeof galleryImages)[number];
+
+function normalizeGalleryCategory(
+  folderSlug?: string,
+  folderName?: string,
+): HomeGalleryImage["category"] {
+  const value = `${folderSlug ?? ""} ${folderName ?? ""}`.toLowerCase();
+
+  if (value.includes("room")) return "rooms";
+  if (value.includes("pool") || value.includes("swim")) return "pool";
+  if (value.includes("garden")) return "garden";
+  if (
+    value.includes("exterior") ||
+    value.includes("outside") ||
+    value.includes("front")
+  )
+    return "exterior";
+  return "facilities";
+}
+
+function pickRandomGalleryPreview(
+  images: HomeGalleryImage[],
+  limit = 8,
+): HomeGalleryImage[] {
+  if (images.length <= limit) return images;
+
+  const selected: HomeGalleryImage[] = [];
+  const selectedIds = new Set<string>();
+
+  galleryCategoryOrder.forEach((category) => {
+    const categoryImages = images.filter(
+      (image) => image.category === category,
+    );
+    if (categoryImages.length === 0) return;
+
+    const randomImage =
+      categoryImages[Math.floor(Math.random() * categoryImages.length)];
+    selected.push(randomImage);
+    selectedIds.add(randomImage.id);
+  });
+
+  const remainingImages = images.filter((image) => !selectedIds.has(image.id));
+  const shuffledRemaining = [...remainingImages].sort(
+    () => Math.random() - 0.5,
+  );
+
+  return [...selected, ...shuffledRemaining].slice(0, limit);
+}
 
 export default function Home() {
   const [heroIndex, setHeroIndex] = useState(0);
@@ -43,7 +113,10 @@ export default function Home() {
   const [homeAttractions, setHomeAttractions] = useState(attractions);
   const [homeOffers, setHomeOffers] = useState(offers);
 
-  const previewImages = homeGalleryImages.slice(0, 8);
+  const previewImages = useMemo(
+    () => pickRandomGalleryPreview(homeGalleryImages, 8),
+    [homeGalleryImages],
+  );
   const featuredRooms = homeRooms.filter((r) => r.featured).slice(0, 3);
   const activeHeroImages = heroImages;
 
@@ -58,28 +131,39 @@ export default function Home() {
     let isMounted = true;
 
     async function loadHomeData() {
-      const [roomsResult, galleryResult, attractionsResult, offersResult] = await Promise.allSettled([
-        getPublicRooms(),
-        getPublicGalleryImages(),
-        getPublicAttractions(),
-        getPublicOffers(),
-      ]);
+      const [roomsResult, galleryResult, attractionsResult, offersResult] =
+        await Promise.allSettled([
+          getPublicRooms(),
+          getPublicGalleryImages(),
+          getPublicAttractions(),
+          getPublicOffers(),
+        ]);
 
       if (!isMounted) return;
 
-      if (roomsResult.status === 'fulfilled' && roomsResult.value.length > 0) {
+      if (roomsResult.status === "fulfilled" && roomsResult.value.length > 0) {
         setHomeRooms(roomsResult.value);
       }
 
-      if (galleryResult.status === 'fulfilled' && galleryResult.value.length > 0) {
+      if (
+        galleryResult.status === "fulfilled" &&
+        galleryResult.value.length > 0
+      ) {
         const normalizedGalleryImages = galleryResult.value
-          .filter((img) => typeof img.image_path === 'string' && img.image_path.trim() !== '')
+          .filter(
+            (img) =>
+              typeof img.image_path === "string" &&
+              img.image_path.trim() !== "",
+          )
           .map((img, index) => ({
             id: String(img.id ?? `api-gallery-${index}`),
             src: img.image_path,
-            alt: img.title || img.folder_name || 'Tulip Guest Inn Gallery',
-            category: 'facilities' as const,
-            width: (index % 5 === 0 ? 'wide' : 'normal') as const,
+            alt: img.title || img.folder_name || "Tulip Guest Inn Gallery",
+            category: normalizeGalleryCategory(
+              img.folder_slug,
+              img.folder_name,
+            ),
+            width: (index % 5 === 0 ? "wide" : "normal") as const,
           }));
 
         if (normalizedGalleryImages.length > 0) {
@@ -87,11 +171,17 @@ export default function Home() {
         }
       }
 
-      if (attractionsResult.status === 'fulfilled' && attractionsResult.value.length > 0) {
+      if (
+        attractionsResult.status === "fulfilled" &&
+        attractionsResult.value.length > 0
+      ) {
         setHomeAttractions(attractionsResult.value);
       }
 
-      if (offersResult.status === 'fulfilled' && offersResult.value.length > 0) {
+      if (
+        offersResult.status === "fulfilled" &&
+        offersResult.value.length > 0
+      ) {
         setHomeOffers(offersResult.value);
       }
     }
@@ -113,14 +203,14 @@ export default function Home() {
             className="absolute inset-0"
             initial={{ opacity: 0 }}
             animate={{ opacity: i === heroIndex ? 1 : 0 }}
-            transition={{ duration: 1.5, ease: 'easeInOut' }}
+            transition={{ duration: 1.5, ease: "easeInOut" }}
           >
             <motion.img
               src={src}
               alt="Tulip Guest Inn"
               className="w-full h-full object-cover"
               animate={{ scale: i === heroIndex ? 1.07 : 1 }}
-              transition={{ duration: 8, ease: 'easeOut' }}
+              transition={{ duration: 8, ease: "easeOut" }}
             />
           </motion.div>
         ))}
@@ -141,7 +231,8 @@ export default function Home() {
             transition={{ delay: 0.6, duration: 0.9 }}
             className="font-serif text-5xl md:text-6xl lg:text-7xl text-white font-light leading-[1.05] mb-6 text-shadow"
           >
-            Boutique Comfort in the<br />
+            Boutique Comfort in the
+            <br />
             <span className="text-gold italic">Heart of Point Pedro</span>
           </motion.h1>
           <motion.div
@@ -156,7 +247,8 @@ export default function Home() {
             transition={{ delay: 1.1, duration: 0.7 }}
             className="text-white/80 text-sm md:text-base leading-relaxed mb-10 max-w-lg mx-auto"
           >
-            Experience peaceful accommodation, modern comfort and genuine Sri Lankan hospitality.
+            Experience peaceful accommodation, modern comfort and genuine Sri
+            Lankan hospitality.
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -167,7 +259,10 @@ export default function Home() {
             <Link to="/booking" className="btn-primary">
               Book Your Stay
             </Link>
-            <Link to="/rooms" className="btn-outline border-white text-white hover:bg-white hover:text-dark">
+            <Link
+              to="/rooms"
+              className="btn-outline border-white text-white hover:bg-white hover:text-dark"
+            >
               Explore Rooms
             </Link>
           </motion.div>
@@ -186,7 +281,9 @@ export default function Home() {
           >
             <ChevronDown size={20} className="text-white/60" />
           </motion.div>
-          <p className="text-[9px] tracking-[0.3em] uppercase text-white/40">Scroll</p>
+          <p className="text-[9px] tracking-[0.3em] uppercase text-white/40">
+            Scroll
+          </p>
         </motion.div>
 
         {/* Hero Dots */}
@@ -196,7 +293,9 @@ export default function Home() {
               key={i}
               onClick={() => setHeroIndex(i)}
               className={`transition-all duration-400 ${
-                i === heroIndex ? 'w-8 h-1.5 bg-gold' : 'w-1.5 h-1.5 rounded-full bg-white/40 hover:bg-white/70'
+                i === heroIndex
+                  ? "w-8 h-1.5 bg-gold"
+                  : "w-1.5 h-1.5 rounded-full bg-white/40 hover:bg-white/70"
               }`}
               aria-label={`Hero image ${i + 1}`}
             />
@@ -220,14 +319,22 @@ export default function Home() {
                   Welcome
                 </p>
                 <h2 className="font-serif text-4xl md:text-5xl font-light text-dark leading-tight mb-5">
-                  Welcome to<br />Tulip Guest Inn
+                  Welcome to
+                  <br />
+                  Tulip Guest Inn
                 </h2>
                 <div className="gold-line-left" />
                 <p className="text-sm text-gray-500 leading-relaxed mb-5">
-                  Nestled in the heart of Point Pedro in Northern Sri Lanka, Tulip Guest Inn is a premium boutique property designed for guests who appreciate genuine comfort, thoughtful service and serene surroundings.
+                  Nestled in the heart of Point Pedro in Northern Sri Lanka,
+                  Tulip Guest Inn is a premium boutique property designed for
+                  guests who appreciate genuine comfort, thoughtful service and
+                  serene surroundings.
                 </p>
                 <p className="text-sm text-gray-500 leading-relaxed mb-8">
-                  From our tranquil outdoor pool and lush tropical gardens to our elegantly appointed rooms, every detail has been carefully considered to ensure a stay that is as restful as it is memorable.
+                  From our tranquil outdoor pool and lush tropical gardens to
+                  our elegantly appointed rooms, every detail has been carefully
+                  considered to ensure a stay that is as restful as it is
+                  memorable.
                 </p>
                 <div className="grid grid-cols-2 gap-3 mb-8">
                   {welcomeFeatures.map(({ icon: Icon, label }) => (
@@ -244,7 +351,10 @@ export default function Home() {
             </div>
 
             {/* Right — Image Collage */}
-            <AnimatedSection direction="right" className="relative h-[480px] hidden lg:block">
+            <AnimatedSection
+              direction="right"
+              className="relative h-[480px] hidden lg:block"
+            >
               <div className="absolute top-0 right-0 w-64 h-72 overflow-hidden shadow-luxury-lg">
                 <img
                   src="https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=800"
@@ -325,7 +435,7 @@ export default function Home() {
               whileInView={{ scale: 1 }}
               initial={{ scale: 1.08 }}
               viewport={{ once: true }}
-              transition={{ duration: 1.2, ease: 'easeOut' }}
+              transition={{ duration: 1.2, ease: "easeOut" }}
               loading="lazy"
             />
           </div>
@@ -336,11 +446,16 @@ export default function Home() {
                 Luxury Experience
               </p>
               <h2 className="font-serif text-4xl lg:text-5xl font-light text-white leading-tight mb-6">
-                Relax, Unwind and<br />Feel at Home
+                Relax, Unwind and
+                <br />
+                Feel at Home
               </h2>
               <div className="w-12 h-[1px] bg-gold mb-6" />
               <p className="text-gray-300 text-sm leading-relaxed mb-8">
-                Escape the busy city and enjoy comfortable accommodation surrounded by peaceful gardens and modern facilities. Our outdoor swimming pool, shaded terraces and lush gardens create a sanctuary of calm in the heart of Point Pedro.
+                Escape the busy city and enjoy comfortable accommodation
+                surrounded by peaceful gardens and modern facilities. Our
+                outdoor swimming pool, shaded terraces and lush gardens create a
+                sanctuary of calm in the heart of Point Pedro.
               </p>
               <Link to="/rooms" className="btn-white">
                 Explore Rooms
@@ -365,22 +480,19 @@ export default function Home() {
       {/* ── GALLERY PREVIEW ───────────────────────────────── */}
       <section className="section-padding bg-background">
         <div className="container-custom">
-          <SectionTitle
-            eyebrow="Photo Gallery"
-            title="A Glimpse of Tulip"
-          />
+          <SectionTitle eyebrow="Photo Gallery" title="A Glimpse of Tulip" />
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {previewImages.map((img, i) => (
               <motion.div
                 key={`${img.id}-${img.src}-${i}`}
                 initial={{ opacity: 0, scale: 0.95 }}
                 whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true, margin: '-40px' }}
+                viewport={{ once: true, margin: "-40px" }}
                 transition={{ duration: 0.5, delay: i * 0.06 }}
                 className={`relative overflow-hidden cursor-pointer group ${
-                  i === 0 || i === 5 ? 'col-span-2 row-span-2' : ''
+                  i === 0 || i === 5 ? "col-span-2 row-span-2" : ""
                 }`}
-                style={{ aspectRatio: i === 0 || i === 5 ? '16/9' : '4/3' }}
+                style={{ aspectRatio: i === 0 || i === 5 ? "16/9" : "4/3" }}
                 onClick={() => setLightbox(img.src)}
               >
                 <img
@@ -411,7 +523,11 @@ export default function Home() {
           />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {homeAttractions.slice(0, 3).map((attraction, i) => (
-              <AttractionCard key={attraction.id} attraction={attraction} index={i} />
+              <AttractionCard
+                key={attraction.id}
+                attraction={attraction}
+                index={i}
+              />
             ))}
           </div>
           <div className="text-center mt-10">

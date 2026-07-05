@@ -47,7 +47,7 @@ export default function RoomDetails() {
     };
   }, [id]);
 
-  if (!room && loading) return <main className="pt-20" />;
+  if (!room && loading) return <main />;
   if (!room) return <Navigate to="/rooms" replace />;
 
   const relatedRooms = roomList.filter((r) => r.id !== room.id).slice(0, 3);
@@ -56,12 +56,12 @@ export default function RoomDetails() {
   const nextImg = () => setActiveImg((i) => (i + 1) % room.images.length);
 
   return (
-    <main className="pt-20">
+    <main>
       {/* Gallery Slider */}
       <section className="relative h-[70vh] min-h-[480px] overflow-hidden bg-dark">
         {room.images.map((src, i) => (
           <motion.div
-            key={src}
+            key={`${src}-${i}`}
             className="absolute inset-0"
             animate={{ opacity: i === activeImg ? 1 : 0 }}
             transition={{ duration: 0.6 }}
@@ -91,7 +91,7 @@ export default function RoomDetails() {
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
           {room.images.map((_, i) => (
             <button
-              key={i}
+              key={`dot-${i}`}
               onClick={() => setActiveImg(i)}
               className={`transition-all duration-300 ${
                 i === activeImg ? 'w-8 h-1.5 bg-gold' : 'w-1.5 h-1.5 rounded-full bg-white/50'
@@ -112,7 +112,7 @@ export default function RoomDetails() {
         <div className="absolute bottom-6 right-6 hidden md:flex gap-2">
           {room.images.map((src, i) => (
             <button
-              key={i}
+              key={`thumb-${i}`}
               onClick={() => setActiveImg(i)}
               className={`w-16 h-12 overflow-hidden border-2 transition-colors duration-200 ${
                 i === activeImg ? 'border-gold' : 'border-transparent opacity-60 hover:opacity-100'
