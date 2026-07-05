@@ -20,12 +20,17 @@ export type PublicGalleryResponse = {
   images: PublicGalleryImage[];
 };
 
+type PublicGalleryApiPayload = Partial<PublicGalleryResponse> & {
+  data?: Partial<PublicGalleryResponse>;
+};
+
 export async function getPublicGallery(): Promise<PublicGalleryResponse> {
-  const payload = await requestJson<Partial<PublicGalleryResponse>>('/gallery/public-list.php');
+  const payload = await requestJson<PublicGalleryApiPayload>('/gallery/public-list.php');
+  const data = payload.data ?? payload;
 
   return {
-    folders: Array.isArray(payload.folders) ? payload.folders : [],
-    images: Array.isArray(payload.images) ? payload.images : [],
+    folders: Array.isArray(data.folders) ? data.folders : [],
+    images: Array.isArray(data.images) ? data.images : [],
   };
 }
 

@@ -571,3 +571,9 @@ ALTER TABLE email_queue ADD COLUMN IF NOT EXISTS body_html MEDIUMTEXT NULL AFTER
 ALTER TABLE email_queue ADD COLUMN IF NOT EXISTS max_attempts TINYINT UNSIGNED NOT NULL DEFAULT 3 AFTER attempts;
 ALTER TABLE email_queue ADD COLUMN IF NOT EXISTS locked_at DATETIME NULL AFTER available_at;
 ALTER TABLE email_queue ADD COLUMN IF NOT EXISTS sent_at DATETIME NULL AFTER locked_at;
+
+-- Required for the gallery folder ordering used by the gallery admin and public APIs.
+-- Run this once on the `hotel_tulip` database.
+
+ALTER TABLE gallery_folders
+ADD COLUMN sort_order INT UNSIGNED NOT NULL DEFAULT 1 AFTER status;

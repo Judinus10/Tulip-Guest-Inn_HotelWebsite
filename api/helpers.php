@@ -27,14 +27,60 @@ function apply_security_headers(): void
     }
 }
 
+function normalize_cors_origin(string $origin): string
+{
+    return rtrim(trim($origin, " \t\n\r\0\x0B\"'"), '/');
+}
+
+function get_configured_cors_origins(): array
+{
+    $origins = [];
+
+    if (defined('ALLOWED_ORIGINS') && is_array(ALLOWED_ORIGINS)) {
+        $origins = array_merge($origins, ALLOWED_ORIGINS);
+    }
+
+    foreach (['FRONTEND_URL', 'PUBLIC_APP_URL', 'APP_BASE_URL', 'ADMIN_APP_URL'] as $constantName) {
+        if (defined($constantName) && trim((string) constant($constantName)) !== '') {
+            $origins[] = (string) constant($constantName);
+        }
+    }
+
+    $normalized = [];
+    foreach ($origins as $origin) {
+        $origin = normalize_cors_origin((string) $origin);
+        if ($origin !== '') {
+            $normalized[$origin] = true;
+        }
+    }
+
+    return array_keys($normalized);
+}
+
+function is_local_dev_origin(string $origin): bool
+{
+    if (!defined('APP_ENV') || APP_ENV !== 'local') {
+        return false;
+    }
+
+    $host = parse_url($origin, PHP_URL_HOST);
+    $scheme = parse_url($origin, PHP_URL_SCHEME);
+
+    if (!in_array($scheme, ['http', 'https'], true)) {
+        return false;
+    }
+
+    return in_array($host, ['localhost', '127.0.0.1'], true);
+}
+
 function apply_cors_headers(): void
 {
     apply_security_headers();
 
-    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-    $allowedOrigins = defined('ALLOWED_ORIGINS') ? ALLOWED_ORIGINS : [];
+    $origin = normalize_cors_origin((string) ($_SERVER['HTTP_ORIGIN'] ?? ''));
+    $allowedOrigins = get_configured_cors_origins();
 
-    if ($origin !== '' && in_array($origin, $allowedOrigins, true)) {
+    if ($origin !== '' && (in_array($origin, $allowedOrigins, true) || is_local_dev_origin($origin))) {
         header('Access-Control-Allow-Origin: ' . $origin);
         header('Vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
     }
