@@ -102,7 +102,7 @@ export function Sidebar({
             {!collapsed && (
               <div className="min-w-0">
                 <p className="truncate text-base font-semibold text-white">
-                  Jebal Guest House
+                  Tulip Guest Inn
                 </p>
                 <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-blue-200">
                   Guest House PMS

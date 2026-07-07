@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 /*
 ==================================================
-JEBAL HOMES BACKEND CONFIGURATION LOADER
+Tulip Guest Inn BACKEND CONFIGURATION LOADER
 ==================================================
 Backend secrets are loaded from api/.env using vlucas/phpdotenv.
 
