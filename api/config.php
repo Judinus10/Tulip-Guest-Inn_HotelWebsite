@@ -139,19 +139,19 @@ jebal_define('SMTP_PASS', (string) jebal_env_value('SMTP_PASS', ''));
 jebal_define('SMTP_PORT', (int) jebal_env_value('SMTP_PORT', 587));
 jebal_define('SMTP_SECURE', (string) jebal_env_value('SMTP_SECURE', 'tls'));
 
-jebal_define('ADMIN_EMAIL', (string) jebal_env_value('ADMIN_EMAIL', 'admin@jebalhomes.com'));
-jebal_define('BOOKING_ADMIN_EMAIL', (string) jebal_env_value('BOOKING_ADMIN_EMAIL', 'bookings@jebalguesthouse.com'));
-jebal_define('CONTACT_ADMIN_EMAIL', (string) jebal_env_value('CONTACT_ADMIN_EMAIL', 'info@jebalguesthouse.com'));
+jebal_define('ADMIN_EMAIL', (string) jebal_env_value('ADMIN_EMAIL', jebal_env_value('SMTP_USER', '')));
+jebal_define('BOOKING_ADMIN_EMAIL', (string) jebal_env_value('BOOKING_ADMIN_EMAIL', jebal_env_value('ADMIN_EMAIL', jebal_env_value('SMTP_USER', ''))));
+jebal_define('CONTACT_ADMIN_EMAIL', (string) jebal_env_value('CONTACT_ADMIN_EMAIL', jebal_env_value('ADMIN_EMAIL', jebal_env_value('SMTP_USER', ''))));
 
-jebal_define('FROM_EMAIL', (string) jebal_env_value('FROM_EMAIL', 'info@jebalhomes.com'));
-jebal_define('BOOKING_FROM_EMAIL', (string) jebal_env_value('BOOKING_FROM_EMAIL', 'bookings@jebalguesthouse.com'));
-jebal_define('CONTACT_FROM_EMAIL', (string) jebal_env_value('CONTACT_FROM_EMAIL', 'info@jebalguesthouse.com'));
-jebal_define('ADMIN_FROM_EMAIL', (string) jebal_env_value('ADMIN_FROM_EMAIL', jebal_env_value('ADMIN_EMAIL', 'admin@jebalguesthouse.com')));
+jebal_define('FROM_EMAIL', (string) jebal_env_value('FROM_EMAIL', jebal_env_value('CONTACT_FROM_EMAIL', jebal_env_value('SMTP_USER', ''))));
+jebal_define('BOOKING_FROM_EMAIL', (string) jebal_env_value('BOOKING_FROM_EMAIL', jebal_env_value('FROM_EMAIL', jebal_env_value('SMTP_USER', ''))));
+jebal_define('CONTACT_FROM_EMAIL', (string) jebal_env_value('CONTACT_FROM_EMAIL', jebal_env_value('FROM_EMAIL', jebal_env_value('SMTP_USER', ''))));
+jebal_define('ADMIN_FROM_EMAIL', (string) jebal_env_value('ADMIN_FROM_EMAIL', jebal_env_value('ADMIN_EMAIL', jebal_env_value('SMTP_USER', ''))));
 
-jebal_define('FROM_NAME', (string) jebal_env_value('FROM_NAME', 'Jebal Homes'));
-jebal_define('BOOKING_FROM_NAME', (string) jebal_env_value('BOOKING_FROM_NAME', 'Tulip Guest Inn Bookings'));
-jebal_define('CONTACT_FROM_NAME', (string) jebal_env_value('CONTACT_FROM_NAME', 'Tulip Guest Inn'));
-jebal_define('ADMIN_FROM_NAME', (string) jebal_env_value('ADMIN_FROM_NAME', 'Tulip Guest Inn Admin'));
+jebal_define('FROM_NAME', (string) jebal_env_value('FROM_NAME', ''));
+jebal_define('BOOKING_FROM_NAME', (string) jebal_env_value('BOOKING_FROM_NAME', jebal_env_value('FROM_NAME', '')));
+jebal_define('CONTACT_FROM_NAME', (string) jebal_env_value('CONTACT_FROM_NAME', jebal_env_value('FROM_NAME', '')));
+jebal_define('ADMIN_FROM_NAME', (string) jebal_env_value('ADMIN_FROM_NAME', jebal_env_value('FROM_NAME', '')));
 
 /*
  | Separate SMTP profiles.
@@ -161,19 +161,19 @@ jebal_define('ADMIN_FROM_NAME', (string) jebal_env_value('ADMIN_FROM_NAME', 'Tul
  | omit the *_SMTP_PASS values; each profile will reuse SMTP_PASS.
  */
 jebal_define('BOOKING_SMTP_HOST', (string) jebal_env_value('BOOKING_SMTP_HOST', jebal_env_value('SMTP_HOST', '')));
-jebal_define('BOOKING_SMTP_USER', (string) jebal_env_value('BOOKING_SMTP_USER', jebal_env_value('BOOKING_FROM_EMAIL', 'bookings@jebalguesthouse.com')));
+jebal_define('BOOKING_SMTP_USER', (string) jebal_env_value('BOOKING_SMTP_USER', jebal_env_value('BOOKING_FROM_EMAIL', jebal_env_value('SMTP_USER', ''))));
 jebal_define('BOOKING_SMTP_PASS', (string) jebal_env_value('BOOKING_SMTP_PASS', jebal_env_value('SMTP_PASS', '')));
 jebal_define('BOOKING_SMTP_PORT', (int) jebal_env_value('BOOKING_SMTP_PORT', jebal_env_value('SMTP_PORT', 587)));
 jebal_define('BOOKING_SMTP_SECURE', (string) jebal_env_value('BOOKING_SMTP_SECURE', jebal_env_value('SMTP_SECURE', 'tls')));
 
 jebal_define('CONTACT_SMTP_HOST', (string) jebal_env_value('CONTACT_SMTP_HOST', jebal_env_value('SMTP_HOST', '')));
-jebal_define('CONTACT_SMTP_USER', (string) jebal_env_value('CONTACT_SMTP_USER', jebal_env_value('CONTACT_FROM_EMAIL', 'info@jebalguesthouse.com')));
+jebal_define('CONTACT_SMTP_USER', (string) jebal_env_value('CONTACT_SMTP_USER', jebal_env_value('CONTACT_FROM_EMAIL', jebal_env_value('SMTP_USER', ''))));
 jebal_define('CONTACT_SMTP_PASS', (string) jebal_env_value('CONTACT_SMTP_PASS', jebal_env_value('SMTP_PASS', '')));
 jebal_define('CONTACT_SMTP_PORT', (int) jebal_env_value('CONTACT_SMTP_PORT', jebal_env_value('SMTP_PORT', 587)));
 jebal_define('CONTACT_SMTP_SECURE', (string) jebal_env_value('CONTACT_SMTP_SECURE', jebal_env_value('SMTP_SECURE', 'tls')));
 
 jebal_define('ADMIN_SMTP_HOST', (string) jebal_env_value('ADMIN_SMTP_HOST', jebal_env_value('SMTP_HOST', '')));
-jebal_define('ADMIN_SMTP_USER', (string) jebal_env_value('ADMIN_SMTP_USER', jebal_env_value('ADMIN_FROM_EMAIL', jebal_env_value('ADMIN_EMAIL', 'admin@jebalguesthouse.com'))));
+jebal_define('ADMIN_SMTP_USER', (string) jebal_env_value('ADMIN_SMTP_USER', jebal_env_value('ADMIN_FROM_EMAIL', jebal_env_value('SMTP_USER', ''))));
 jebal_define('ADMIN_SMTP_PASS', (string) jebal_env_value('ADMIN_SMTP_PASS', jebal_env_value('SMTP_PASS', '')));
 jebal_define('ADMIN_SMTP_PORT', (int) jebal_env_value('ADMIN_SMTP_PORT', jebal_env_value('SMTP_PORT', 587)));
 jebal_define('ADMIN_SMTP_SECURE', (string) jebal_env_value('ADMIN_SMTP_SECURE', jebal_env_value('SMTP_SECURE', 'tls')));

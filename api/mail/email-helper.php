@@ -85,7 +85,7 @@ function send_html_email(string $to, string $subject, string $htmlBody, ?string 
             : (defined('FROM_EMAIL') ? trim((string) FROM_EMAIL) : '');
         $fromName = $fromNameOverride !== null && trim($fromNameOverride) !== ''
             ? trim($fromNameOverride)
-            : (defined('FROM_NAME') ? trim((string) FROM_NAME) : 'Tulip Guest Inn');
+            : (defined('FROM_NAME') ? trim((string) FROM_NAME) : '');
 
         $smtpProfile = email_smtp_profile_for_from($fromEmail);
         $smtpHost = $smtpProfile['host'];
@@ -240,7 +240,7 @@ function email_env_name(string $constantName, string $fallbackConstant = 'FROM_N
     }
 
     $fallback = defined($fallbackConstant) ? trim((string) constant($fallbackConstant)) : '';
-    return $fallback !== '' ? $fallback : 'Tulip Guest Inn';
+    return $fallback !== '' ? $fallback : '';
 }
 
 function booking_from_email(): string
@@ -467,7 +467,7 @@ function email_contact_settings(): array
         'phone' => '+94 77 123 4567',
         'reception_contact_number' => '+94 21 222 4567',
         'whatsapp_reservation_number' => '+94 77 123 4567',
-        'email' => 'reservations@jebalguesthouse.com',
+        'email' => email_env_address('CONTACT_FROM_EMAIL'),
         'business_hours' => 'Daily · 7:00 AM – 10:00 PM',
         'facebook_link' => '',
         'instagram_link' => '',
@@ -502,7 +502,7 @@ function email_contact_phone(): string
 
 function email_contact_email(): string
 {
-    return email_contact_value('email', 'reservations@jebalguesthouse.com');
+    return email_contact_value('email', email_env_address('CONTACT_FROM_EMAIL'));
 }
 
 function email_contact_address(): string
@@ -513,7 +513,7 @@ function email_contact_address(): string
 function email_contact_website(): string
 {
     $url = email_public_url();
-    if ($url === '') { return 'www.jebalguesthouse.com'; }
+    if ($url === '') { return ''; }
     $host = parse_url($url, PHP_URL_HOST);
     return is_string($host) && $host !== '' ? $host : $url;
 }

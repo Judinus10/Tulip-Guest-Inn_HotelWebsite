@@ -18,7 +18,7 @@ function default_contact_settings(): array
         'phone' => '+94 77 123 4567',
         'reception_contact_number' => '+94 21 222 4567',
         'whatsapp_reservation_number' => '+94 77 123 4567',
-        'email' => 'reservations@jebalguesthouse.com',
+        'email' => defined('CONTACT_FROM_EMAIL') ? (string) CONTACT_FROM_EMAIL : '',
         'business_hours' => 'Daily · 7:00 AM – 10:00 PM',
         'facebook_link' => '',
         'instagram_link' => '',
