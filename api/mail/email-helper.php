@@ -2512,3 +2512,174 @@ function queue_contact_enquiry_emails(PDO $pdo, int $enquiryId, string $name, st
 
     return $queued;
 }
+
+function lock_next_email_queue_batch(PDO $pdo, int $limit = 10): array
+{
+    ensure_email_queue_table($pdo);
+    $limit = max(1, min(50, $limit));
+    $lockToken = bin2hex(random_bytes(16));
+
+    // Reset stale locks so a crashed cron run does not block the queue forever.
+    $pdo->exec(
+        "UPDATE email_queue
+         SET status = 'pending', locked_at = NULL, last_error = CONCAT(COALESCE(last_error, ''), '\nStale processing lock reset.'), updated_at = NOW()
+         WHERE status = 'processing'
+           AND locked_at < (NOW() - INTERVAL 10 MINUTE)"
+    );
+
+    $pdo->beginTransaction();
+    try {
+        $select = $pdo->prepare(
+            "SELECT id
+             FROM email_queue
+             WHERE status = 'pending'
+               AND available_at <= NOW()
+               AND attempts < max_attempts
+             ORDER BY id ASC
+             LIMIT {$limit}
+             FOR UPDATE"
+        );
+        $select->execute();
+        $ids = array_map('intval', $select->fetchAll(PDO::FETCH_COLUMN));
+
+        if ($ids === []) {
+            $pdo->commit();
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $update = $pdo->prepare(
+            "UPDATE email_queue
+             SET status = 'processing', locked_at = NOW(), last_error = ?, updated_at = NOW()
+             WHERE id IN ({$placeholders})"
+        );
+        $update->execute(array_merge([$lockToken], $ids));
+        $pdo->commit();
+
+        $fetch = $pdo->prepare("SELECT * FROM email_queue WHERE last_error = :token AND status = 'processing' ORDER BY id ASC");
+        $fetch->execute([':token' => $lockToken]);
+        return $fetch->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
+    }
+}
+
+function email_queue_body_from_job(array $job): string
+{
+    $body = isset($job['body_html']) ? trim((string) $job['body_html']) : '';
+    if ($body !== '') {
+        return $body;
+    }
+
+    // Backward compatibility for your older queue table that stored data in payload_json.
+    if (isset($job['payload_json']) && trim((string) $job['payload_json']) !== '') {
+        $payload = json_decode((string) $job['payload_json'], true);
+        if (is_array($payload)) {
+            foreach (['body_html', 'html', 'body', 'message'] as $key) {
+                if (!empty($payload[$key])) {
+                    return (string) $payload[$key];
+                }
+            }
+        }
+    }
+
+    return '<p>Email content was missing from the queue record.</p>';
+}
+
+function process_email_queue(PDO $pdo, int $limit = 10): array
+{
+    $jobs = lock_next_email_queue_batch($pdo, $limit);
+    $processed = 0;
+    $sent = 0;
+    $failed = 0;
+
+    foreach ($jobs as $job) {
+        $processed++;
+        $jobId = (int) $job['id'];
+        $relatedType = $job['related_type'] !== null ? (string) $job['related_type'] : '';
+        $relatedId = $job['related_id'] !== null ? (int) $job['related_id'] : null;
+        $emailType = (string) $job['email_type'];
+        $to = (string) $job['recipient_email'];
+        $subject = (string) $job['subject'];
+        $replyTo = $job['reply_to_email'] !== null ? (string) $job['reply_to_email'] : null;
+        $fromEmail = isset($job['from_email']) && $job['from_email'] !== null ? (string) $job['from_email'] : null;
+        $fromName = isset($job['from_name']) && $job['from_name'] !== null ? (string) $job['from_name'] : null;
+
+        if ($fromEmail === null || trim($fromEmail) === '') {
+            [$fromEmail, $fromName] = email_sender_for_type($emailType, $relatedType);
+        }
+
+        try {
+            $bodyHtml = email_queue_body_from_job($job);
+            $ok = send_html_email($to, $subject, $bodyHtml, $replyTo, $fromEmail, $fromName);
+
+            if ($ok) {
+                $update = $pdo->prepare(
+                    "UPDATE email_queue
+                     SET status = 'sent', attempts = attempts + 1, locked_at = NULL, last_error = NULL, sent_at = NOW(), updated_at = NOW()
+                     WHERE id = :id"
+                );
+                $update->execute([':id' => $jobId]);
+
+                track_email(
+                    $pdo,
+                    $relatedType,
+                    $relatedId,
+                    $to,
+                    $subject,
+                    $emailType,
+                    true,
+                    null
+                );
+                $sent++;
+                continue;
+            }
+
+            throw new RuntimeException('PHPMailer returned false.');
+        } catch (Throwable $e) {
+            $error = mb_substr($e->getMessage(), 0, 1000);
+            $attemptsAfter = (int) $job['attempts'] + 1;
+            $maxAttempts = (int) $job['max_attempts'];
+            $newStatus = $attemptsAfter >= $maxAttempts ? 'failed' : 'pending';
+
+            $update = $pdo->prepare(
+                "UPDATE email_queue
+                 SET status = :status,
+                     attempts = attempts + 1,
+                     locked_at = NULL,
+                     last_error = :last_error,
+                     available_at = DATE_ADD(NOW(), INTERVAL LEAST(30, POW(2, attempts + 1)) MINUTE),
+                     updated_at = NOW()
+                 WHERE id = :id"
+            );
+            $update->execute([
+                ':status' => $newStatus,
+                ':last_error' => $error,
+                ':id' => $jobId,
+            ]);
+
+            track_email(
+                $pdo,
+                $relatedType,
+                $relatedId,
+                $to,
+                $subject,
+                $emailType,
+                false,
+                $error
+            );
+            $failed++;
+            error_log('Email queue job #' . $jobId . ' failed: ' . $error);
+        }
+    }
+
+    return [
+        'processed' => $processed,
+        'sent' => $sent,
+        'failed' => $failed,
+        'remaining_pending' => (int) $pdo->query("SELECT COUNT(*) FROM email_queue WHERE status = 'pending' AND available_at <= NOW()")->fetchColumn(),
+    ];
+}
