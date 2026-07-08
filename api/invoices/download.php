@@ -9,6 +9,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/invoice-helper.php';
 
 apply_cors_headers();
 
@@ -52,7 +53,7 @@ try {
     $stmt->execute([':id' => $bookingId]);
     $booking = $stmt->fetch();
 
-    if (!$booking || empty($booking['invoice_file_path'])) {
+    if (!$booking) {
         header('Content-Type: application/json; charset=utf-8');
         json_response(false, 'Invoice not found.', 404);
     }
@@ -61,6 +62,25 @@ try {
         header('Content-Type: application/json; charset=utf-8');
         json_response(false, 'Invoice is available only after successful payment.', 403);
     }
+
+    $paymentStmt = $pdo->prepare(
+        'SELECT *
+         FROM payments
+         WHERE booking_id = :booking_id
+         ORDER BY id DESC
+         LIMIT 1'
+    );
+    $paymentStmt->execute([':booking_id' => $bookingId]);
+    $payment = $paymentStmt->fetch() ?: [];
+
+    $generatedInvoice = generate_invoice_for_booking($pdo, $bookingId, $payment, true);
+    if (!$generatedInvoice || empty($generatedInvoice['file_path'])) {
+        header('Content-Type: application/json; charset=utf-8');
+        json_response(false, 'Invoice not found.', 404);
+    }
+
+    $booking['invoice_file_path'] = $generatedInvoice['file_path'];
+    $booking['invoice_number'] = $generatedInvoice['invoice_number'] ?? $booking['invoice_number'] ?? 'invoice';
 
     $filePath = realpath(__DIR__ . '/../' . $booking['invoice_file_path']);
     $basePath = realpath(__DIR__ . '/../storage/invoices');

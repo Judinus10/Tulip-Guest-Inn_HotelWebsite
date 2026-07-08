@@ -5,8 +5,6 @@ import {
   CalendarDays,
   Check,
   CheckCircle2,
-  CreditCard,
-  Download,
   Loader2,
   Mail,
   Phone,
@@ -214,11 +212,20 @@ export default function BookingBill() {
                       <span className="text-[#4f5d57]">Room Charges ({nights} {nights === 1 ? 'Night' : 'Nights'})</span>
                       <span className="font-medium text-[#14251f]">{formatAmount(booking.amount, booking.currency)}</span>
                     </div>
-                    <div className="mt-10 border-t border-[#eee8df] pt-5 lg:mt-16">
+                    <div className="mt-8 border-t border-[#eee8df] pt-5">
                       <div className="flex items-center justify-between gap-4">
                         <span className="font-serif text-[20px] font-bold text-[#14251f]">Total Amount</span>
                         <span className="font-serif text-[23px] font-bold text-[#b78335]">{formatAmount(booking.amount, booking.currency)}</span>
                       </div>
+                    </div>
+                    <div className="mt-7 rounded-[6px] border border-[#ead6b3] bg-[#fff7e9] p-4 text-[11px] leading-relaxed text-[#405049]">
+                      <p className="mb-2 font-serif text-[17px] font-semibold text-[#14251f]">Important Notes</p>
+                      <ul className="space-y-1.5 pl-4">
+                        <li className="list-disc">Standard check-in time is 11:00 AM.</li>
+                        <li className="list-disc">Standard check-out time is 10:00 AM.</li>
+                        <li className="list-disc">Please keep your payment receipt for verification at reception.</li>
+                        <li className="list-disc">Contact support for booking changes before arrival.</li>
+                      </ul>
                     </div>
                   </div>
                 </article>
@@ -292,24 +299,14 @@ export default function BookingBill() {
                 </article>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                {booking.invoice_download_url ? (
-                  <a href={booking.invoice_download_url} className="flex h-11 items-center justify-center gap-2 rounded-[5px] border border-[#d8d2c8] bg-white text-[10px] font-bold uppercase tracking-[0.18em] text-[#14251f] transition hover:border-[#c99d53] hover:text-[#c99d53]">
-                    View Invoice <Download size={13} />
-                  </a>
-                ) : (
-                  <button type="button" disabled className="flex h-11 items-center justify-center gap-2 rounded-[5px] border border-[#d8d2c8] bg-white text-[10px] font-bold uppercase tracking-[0.18em] text-[#14251f] opacity-50">
-                    Invoice Not Ready <Download size={13} />
-                  </button>
-                )}
-
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {booking.can_retry_payment ? (
                   <button type="button" onClick={handleRetryPayment} disabled={retrying} className="flex h-11 items-center justify-center gap-2 rounded-[5px] border border-[#d8d2c8] bg-white text-[10px] font-bold uppercase tracking-[0.18em] text-[#14251f] transition hover:border-[#c99d53] hover:text-[#c99d53]">
                     <RefreshCcw size={13} /> {retrying ? 'Restarting' : 'Retry Payment'}
                   </button>
                 ) : (
                   <a href={booking.invoice_download_url || '#'} className={booking.invoice_download_url ? 'flex h-11 items-center justify-center gap-2 rounded-[5px] border border-[#d8d2c8] bg-white text-[10px] font-bold uppercase tracking-[0.18em] text-[#14251f] transition hover:border-[#c99d53] hover:text-[#c99d53]' : 'pointer-events-none flex h-11 items-center justify-center gap-2 rounded-[5px] border border-[#d8d2c8] bg-white text-[10px] font-bold uppercase tracking-[0.18em] text-[#14251f] opacity-50'}>
-                    Download Receipt <Download size={13} />
+                    Download Receipt
                   </a>
                 )}
 
