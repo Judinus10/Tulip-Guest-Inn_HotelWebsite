@@ -89,18 +89,30 @@ export default function Booking() {
   useEffect(() => {
     let mounted = true;
 
-    fetchPublicRooms()
+    const params: Record<string, string> = {};
+    const hasDateFilter = Boolean(form.checkIn && form.checkOut);
+
+    if (hasDateFilter) {
+      params.check_in_date = form.checkIn;
+      params.check_out_date = form.checkOut;
+    }
+
+    if (form.guests) {
+      params.guests = form.guests;
+    }
+
+    fetchPublicRooms(params)
       .then((backendRooms) => {
-        if (mounted && backendRooms.length > 0) setBookingRooms(backendRooms);
+        if (mounted) setBookingRooms(backendRooms);
       })
       .catch(() => {
-        if (mounted) setBookingRooms(fallbackRooms);
+        if (mounted) setBookingRooms(hasDateFilter ? [] : fallbackRooms);
       });
 
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [form.checkIn, form.checkOut, form.guests]);
 
   const roomTypeOptions = buildRoomTypeOptions(bookingRooms);
   const selectedRoom = bookingRooms.find((r) => r.slug === form.roomType);

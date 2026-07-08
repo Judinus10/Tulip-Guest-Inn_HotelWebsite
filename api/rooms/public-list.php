@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/_room_helpers.php';
+require_once __DIR__ . '/../bookings/booking-expiry-helper.php';
 
 apply_cors_headers();
 
@@ -11,14 +12,14 @@ function room_is_available_for_dates(PDO $pdo, string $roomName, string $checkIn
         "SELECT id
          FROM bookings
          WHERE room_name = :room_name
-           AND status IN ('Confirmed', 'Pending')
-           AND COALESCE(payment_status, '') NOT IN ('Failed', 'Cancelled', 'Refunded')
+           " . active_booking_conflict_sql() . "
            AND :requested_check_in < check_out_date
            AND :requested_check_out > check_in_date
          LIMIT 1"
     );
     $stmt->execute([
         ':room_name' => $roomName,
+        ':hold_cutoff' => booking_hold_cutoff_datetime(),
         ':requested_check_in' => $checkInDate,
         ':requested_check_out' => $checkOutDate,
     ]);
@@ -28,6 +29,7 @@ function room_is_available_for_dates(PDO $pdo, string $roomName, string $checkIn
 
 try {
     $pdo = get_db_connection();
+    expire_pending_bookings($pdo, null, false);
 
     $checkInDate = clean_string($_GET['check_in_date'] ?? $_GET['check_in'] ?? '', 20);
     $checkOutDate = clean_string($_GET['check_out_date'] ?? $_GET['check_out'] ?? '', 20);
