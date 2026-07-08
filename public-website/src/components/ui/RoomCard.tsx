@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Users, BedDouble, Maximize } from 'lucide-react';
 import type { Room } from '../../data/rooms';
@@ -10,7 +10,15 @@ interface RoomCardProps {
 
 export default function RoomCard({ room, index = 0 }: RoomCardProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const roomPath = `/rooms/${room.slug}`;
+
+  const buildBookingPath = () => {
+    const params = new URLSearchParams(location.search);
+    params.set('room', room.slug);
+
+    return `/booking?${params.toString()}`;
+  };
 
   const openRoom = () => {
     navigate(roomPath);
@@ -86,7 +94,7 @@ export default function RoomCard({ room, index = 0 }: RoomCardProps) {
             View Room
           </Link>
           <Link
-            to={`/booking?room=${room.slug}`}
+            to={buildBookingPath()}
             onClick={(event) => event.stopPropagation()}
             className="btn-primary flex-1 justify-center text-[9px] py-2.5 px-4"
           >

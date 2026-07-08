@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import PageHero from '../components/ui/PageHero';
 import RoomCard from '../components/ui/RoomCard';
 import CTASection from '../components/ui/CTASection';
@@ -27,24 +27,41 @@ const amenitiesHighlight = [
 ];
 
 export default function Rooms() {
+  const [searchParams] = useSearchParams();
   const [active, setActive] = useState<Category>('all');
   const [roomList, setRoomList] = useState<Room[]>(fallbackRooms);
 
   useEffect(() => {
     let mounted = true;
 
-    fetchPublicRooms()
+    const checkIn = searchParams.get('checkin') || searchParams.get('checkIn') || '';
+    const checkOut = searchParams.get('checkout') || searchParams.get('checkOut') || '';
+    const guests = searchParams.get('guests') || '';
+
+    const params: Record<string, string> = {};
+    const hasDateFilter = Boolean(checkIn && checkOut);
+
+    if (hasDateFilter) {
+      params.check_in_date = checkIn;
+      params.check_out_date = checkOut;
+    }
+
+    if (guests) {
+      params.guests = guests;
+    }
+
+    fetchPublicRooms(params)
       .then((backendRooms) => {
-        if (mounted && backendRooms.length > 0) setRoomList(backendRooms);
+        if (mounted) setRoomList(backendRooms);
       })
       .catch(() => {
-        if (mounted) setRoomList(fallbackRooms);
+        if (mounted) setRoomList(hasDateFilter ? [] : fallbackRooms);
       });
 
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [searchParams]);
 
   const filtered = active === 'all' ? roomList : roomList.filter((r) => r.category === active);
 

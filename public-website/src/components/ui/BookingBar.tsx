@@ -22,7 +22,7 @@ const buildBookingQuery = (form: BookingBarForm) => {
     rooms: form.rooms,
   });
 
-  return `/booking?${params.toString()}`;
+  return `/rooms?${params.toString()}`;
 };
 
 export default function BookingBar() {
