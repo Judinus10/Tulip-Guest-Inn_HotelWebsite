@@ -1685,13 +1685,117 @@ function booking_customer_confirmation_email_html(array $booking, array $payment
 </body></html>';
 }
 
+
+function booking_admin_notification_email_html(array $booking, array $payment = [], string $extraButton = '', array $extraRows = [], string $customHeading = '', string $customMessage = ''): string
+{
+    $brand = email_brand_name();
+    $year = date('Y');
+    $logoUrl = email_logo_url();
+    $bookerName = trim((string) ($booking['full_name'] ?? $booking['guest_name'] ?? 'Guest'));
+    $guestName = booking_guest_name($booking);
+    $roomName = trim((string) ($booking['room_name'] ?? 'Room'));
+    $bookingRef = booking_reference($booking);
+    $checkInRaw = (string) ($booking['check_in_date'] ?? '');
+    $checkOutRaw = (string) ($booking['check_out_date'] ?? '');
+    $checkIn = booking_email_format_date($checkInRaw, true);
+    $checkOut = booking_email_format_date($checkOutRaw, true);
+    $nights = '';
+    if ($checkInRaw !== '' && $checkOutRaw !== '') {
+        try { $nights = (string) calculate_nights($checkInRaw, $checkOutRaw) . ' Nights'; } catch (Throwable) { $nights = ''; }
+    }
+    $guests = !empty($booking['guests']) ? ((string) $booking['guests'] . ' Guests') : '';
+    $rooms = !empty($booking['rooms']) ? ((string) $booking['rooms'] . ' Room') : '1 Room';
+    $amountValue = $payment['amount'] ?? $booking['amount'] ?? 0;
+    $amount = format_money_amount($amountValue);
+    $paymentMethod = trim((string) ($payment['payment_method'] ?? $payment['method'] ?? ($payment ? 'Card Payment' : '-')));
+    $transaction = trim((string) ($payment['transaction_id'] ?? $payment['payment_id'] ?? $payment['order_id'] ?? $booking['transaction_id'] ?? ''));
+    $paymentStatus = status_label_for_email($booking['payment_status'] ?? $payment['status'] ?? 'Pending');
+    $paymentDate = trim((string) ($payment['payment_date'] ?? $payment['paid_at'] ?? $payment['created_at'] ?? ''));
+    if ($paymentDate !== '') {
+        try { $paymentDate = (new DateTime($paymentDate))->format('d M Y, h:i A'); } catch (Throwable) { $paymentDate = booking_email_format_date($paymentDate); }
+    } else {
+        $paymentDate = date('d M Y, h:i A');
+    }
+    $phone = trim((string) ($booking['phone'] ?? ''));
+    $email = trim((string) ($booking['email'] ?? ''));
+    $address = trim((string) ($booking['address'] ?? $booking['guest_address'] ?? ''));
+    $roomImage = booking_email_room_image_url($booking);
+    $heroImage = email_public_url() . '/api/uploads/gallery/gallery_20260705_155125_34cdb3e8b90c.jpg';
+    $heading = $customHeading !== '' ? $customHeading : 'New Booking Alert!';
+    $message = $customMessage !== '' ? $customMessage : 'A new booking has been successfully placed. Please review the details below and prepare for the guest\'s arrival.';
+    $dashboardUrl = function_exists('reminder_email_admin_dashboard_url') ? reminder_email_admin_dashboard_url() : email_public_url();
+
+    $guestRows = '';
+    foreach ([
+        'Name' => $guestName,
+        'Booked By' => $bookerName,
+        'Email' => $email,
+        'Phone' => $phone,
+        'Address' => $address,
+    ] as $label => $value) {
+        if (trim((string) $value) === '') { continue; }
+        $guestRows .= '<tr><td style="padding:7px 0;color:#102033;font-size:13px;">' . email_safe($label) . '</td><td align="right" style="padding:7px 0;color:#071529;font-size:13px;font-weight:700;line-height:1.45;">' . email_safe((string) $value) . '</td></tr>';
+    }
+
+    $paymentRows = [
+        'Total Amount' => $amount,
+        'Payment Method' => $paymentMethod,
+        'Payment Status' => $paymentStatus,
+        'Payment Date' => $paymentDate,
+        'Transaction ID' => $transaction,
+    ];
+    if ($extraRows) { $paymentRows = array_merge($paymentRows, $extraRows); }
+    $paymentHtml = '';
+    foreach ($paymentRows as $label => $value) {
+        if (trim((string) $value) === '') { continue; }
+        $color = $label === 'Total Amount' ? '#c7a060' : ($label === 'Payment Status' && strtolower((string) $value) === 'paid' ? '#17803b' : '#071529');
+        $paymentHtml .= '<tr><td style="padding:7px 0;color:#102033;font-size:13px;">' . email_safe($label) . '</td><td align="right" style="padding:7px 0;color:' . $color . ';font-size:13px;font-weight:800;line-height:1.45;">' . email_safe((string) $value) . '</td></tr>';
+    }
+
+    $roomImgHtml = $roomImage !== ''
+        ? '<img src="' . email_safe($roomImage) . '" width="220" alt="' . email_safe($roomName) . '" style="display:block;width:220px;max-width:100%;height:138px;object-fit:cover;border-radius:8px;border:0;">'
+        : '<div style="width:220px;max-width:100%;height:138px;border-radius:8px;background:#f5efe5;text-align:center;line-height:138px;color:#c7a060;font-size:13px;font-weight:700;">Room Image</div>';
+
+    return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' . email_safe($brand) . '</title>' . email_icon_font_css() . '</head>
+<body style="margin:0;padding:0;background:#f7f3ec;font-family:Arial,Helvetica,sans-serif;color:#071529;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">' . email_safe($message) . '</div>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;background:#f7f3ec;padding:20px 0;"><tr><td align="center" style="padding:20px 10px;">
+<table role="presentation" width="760" cellspacing="0" cellpadding="0" style="width:760px;max-width:100%;border-collapse:collapse;background:#ffffff;border-radius:6px;overflow:hidden;box-shadow:0 18px 40px rgba(7,21,41,.10);">
+<tr><td style="background:#06182a;padding:18px 24px;color:#ffffff;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td style="vertical-align:middle;"><img src="' . email_safe($logoUrl) . '" width="132" alt="' . email_safe($brand) . '" style="display:block;width:132px;max-width:48%;height:auto;border:0;"></td><td align="right" style="font-size:13px;line-height:1.45;color:#d5ad68;font-weight:800;">New Booking Received&nbsp;&nbsp;' . booking_email_icon('bell', 18) . '</td></tr></table>
+</td></tr>
+<tr><td background="' . email_safe($heroImage) . '" style="background:#071529 url(' . email_safe($heroImage) . ') center/cover no-repeat;padding:52px 24px 42px;text-align:center;color:#ffffff;">
+<div style="background:rgba(7,21,41,.55);padding:16px 10px;"><div style="width:58px;height:58px;border-radius:999px;border:1px solid #d5ad68;margin:0 auto 18px;color:#d5ad68;line-height:58px;font-size:24px;">' . booking_email_icon('calendar', 26) . '</div><h1 style="margin:0 0 10px;font-size:32px;line-height:1.18;font-weight:800;color:#ffffff;">' . email_safe($heading) . '</h1><p style="margin:0;font-size:16px;line-height:1.45;color:#ffffff;">A new booking has been made on your website.</p><div style="margin:16px auto 0;width:40px;border-top:1px solid #d5ad68;font-size:0;line-height:0;">&nbsp;</div></div>
+</td></tr>
+<tr><td style="padding:30px 46px 24px;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:22px;"><tr><td style="width:54px;vertical-align:top;"><div style="width:48px;height:48px;border-radius:50%;background:#fbf5ea;text-align:center;line-height:48px;color:#c7a060;">' . booking_email_icon('bell', 24) . '</div></td><td style="padding-left:16px;vertical-align:top;"><p style="margin:0 0 8px;font-size:15px;font-weight:800;color:#071529;">Dear Hotel Team,</p><p style="margin:0;font-size:13px;line-height:1.65;color:#102033;">' . email_safe($message) . '</p></td></tr></table>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #eadfd2;border-radius:8px;margin-bottom:16px;overflow:hidden;"><tr><td style="padding:18px 18px 20px;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:18px;"><tr><td style="font-size:16px;font-weight:800;color:#071529;">' . booking_email_icon('calendar', 16) . ' &nbsp;Booking Overview</td><td align="right"><div style="display:inline-block;background:#fbf7f1;border-radius:6px;padding:10px 18px;text-align:center;color:#071529;font-size:11px;line-height:1.45;">Booking ID<br><strong style="font-size:12px;">' . email_safe($bookingRef) . '</strong></div></td></tr></table>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td style="width:230px;vertical-align:top;">' . $roomImgHtml . '</td><td style="padding-left:24px;vertical-align:top;"><h2 style="margin:8px 0 12px;font-size:16px;line-height:1.3;color:#071529;">' . email_safe($roomName) . '</h2><div style="font-size:13px;color:#071529;line-height:1.9;"><span style="color:#c7a060;">' . booking_email_icon('user', 14) . '</span> ' . email_safe($guests) . ' &nbsp;&nbsp; <span style="color:#c7a060;">' . booking_email_icon('bed', 14) . '</span> ' . email_safe($rooms) . ' &nbsp;&nbsp; <span style="color:#c7a060;">' . booking_email_icon('time', 14) . '</span> ' . email_safe($nights) . '</div></td></tr></table>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:20px;border-top:1px solid #eadfd2;padding-top:16px;"><tr><td style="width:50%;font-size:13px;line-height:1.7;color:#071529;"><strong>Check-in</strong><br>' . email_safe($checkIn) . '</td><td style="width:50%;font-size:13px;line-height:1.7;color:#071529;"><strong>Check-out</strong><br>' . email_safe($checkOut) . '</td></tr></table>
+</td></tr></table>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td width="50%" style="width:50%;vertical-align:top;padding:0 6px 14px 0;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #eadfd2;border-radius:8px;"><tr><td style="padding:18px;"><div style="font-size:15px;font-weight:800;margin-bottom:12px;color:#071529;">' . booking_email_icon('user', 16) . ' &nbsp;Guest Information</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0">' . $guestRows . '</table></td></tr></table></td><td width="50%" style="width:50%;vertical-align:top;padding:0 0 14px 6px;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #eadfd2;border-radius:8px;"><tr><td style="padding:18px;"><div style="font-size:15px;font-weight:800;margin-bottom:12px;color:#071529;">' . booking_email_icon('wallet', 16) . ' &nbsp;Payment Information</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0">' . $paymentHtml . '</table></td></tr></table></td></tr></table>
+<div style="background:#eef6ff;border-radius:8px;padding:18px 20px;margin:0 0 18px;color:#102033;font-size:13px;line-height:1.75;"><strong style="font-size:15px;color:#071529;">' . booking_email_icon('clipboard', 18) . ' &nbsp;Next Steps</strong><br>• Review the booking details.<br>• Ensure the room is prepared for the guest.<br>• If any changes are required, please contact the guest.</div>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:18px;"><tr><td width="33.33%" style="width:33.33%;vertical-align:top;padding:0 12px 0 0;border-right:1px solid #e8edf3;"><strong style="font-size:13px;color:#071529;">Hotel Contact</strong><br><span style="font-size:13px;line-height:1.8;color:#102033;">' . booking_email_icon('phone', 14) . ' ' . email_safe(email_contact_phone()) . '<br>' . booking_email_icon('mail', 14) . ' ' . email_safe(email_contact_email()) . '</span></td><td width="33.33%" style="width:33.33%;vertical-align:top;padding:0 12px;border-right:1px solid #e8edf3;"><strong style="font-size:13px;color:#071529;">Hotel Address</strong><br><span style="font-size:13px;line-height:1.8;color:#102033;">' . booking_email_icon('location', 14) . ' ' . email_safe(email_contact_address()) . '</span></td><td width="33.33%" align="center" style="width:33.33%;vertical-align:top;padding:0 0 0 12px;"><strong style="font-size:13px;color:#071529;">View in Dashboard</strong><br><a href="' . email_safe($dashboardUrl) . '" style="display:inline-block;margin-top:10px;background:#06182a;color:#ffffff;text-decoration:none;border-radius:6px;padding:12px 22px;font-size:13px;font-weight:800;">Open Dashboard</a></td></tr></table>
+' . ($extraButton !== '' ? '<div style="text-align:center;margin:18px 0 0;">' . $extraButton . '</div>' : '') . '
+</td></tr>
+<tr><td style="background:#06182a;padding:24px 46px;color:#ffffff;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td><img src="' . email_safe($logoUrl) . '" width="120" alt="' . email_safe($brand) . '" style="display:block;width:120px;height:auto;border:0;"></td><td align="center" style="font-size:13px;line-height:1.5;color:#ffffff;">Thank you for using Tulip Guest Inn.<br>We look forward to welcoming our guests!</td></tr></table><div style="margin-top:22px;border-top:1px solid rgba(255,255,255,.12);padding-top:16px;text-align:center;font-size:12px;color:#cdd6e2;">&copy; ' . $year . ' ' . email_safe($brand) . '. All rights reserved.</div></td></tr>
+</table>
+</td></tr></table>
+</body></html>';
+}
+
 function booking_email_html(string $state, array $booking, array $payment = [], bool $admin = false, string $extraButton = '', array $extraRows = [], string $customHeading = '', string $customMessage = '', string $customBadge = ''): string
 {
-    if (!$admin && in_array(strtolower(trim($state)), ['confirmed', 'paid'], true)) {
+    if ($admin) {
+        return booking_admin_notification_email_html($booking, $payment, $extraButton, $extraRows, $customHeading, $customMessage);
+    }
+
+    if (in_array(strtolower(trim($state)), ['confirmed', 'paid'], true)) {
         return booking_customer_confirmation_email_html($booking, $payment, $extraButton, $extraRows, $customHeading, $customMessage);
     }
 
-    $cfg = $admin ? booking_email_status_config('admin') : booking_email_status_config($state);
+    $cfg = booking_email_status_config($state);
     [$heading, $message, $badge, $icon, $badgeColor, $badgeBg] = $cfg;
 
     if ($admin) {
