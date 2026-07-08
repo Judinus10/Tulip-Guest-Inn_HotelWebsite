@@ -1002,189 +1002,146 @@ function reminder_email_admin_dashboard_url(): string
     return $base !== '' ? rtrim($base, '/') : '';
 }
 
-function reminder_email_shell(string $title, string $content, string $preheader = '', string $sideTitle = 'Stay Reminder', string $sideSubTitle = 'Check-in Reminder'): string
+function reminder_email_shell(string $title, string $content, string $preheader = '', string $sideTitle = 'Daily Operations Summary', string $sideSubTitle = ''): string
 {
     $year = date('Y');
+    $logoUrl = email_logo_url();
+    $phone = email_contact_phone();
+    $email = email_contact_email();
+    $address = email_contact_address();
 
-    return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' . email_safe(email_brand_name()) . '</title>
-' . email_icon_font_css() . '
+    $preheaderHtml = $preheader !== ''
+        ? '<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">' . email_safe($preheader) . '</div>'
+        : '';
+
+    return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' . email_safe(email_brand_name()) . '</title>' . email_icon_font_css() . '
 <style>
 @media only screen and (max-width:620px){
-  .reminder-wrap{padding:0!important;background:#fff!important;}
-  .reminder-card{width:100%!important;border-radius:0!important;}
-  .reminder-header{padding:18px 22px!important;}
-  .reminder-brand{font-size:30px!important;letter-spacing:5px!important;}
-  .reminder-header-side{width:54px!important;}
-  .reminder-side-text{display:none!important;}
-  .reminder-body{padding:18px 16px!important;}
-  .reminder-hero-icon{width:64px!important;height:64px!important;font-size:31px!important;display:block!important;margin:0 0 12px!important;}
-  .reminder-hero-copy{display:block!important;width:100%!important;padding-left:0!important;}
-  .reminder-title{font-size:25px!important;margin-bottom:10px!important;}
-  .reminder-summary td{display:block!important;width:auto!important;border-right:0!important;border-bottom:1px solid #eadfd2!important;padding:13px 16px!important;}
-  .reminder-desktop-table{display:none!important;}
-  .reminder-mobile-cards{display:block!important;}
-  .reminder-action td{display:block!important;width:auto!important;text-align:left!important;}
-  .reminder-button{display:block!important;width:auto!important;}
-  .reminder-help{padding:16px!important;}
-  .reminder-help td{display:block!important;width:auto!important;border:0!important;padding:4px 0!important;}
+  .rem-wrap{padding:0!important;background:#fff!important;}
+  .rem-card{width:100%!important;border-radius:0!important;}
+  .rem-top{padding:16px 18px!important;}
+  .rem-logo{width:132px!important;height:auto!important;}
+  .rem-top-side{display:none!important;}
+  .rem-hero{padding:22px 18px 18px!important;}
+  .rem-hero-title{font-size:23px!important;line-height:1.2!important;}
+  .rem-body{padding:18px 14px!important;}
+  .rem-stat-td{display:block!important;width:auto!important;padding:0 0 10px!important;}
+  .rem-stat-card{height:auto!important;}
+  .rem-two-col{display:block!important;width:auto!important;padding:0 0 14px!important;}
+  .rem-three-col{display:block!important;width:auto!important;padding:0 0 12px!important;}
+  .rem-table{display:none!important;}
+  .rem-mobile-list{display:block!important;}
+  .rem-footer-col{display:block!important;width:auto!important;text-align:left!important;padding:10px 0!important;border:0!important;}
 }
-</style></head>
-<body style="margin:0;padding:0;background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:#111;">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">' . email_safe($preheader) . '</div>
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" class="reminder-wrap" style="border-collapse:collapse;background:#ffffff;padding:22px 0;"><tr><td align="center" style="padding:22px 12px;">
-<table role="presentation" width="760" cellspacing="0" cellpadding="0" class="reminder-card" style="width:760px;max-width:100%;border-collapse:collapse;background:#fff;border-radius:4px;box-shadow:0 14px 40px rgba(20,20,20,.08);overflow:hidden;">
-<tr><td class="reminder-header" style="padding:24px 34px;background:#987b58;background:#987b58;color:#ffffff;">
+</style></head><body style="margin:0;padding:0;background:#f7f3ec;font-family:Arial,Helvetica,sans-serif;color:#071529;">' . $preheaderHtml . '
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" class="rem-wrap" style="border-collapse:collapse;background:#f7f3ec;padding:24px 0;"><tr><td align="center" style="padding:0 12px;">
+<table role="presentation" width="820" cellspacing="0" cellpadding="0" class="rem-card" style="width:820px;max-width:100%;border-collapse:separate;border-spacing:0;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 18px 42px rgba(7,21,41,.12);">
+<tr><td class="rem-top" style="padding:22px 30px;background:#06182d;color:#ffffff;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;"><tr>
-    <td align="left" style="text-align:left;">
-      <div class="reminder-brand" style="font-family:Arial,Helvetica,sans-serif;font-size:30px;letter-spacing:4px;color:#fff;font-weight:700;line-height:1;">JEBAL</div>
-      <div style="font-size:11px;letter-spacing:4px;color:#fff;font-weight:700;margin-top:6px;">GUEST HOUSE</div>
-      <div style="font-size:12px;color:#fff;margin-top:12px;letter-spacing:.08em;"><span style="display:inline-block;width:38px;border-top:1px solid #c9a77d;vertical-align:middle;margin-right:8px;"></span>ADMIN NOTIFICATION<span style="display:inline-block;width:38px;border-top:1px solid #c9a77d;vertical-align:middle;margin-left:8px;"></span></div>
-    </td>
-    <td align="right" class="reminder-header-side" style="width:230px;vertical-align:middle;">
-      <table role="presentation" cellspacing="0" cellpadding="0" align="right" style="border-collapse:collapse;"><tr>
-        <td style="width:54px;height:54px;border-radius:50%;background:#987b58;color:#ffffff;text-align:center;font-size:18px;line-height:54px;">' . booking_email_icon('calendar') . '</td>
-        <td class="reminder-side-text" style="padding-left:16px;color:#fff;font-size:16px;line-height:1.45;text-align:left;"><strong>' . email_safe($sideTitle) . '</strong><br>' . email_safe($sideSubTitle) . '</td>
-      </tr></table>
-    </td>
+    <td><img src="' . email_safe($logoUrl) . '" width="160" alt="Tulip Guest Inn" class="rem-logo" style="display:block;width:160px;height:auto;border:0;outline:none;text-decoration:none;"></td>
+    <td align="right" class="rem-top-side" style="font-size:14px;line-height:1.5;color:#ffffff;font-weight:700;">' . email_safe($sideTitle) . '<br><span style="font-weight:500;">' . email_safe($sideSubTitle) . '</span></td>
   </tr></table>
 </td></tr>
-<tr><td class="reminder-body" style="padding:34px 38px 26px;">' . $content . '</td></tr>
-<tr><td>' . reminder_email_help_block() . '</td></tr>
-<tr><td style="padding:17px 24px 24px;text-align:center;border-top:1px solid #eee;color:#111;font-size:14px;line-height:1.6;">
-    <div>This is an automated email. Please do not reply.</div>
-    <div style="color:#333;">&copy; ' . $year . ' Tulip Guest Inn. All rights reserved.</div>
+<tr><td class="rem-hero" background="' . email_safe(email_public_url() . '/assets/email-hero.jpg') . '" style="padding:38px 30px 30px;background-color:#0b2a44;background-image:linear-gradient(rgba(3,14,27,.70),rgba(3,14,27,.70));color:#ffffff;text-align:center;">
+  <h1 class="rem-hero-title" style="margin:0 0 8px;font-size:31px;line-height:1.2;font-weight:800;color:#ffffff;">' . email_safe($title) . '</h1>
+  <p style="margin:0 0 16px;font-size:16px;line-height:1.5;color:#ffffff;">Here is your daily summary for Tulip Guest Inn.</p>
+  <span style="display:inline-block;background:#ffffff;color:#bd8f3c;border-radius:999px;padding:10px 24px;font-size:14px;font-weight:700;">' . booking_email_icon('calendar', 15) . ' &nbsp;' . email_safe($sideSubTitle) . '</span>
 </td></tr>
-</table>
-</td></tr></table>
-</body></html>';
+<tr><td class="rem-body" style="padding:22px 26px 20px;">' . $content . '</td></tr>
+<tr><td style="background:#06182d;color:#ffffff;padding:28px 34px;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;"><tr>
+    <td class="rem-footer-col" style="width:34%;vertical-align:top;"><img src="' . email_safe($logoUrl) . '" width="150" alt="Tulip Guest Inn" style="display:block;width:150px;height:auto;border:0;"><div style="margin-top:12px;color:#d9a84b;font-style:italic;font-size:13px;">Great Stays Begin Here</div></td>
+    <td class="rem-footer-col" style="width:42%;vertical-align:top;color:#ffffff;font-size:13px;line-height:1.8;border-left:1px solid rgba(255,255,255,.12);padding-left:28px;">' . booking_email_icon('phone', 15) . ' &nbsp;' . email_safe($phone) . '<br>' . booking_email_icon('mail', 15) . ' &nbsp;' . email_safe($email) . '<br>' . booking_email_icon('location', 15) . ' &nbsp;' . email_safe($address) . '</td>
+    <td class="rem-footer-col" style="width:24%;vertical-align:top;text-align:center;color:#ffffff;font-size:13px;font-weight:700;">FOLLOW US<br><div style="margin-top:12px;font-size:16px;letter-spacing:10px;">f ◎ ☎</div></td>
+  </tr></table>
+  <div style="margin-top:24px;padding-top:18px;border-top:1px solid rgba(255,255,255,.12);text-align:center;color:#dbe5ef;font-size:12px;">This is an automated email. Please do not reply.<br>© ' . (int) $year . ' Tulip Guest Inn. All rights reserved.</div>
+</td></tr>
+</table></td></tr></table></body></html>';
 }
 
 function reminder_email_help_block(): string
 {
-    return '<div class="reminder-help" style="background:#ffffff;border-top:1px solid #eadfd2;border-bottom:1px solid #eadfd2;padding:22px 34px;">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
-            <tr>
-                <td style="width:43%;vertical-align:middle;padding:0 24px 0 0;">
-                    <table role="presentation" cellspacing="0" cellpadding="0" style="border-collapse:collapse;"><tr>
-                        <td style="width:54px;height:54px;border-radius:50%;background:#f7f4ef;text-align:center;vertical-align:middle;color:#987b58;font-size:18px;">' . booking_email_icon('mail', 24) . '</td>
-                        <td style="padding-left:16px;"><div style="font-size:17px;font-weight:800;color:#111;line-height:1.2;">Need help?</div><div style="font-size:14px;color:#111;margin-top:4px;">Contact us anytime.</div></td>
-                    </tr></table>
-                </td>
-                <td style="width:1px;background:#d7c8b9;"></td>
-                <td style="vertical-align:middle;padding-left:34px;color:#333;font-size:14px;line-height:1.9;">
-                    <div><span style="color:#987b58;width:24px;display:inline-block;">' . booking_email_icon('phone') . '</span> ' . email_safe(email_contact_phone()) . '</div>
-                    <div><span style="color:#987b58;width:24px;display:inline-block;">' . booking_email_icon('mail') . '</span> ' . email_safe(email_contact_email()) . '</div>
-                    <div><span style="color:#987b58;width:24px;display:inline-block;">' . booking_email_icon('web') . '</span> ' . email_safe(email_contact_website()) . '</div>
-                </td>
-            </tr>
-        </table>
+    return '';
+}
+
+function reminder_email_metric_card(string $icon, string $value, string $label): string
+{
+    return '<td class="rem-stat-td" style="width:25%;padding:0 7px 14px;vertical-align:top;">
+      <div class="rem-stat-card" style="border:1px solid #e6eaf0;border-radius:8px;background:#ffffff;padding:16px 15px;height:72px;box-shadow:0 5px 14px rgba(7,21,41,.04);">
+        <table role="presentation" cellspacing="0" cellpadding="0" style="border-collapse:collapse;"><tr><td style="width:44px;vertical-align:middle;"><span style="display:inline-block;width:38px;height:38px;border-radius:50%;background:#09285b;text-align:center;line-height:38px;">' . booking_email_icon($icon, 19) . '</span></td><td style="vertical-align:middle;padding-left:10px;"><div style="font-size:24px;font-weight:800;line-height:1;color:#071529;">' . email_safe($value) . '</div><div style="font-size:12px;color:#071529;margin-top:6px;">' . email_safe($label) . '</div><div style="font-size:11px;color:#09285b;font-weight:700;margin-top:7px;">View Details →</div></td></tr></table>
+      </div>
+    </td>';
+}
+
+function reminder_email_booking_table(string $title, array $bookings, string $dateField, string $emptyText): string
+{
+    $rows = '';
+    $cards = '';
+    foreach ($bookings as $booking) {
+        $guest = (string) ($booking['guest_name'] ?? $booking['full_name'] ?? 'Guest');
+        $room = (string) ($booking['room_name'] ?? '-');
+        $time = trim((string) ($booking[$dateField . '_time'] ?? $booking['time'] ?? ''));
+        if ($time === '') { $time = $dateField === 'check_out_date' ? '12:00 PM' : '02:00 PM'; }
+        $rows .= '<tr><td style="padding:9px 12px;border-bottom:1px solid #edf0f4;font-size:13px;">' . email_safe($guest) . '</td><td style="padding:9px 12px;border-bottom:1px solid #edf0f4;font-size:13px;">' . email_safe($room) . '</td><td align="right" style="padding:9px 12px;border-bottom:1px solid #edf0f4;font-size:13px;">' . email_safe($time) . '</td></tr>';
+        $cards .= '<div style="padding:10px 0;border-bottom:1px solid #edf0f4;font-size:13px;"><strong>' . email_safe($guest) . '</strong><br><span style="color:#334155;">' . email_safe($room) . '</span><span style="float:right;color:#071529;">' . email_safe($time) . '</span></div>';
+    }
+    if ($rows === '') {
+        $rows = '<tr><td colspan="3" style="padding:13px 12px;color:#64748b;font-size:13px;">' . email_safe($emptyText) . '</td></tr>';
+        $cards = '<p style="margin:0;color:#64748b;font-size:13px;">' . email_safe($emptyText) . '</p>';
+    }
+    return '<div style="border:1px solid #e6eaf0;border-radius:8px;background:#ffffff;overflow:hidden;box-shadow:0 5px 14px rgba(7,21,41,.04);">
+      <div style="padding:14px 16px;color:#09285b;font-weight:800;font-size:13px;text-transform:uppercase;">' . booking_email_icon('user', 16) . ' &nbsp;' . email_safe($title) . '</div>
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" class="rem-table" style="border-collapse:collapse;"><tr style="background:#f7f7f8;"><th align="left" style="padding:9px 12px;font-size:12px;">Guest Name</th><th align="left" style="padding:9px 12px;font-size:12px;">Room</th><th align="right" style="padding:9px 12px;font-size:12px;">Time</th></tr>' . $rows . '</table>
+      <div class="rem-mobile-list" style="display:none;padding:0 14px 12px;">' . $cards . '</div>
     </div>';
 }
 
-function reminder_email_summary_panel(string $reminderDate, string $forDate, int $total, string $label): string
+function reminder_email_small_panel(string $title, string $body, string $icon = 'calendar'): string
 {
-    return '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" class="reminder-summary" style="border-collapse:separate;border-spacing:0;margin:22px 0 26px;border:1px solid #eadfd2;border-radius:8px;background:#ffffff;overflow:hidden;">
-        <tr>
-            <td style="width:33.33%;padding:20px 22px;border-right:1px solid #d7c8b9;"><span style="color:#987b58;font-size:20px;vertical-align:middle;">' . booking_email_icon('calendar') . '</span><span style="display:inline-block;padding-left:16px;color:#555;font-size:13px;line-height:1.45;vertical-align:middle;">Reminder Date<br><strong style="display:block;margin-top:5px;color:#111;font-size:15px;">' . email_safe(reminder_email_format_date($reminderDate)) . '</strong></span></td>
-            <td style="width:33.33%;padding:20px 22px;border-right:1px solid #d7c8b9;"><span style="color:#987b58;font-size:20px;vertical-align:middle;">' . booking_email_icon('time') . '</span><span style="display:inline-block;padding-left:16px;color:#555;font-size:13px;line-height:1.45;vertical-align:middle;">' . email_safe($label) . '<br><strong style="display:block;margin-top:5px;color:#111;font-size:15px;">' . email_safe(reminder_email_format_date($forDate)) . '</strong></span></td>
-            <td style="width:33.33%;padding:20px 22px;"><span style="color:#987b58;font-size:20px;vertical-align:middle;">' . booking_email_icon('user') . '</span><span style="display:inline-block;padding-left:16px;color:#555;font-size:13px;line-height:1.45;vertical-align:middle;">Total Bookings<br><strong style="display:block;margin-top:5px;color:#111;font-size:15px;">' . (int) $total . '</strong></span></td>
-        </tr>
-    </table>';
-}
-
-function reminder_email_bookings_section(string $title, array $bookings, string $emptyText): string
-{
-    $desktopRows = '';
-    $mobileCards = '';
-
-    foreach ($bookings as $booking) {
-        $ref = (string) ($booking['booking_no'] ?? ('BK-' . str_pad((string) ($booking['id'] ?? 0), 5, '0', STR_PAD_LEFT)));
-        $guest = (string) ($booking['guest_name'] ?? $booking['full_name'] ?? 'Guest');
-        $room = (string) ($booking['room_name'] ?? '-');
-        $date = (string) ($booking['check_in_date'] ?? $booking['check_out_date'] ?? '-');
-        $guests = (string) ($booking['guests'] ?? '-');
-        $guestLabel = $guests === '1' ? '1 Guest' : $guests . ' Guests';
-        $phone = (string) ($booking['guest_phone'] ?? $booking['phone'] ?? '-');
-        $email = (string) ($booking['guest_email'] ?? $booking['email'] ?? '-');
-
-        $desktopRows .= '<tr>
-            <td style="padding:17px 16px;border-bottom:1px solid #eadfd2;color:#987b58;font-weight:800;">' . email_safe($ref) . '</td>
-            <td style="padding:17px 16px;border-bottom:1px solid #eadfd2;font-weight:800;">' . email_safe($guest) . '</td>
-            <td style="padding:17px 16px;border-bottom:1px solid #eadfd2;">' . email_safe($room) . '</td>
-            <td style="padding:17px 16px;border-bottom:1px solid #eadfd2;">' . email_safe(reminder_email_format_date($date)) . '</td>
-            <td style="padding:17px 16px;border-bottom:1px solid #eadfd2;">' . email_safe($guests) . '</td>
-            <td style="padding:17px 16px;border-bottom:1px solid #eadfd2;line-height:1.7;color:#111111;">' . email_safe($phone) . '<br>' . email_safe($email) . '</td>
-        </tr>';
-
-        $mobileCards .= '<div style="margin:0 0 10px;padding:12px 14px;border:1px solid #eadfd2;border-radius:8px;background:#ffffff;">
-            <div style="color:#987b58;font-weight:800;font-size:14px;">' . email_safe($ref) . '</div>
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-top:2px;"><tr><td style="font-weight:800;font-size:13px;color:#111;">' . email_safe($guest) . '</td><td align="right"><span style="display:inline-block;background:#f7f4ef;border-radius:8px;padding:6px 10px;font-size:12px;color:#111;">' . email_safe($room) . '</span></td></tr></table>
-            <div style="margin-top:12px;color:#111;font-size:12px;line-height:1.9;"><span style="color:#000000;">' . booking_email_icon('calendar') . '</span> &nbsp;' . email_safe(reminder_email_format_date($date)) . ' &nbsp; | &nbsp; <span style="color:#000000;">' . booking_email_icon('user') . '</span> &nbsp;' . email_safe($guestLabel) . '<br>' . email_safe($phone) . '<br>' . email_safe($email) . '</div>
-        </div>';
-    }
-
-    if ($desktopRows === '') {
-        $desktopRows = '<tr><td colspan="6" style="padding:18px;color:#6b7280;">' . email_safe($emptyText) . '</td></tr>';
-        $mobileCards = '<p style="margin:0;color:#6b7280;">' . email_safe($emptyText) . '</p>';
-    }
-
-    return '<h2 style="margin:22px 0 14px;color:#987b58;font-size:18px;line-height:1.2;letter-spacing:.02em;text-transform:uppercase;"><span style="font-size:18px;vertical-align:middle;">' . booking_email_icon('calendar') . '</span> &nbsp;' . email_safe($title) . '</h2>
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" class="reminder-desktop-table" style="border-collapse:separate;border-spacing:0;border:1px solid #eadfd2;border-radius:8px;overflow:hidden;">
-        <tr style="background:#987b58;color:#ffffff;">
-            <th align="left" style="padding:13px 16px;font-size:13px;">Booking Ref</th>
-            <th align="left" style="padding:13px 16px;font-size:13px;">Guest Name</th>
-            <th align="left" style="padding:13px 16px;font-size:13px;">Room</th>
-            <th align="left" style="padding:13px 16px;font-size:13px;">Date</th>
-            <th align="left" style="padding:13px 16px;font-size:13px;">Guests</th>
-            <th align="left" style="padding:13px 16px;font-size:13px;">Contact</th>
-        </tr>' . $desktopRows . '
-    </table>
-    <div class="reminder-mobile-cards" style="display:none;">' . $mobileCards . '</div>';
+    return '<td class="rem-three-col" style="width:33.33%;padding:0 7px 14px;vertical-align:top;"><div style="border:1px solid #e6eaf0;border-radius:8px;background:#ffffff;padding:16px;min-height:88px;box-shadow:0 5px 14px rgba(7,21,41,.04);"><div style="color:#09285b;font-size:13px;font-weight:800;text-transform:uppercase;">' . booking_email_icon($icon, 16) . ' &nbsp;' . email_safe($title) . '</div><div style="margin-top:12px;color:#071529;font-size:13px;line-height:1.7;">' . $body . '</div></div></td>';
 }
 
 function reminder_email_action_block(): string
 {
-    $dashboardUrl = reminder_email_admin_dashboard_url();
-    $button = $dashboardUrl !== ''
-        ? '<a href="' . email_safe($dashboardUrl) . '" class="reminder-button" style="display:inline-block;background:#987b58;color:#ffffff;text-decoration:none;border-radius:5px;padding:15px 46px;font-weight:800;font-size:15px;">' . booking_email_icon('open') . ' &nbsp; Open Admin Dashboard</a>'
-        : '';
-
-    return '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" class="reminder-action" style="border-collapse:collapse;margin:22px 0 20px;border:1px solid #d8c9b8;border-radius:8px;background:#ffffff;overflow:hidden;">
-        <tr><td style="width:44px;padding:18px 0 18px 22px;color:#987b58;font-size:28px;vertical-align:top;">!</td><td style="padding:18px 20px;color:#111;font-size:14px;line-height:1.5;"><strong style="display:block;font-size:15px;margin-bottom:4px;">Action Required</strong>Please ensure that rooms are ready and all check-in/check-out preparations are completed.</td></tr>
-    </table>' . ($button !== '' ? '<div style="text-align:center;margin:0 0 6px;">' . $button . '</div>' : '');
+    return '<div style="background:#fbf4e8;border:1px solid #f2e2c9;border-radius:8px;padding:18px 20px;margin-top:12px;color:#071529;font-size:13px;line-height:1.7;"><strong style="display:block;color:#bd8f3c;font-size:14px;margin-bottom:8px;">' . booking_email_icon('info', 17) . ' &nbsp;Important Reminders</strong><ul style="margin:0;padding-left:22px;"><li>Review today\'s check-ins and check-outs before guest arrival.</li><li>Prepare rooms and confirm any special guest requests early.</li></ul></div>';
 }
 
 function stay_reminder_email_html(string $date, array $checkIns, array $checkOuts): string
 {
     $checkInCount = count($checkIns);
     $checkOutCount = count($checkOuts);
-    $total = $checkInCount + $checkOutCount;
-    $title = $checkOutCount > 0 && $checkInCount > 0 ? 'Today\'s Stay Reminder' : ($checkOutCount > 0 ? 'Check-out Reminder' : 'Check-in Reminder');
-    $sideSubTitle = $checkOutCount > 0 && $checkInCount > 0 ? 'Stay Reminder' : ($checkOutCount > 0 ? 'Check-out Reminder' : 'Check-in Reminder');
-    $summaryLabel = $checkOutCount > 0 && $checkInCount === 0 ? 'For Check-out Date' : 'For Check-in Date';
-    $whenText = $date === date('Y-m-d', strtotime('+1 day')) ? 'tomorrow' : 'today';
+    $occupied = $checkInCount + $checkOutCount;
+    $summaryDate = date('l, d F Y', strtotime($date) ?: time());
 
-    $content = '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;"><tr>
-        <td class="reminder-hero-icon" style="width:104px;height:104px;border-radius:50%;background:#f7f4ef;text-align:center;vertical-align:middle;color:#987b58;font-size:13px;line-height:104px;">' . booking_email_icon('calendar', 30) . '</td>
-        <td class="reminder-hero-copy" style="vertical-align:middle;padding-left:34px;">
-            <h1 class="reminder-title" style="margin:0 0 12px;color:#111;font-size:30px;line-height:1.15;font-weight:800;">' . email_safe($title) . '</h1>
-            <p style="margin:0 0 6px;color:#111;font-size:15px;line-height:1.55;"><strong>Hello Admin,</strong></p>
-            <p style="margin:0;color:#111;font-size:15px;line-height:1.55;">This is a reminder for guests who are scheduled for stay action <strong style="color:#987b58;">' . email_safe($whenText) . '</strong>.</p>
-        </td>
-    </tr></table>';
-
-    $content .= reminder_email_summary_panel(date('Y-m-d'), $date, $total, $summaryLabel);
-
-    if ($checkInCount > 0) {
-        $content .= reminder_email_bookings_section('Upcoming Check-ins', $checkIns, 'No check-ins scheduled.');
+    $newBookings = [];
+    foreach (array_slice(array_merge($checkIns, $checkOuts), 0, 3) as $booking) {
+        $newBookings[] = (string) ($booking['booking_no'] ?? ('BK-' . str_pad((string) ($booking['id'] ?? 0), 5, '0', STR_PAD_LEFT)));
     }
-    if ($checkOutCount > 0) {
-        $content .= reminder_email_bookings_section('Upcoming Check-outs', $checkOuts, 'No check-outs scheduled.');
-    }
+    $newBookingBody = $newBookings === [] ? 'No new booking updates.' : '• Booking ID: ' . implode('<br>• Booking ID: ', array_map('email_safe', $newBookings));
 
-    $content .= reminder_email_action_block();
+    $paymentTotal = 0.0;
+    foreach (array_merge($checkIns, $checkOuts) as $booking) { $paymentTotal += (float) ($booking['amount'] ?? 0); }
+    $paymentBody = '<strong style="font-size:18px;color:#071529;">' . email_safe(format_money_amount($paymentTotal)) . '</strong><br><span style="color:#09285b;font-weight:700;">View Payment Reports →</span>';
 
-    return reminder_email_shell($title, $content, $title . ' for Tulip Guest Inn.', 'Stay Reminder', $sideSubTitle);
+    $content = '<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#071529;"><strong>Dear Admin,</strong></p>
+    <p style="margin:0 0 18px;font-size:14px;line-height:1.65;color:#071529;">Here is your daily overview of bookings, guest arrivals, departures and other important updates.</p>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin:0 -7px 4px;"><tr>' .
+        reminder_email_metric_card('user', (string) $checkInCount, 'Today\'s Check-ins') .
+        reminder_email_metric_card('open', (string) $checkOutCount, 'Today\'s Check-outs') .
+        reminder_email_metric_card('bed', (string) $occupied, 'Rooms Occupied') .
+        reminder_email_metric_card('wallet', $occupied > 0 ? 'Active' : '0%', 'Today\'s Occupancy') .
+    '</tr></table>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;"><tr>
+      <td class="rem-two-col" style="width:50%;padding:0 10px 16px 0;vertical-align:top;">' . reminder_email_booking_table('Today\'s Check-ins (' . $checkInCount . ')', $checkIns, 'check_in_date', 'No check-ins scheduled.') . '</td>
+      <td class="rem-two-col" style="width:50%;padding:0 0 16px 10px;vertical-align:top;">' . reminder_email_booking_table('Today\'s Check-outs (' . $checkOutCount . ')', $checkOuts, 'check_out_date', 'No check-outs scheduled.') . '</td>
+    </tr></table>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin:0 -7px;" class="rem-small-grid"><tr>' .
+      reminder_email_small_panel('New Bookings (' . count($newBookings) . ')', $newBookingBody, 'calendar') .
+      reminder_email_small_panel('Payment Received', $paymentBody, 'wallet') .
+      reminder_email_small_panel('Pending Enquiries (0)', '<span style="color:#64748b;">No pending enquiries included in this reminder.</span>', 'mail') .
+    '</tr></table>' . reminder_email_action_block();
+
+    return reminder_email_shell('Good Morning, Admin!', $content, 'Daily operations summary for Tulip Guest Inn.', 'Daily Operations Summary', $summaryDate);
 }
 
 function otp_email_html(string $title, string $otp, int $validMinutes = 1): string
