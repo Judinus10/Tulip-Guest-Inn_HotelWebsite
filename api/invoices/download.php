@@ -45,7 +45,7 @@ try {
     $pdo = get_db_connection();
 
     $stmt = $pdo->prepare(
-        'SELECT invoice_file_path, invoice_number, payment_status
+        'SELECT invoice_number, payment_status
          FROM bookings
          WHERE id = :id
          LIMIT 1'
@@ -73,30 +73,22 @@ try {
     $paymentStmt->execute([':booking_id' => $bookingId]);
     $payment = $paymentStmt->fetch() ?: [];
 
-    $generatedInvoice = generate_invoice_for_booking($pdo, $bookingId, $payment, true);
-    if (!$generatedInvoice || empty($generatedInvoice['file_path'])) {
+    $invoice = build_invoice_data_for_booking($pdo, $bookingId, $payment);
+    if (!$invoice) {
         header('Content-Type: application/json; charset=utf-8');
         json_response(false, 'Invoice not found.', 404);
     }
 
-    $booking['invoice_file_path'] = $generatedInvoice['file_path'];
-    $booking['invoice_number'] = $generatedInvoice['invoice_number'] ?? $booking['invoice_number'] ?? 'invoice';
-
-    $filePath = realpath(__DIR__ . '/../' . $booking['invoice_file_path']);
-    $basePath = realpath(__DIR__ . '/../storage/invoices');
-
-    if (!$filePath || !$basePath || !str_starts_with($filePath, $basePath) || !is_file($filePath)) {
-        header('Content-Type: application/json; charset=utf-8');
-        json_response(false, 'Invoice file not found.', 404);
-    }
-
-    $invoiceNumber = preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($booking['invoice_number'] ?: 'invoice')) ?: 'invoice';
+    $invoiceNumber = preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($invoice['invoice_number'] ?: generate_invoice_number($bookingId))) ?: 'invoice';
+    $pdf = create_invoice_pdf_binary($invoice);
 
     header('Content-Type: application/pdf');
     header('Content-Disposition: attachment; filename="' . $invoiceNumber . '.pdf"');
-    header('Content-Length: ' . filesize($filePath));
+    header('Content-Length: ' . strlen($pdf));
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
 
-    readfile($filePath);
+    echo $pdf;
     exit;
 } catch (Throwable $e) {
     error_log('Invoice download error: ' . $e->getMessage());

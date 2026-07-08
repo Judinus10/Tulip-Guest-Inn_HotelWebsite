@@ -164,27 +164,7 @@ try {
     // Do not trigger booking emails from the public bill/status polling endpoint.
     // Emails are queued by the verified PayHere notify endpoint and delivered by cron.
 
-    if ($paymentStatus === 'Paid' && (empty($record['invoice_id']) || empty($record['invoice_file_path']))) {
-        try {
-            booking_audit_log($pdo, $bookingId, 'invoice_generation_started', 'Invoice Generation Started', 'Invoice generation was triggered from the bill page.', ['order_id' => $orderId]);
-
-            generate_invoice_for_booking($pdo, $bookingId, [
-                'amount' => (float) ($record['paid_amount'] ?? $record['amount'] ?? 0),
-                'currency' => (string) ($record['paid_currency'] ?? $record['currency'] ?? PAYMENT_CURRENCY),
-                'method' => (string) ($record['payment_method'] ?? 'PayHere'),
-                'paid_at' => (string) ($record['payment_updated_at'] ?? date('Y-m-d H:i:s')),
-            ]);
-
-            $freshStmt = $pdo->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1');
-            $freshStmt->execute([':id' => $bookingId]);
-            $freshBooking = $freshStmt->fetch();
-            if ($freshBooking) {
-                $record = array_merge($record, $freshBooking);
-            }
-        } catch (Throwable $exception) {
-            error_log('Public payment status invoice generation failed: ' . $exception->getMessage());
-        }
-    }
+    // Invoice PDFs are no longer stored locally. They are generated only when downloaded.
 
     $paymentHistory = load_payment_history($pdo, $bookingId);
 
@@ -194,7 +174,7 @@ try {
         && (string) ($record['status'] ?? '') !== 'Confirmed';
 
     $invoiceDownloadUrl = null;
-    if ($paymentStatus === 'Paid' && !empty($record['invoice_file_path'])) {
+    if ($paymentStatus === 'Paid') {
         $baseApiUrl = API_BASE_URL !== '' ? API_BASE_URL : rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/api/payments')), '/');
         $invoiceDownloadUrl = $baseApiUrl . '/invoices/download.php?' . http_build_query([
             'id' => $bookingId,
