@@ -54,6 +54,7 @@ export type BookingPaymentStatus = {
   payment_id: string;
   payment_method: string;
   room_url: string;
+  room_main_image?: string;
   invoice_download_url?: string | null;
   hold_minutes: number;
   expires_at?: string | null;

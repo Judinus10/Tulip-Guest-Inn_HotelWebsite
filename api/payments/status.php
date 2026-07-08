@@ -11,6 +11,7 @@ require_once __DIR__ . '/../invoices/invoice-helper.php';
 require_once __DIR__ . '/../bookings/booking-expiry-helper.php';
 require_once __DIR__ . '/../bookings/booking-audit-helper.php';
 require_once __DIR__ . '/../mail/email-helper.php';
+require_once __DIR__ . '/../rooms/_room_helpers.php';
 
 apply_cors_headers();
 
@@ -89,6 +90,27 @@ function public_room_url(PDO $pdo, string $roomName): string
     }
 
     return $publicBaseUrl . '/rooms';
+}
+
+
+function public_room_main_image(PDO $pdo, string $roomName): string
+{
+    try {
+        ensure_room_images_table($pdo);
+        $stmt = $pdo->prepare('SELECT id FROM rooms WHERE room_name = :room_name LIMIT 1');
+        $stmt->execute([':room_name' => $roomName]);
+        $roomId = (int) ($stmt->fetchColumn() ?: 0);
+        if ($roomId < 1) return '';
+
+        $images = fetch_room_images($pdo, [$roomId]);
+        $roomImages = $images[$roomId] ?? [];
+        if ($roomImages === []) return '';
+
+        return (string) ($roomImages[0]['image_url'] ?? '');
+    } catch (Throwable $exception) {
+        error_log('Unable to load public room main image: ' . $exception->getMessage());
+        return '';
+    }
 }
 
 $bookingId = (int) ($_GET['booking_id'] ?? 0);
@@ -199,6 +221,7 @@ try {
             'payment_id' => (string) ($record['payment_id'] ?? ''),
             'payment_method' => (string) ($record['payment_method'] ?? 'PayHere'),
             'room_url' => public_room_url($pdo, (string) ($record['room_name'] ?? '')),
+            'room_main_image' => public_room_main_image($pdo, (string) ($record['room_name'] ?? '')),
             'invoice_download_url' => $invoiceDownloadUrl,
             'hold_minutes' => booking_hold_minutes(),
             'expires_at' => $expiresAt,
