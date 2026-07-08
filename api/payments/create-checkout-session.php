@@ -199,7 +199,7 @@ try {
         'cancel_url' => $cancelUrl,
         'notify_url' => $notifyUrl,
         'order_id' => $orderId,
-        'items' => 'Jebal Homes booking #' . $bookingId . ' - ' . $roomName,
+        'items' => 'Tulip Guest Inn booking #' . $bookingId . ' - ' . $roomName,
         'currency' => $currency,
         'amount' => $amountFormatted,
         'first_name' => (string) ($booking['full_name'] ?? 'Guest'),

@@ -16,6 +16,52 @@ export type BookingFormPayload = {
   staying_guest_note?: string;
 };
 
+export type CheckoutSession = {
+  checkout_url: string;
+  order_id: string;
+  amount: string | number;
+  currency: string;
+};
+
+export type PaymentHistoryItem = {
+  attempt: number;
+  order_id: string;
+  payment_id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  method: string;
+  invoice_number: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BookingPaymentStatus = {
+  id: number;
+  full_name: string;
+  email: string;
+  phone: string;
+  room_name: string;
+  check_in_date: string;
+  check_out_date: string;
+  guests: number;
+  booking_status: string;
+  payment_status: string;
+  amount: number;
+  currency: string;
+  invoice_number: string;
+  order_id: string;
+  payment_id: string;
+  payment_method: string;
+  room_url: string;
+  invoice_download_url?: string | null;
+  hold_minutes: number;
+  expires_at?: string | null;
+  seconds_remaining: number;
+  can_retry_payment: boolean;
+  payment_history: PaymentHistoryItem[];
+};
+
 export async function submitBookingRequest(payload: BookingFormPayload): Promise<{
   inquiry_id?: string;
   booking_id?: string | number;
@@ -27,4 +73,27 @@ export async function submitBookingRequest(payload: BookingFormPayload): Promise
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+
+export async function createCheckoutSession(bookingId: string | number): Promise<CheckoutSession> {
+  return requestJson('/payments/create-checkout-session.php', {
+    method: 'POST',
+    body: JSON.stringify({ booking_id: bookingId }),
+  });
+}
+
+export async function fetchBookingPaymentStatus(params: {
+  booking_id: string | number;
+  order_id: string;
+  token: string;
+}): Promise<BookingPaymentStatus> {
+  const query = new URLSearchParams({
+    booking_id: String(params.booking_id),
+    order_id: params.order_id,
+    token: params.token,
+  });
+
+  const payload = await requestJson<{ booking: BookingPaymentStatus }>(`/payments/status.php?${query.toString()}`);
+  return payload.booking;
 }

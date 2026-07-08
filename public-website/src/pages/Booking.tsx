@@ -5,7 +5,7 @@ import PageHero from '../components/ui/PageHero';
 import AnimatedSection from '../components/ui/AnimatedSection';
 import { rooms as fallbackRooms } from '../data/rooms';
 import type { Room } from '../data/rooms';
-import { fetchPublicRooms, submitBookingRequest } from '../services/publicApi';
+import { createCheckoutSession, fetchPublicRooms, submitBookingRequest } from '../services/publicApi';
 
 function buildRoomTypeOptions(roomList: Room[]) {
   return [
@@ -29,6 +29,11 @@ interface BookingForm {
   phone: string;
   nationality: string;
   specialRequests: string;
+  isBookingForOther: boolean;
+  stayingGuestName: string;
+  stayingGuestEmail: string;
+  stayingGuestPhone: string;
+  stayingGuestNote: string;
 }
 
 export default function Booking() {
@@ -50,8 +55,12 @@ export default function Booking() {
     phone: '',
     nationality: '',
     specialRequests: '',
+    isBookingForOther: false,
+    stayingGuestName: '',
+    stayingGuestEmail: '',
+    stayingGuestPhone: '',
+    stayingGuestNote: '',
   });
-  const [submitted, setSubmitted] = useState(false);
   const [bookingRooms, setBookingRooms] = useState<Room[]>(fallbackRooms);
   const [submitError, setSubmitError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -72,7 +81,9 @@ export default function Booking() {
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const target = e.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+    const value = target instanceof HTMLInputElement && target.type === 'checkbox' ? target.checked : target.value;
+    setForm((prev) => ({ ...prev, [target.name]: value }));
   };
 
   useEffect(() => {
@@ -105,7 +116,7 @@ export default function Booking() {
         )
       : 0;
 
-  const total = selectedRoom ? selectedRoom.price * nights * Number(form.rooms) : 0;
+  const total = selectedRoom ? selectedRoom.price * nights : 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,7 +130,7 @@ export default function Booking() {
     setIsSubmitting(true);
 
     try {
-      await submitBookingRequest({
+      const booking = await submitBookingRequest({
         full_name: `${form.firstName} ${form.lastName}`.trim(),
         email: form.email,
         phone: form.phone,
@@ -127,6 +138,11 @@ export default function Booking() {
         check_in_date: form.checkIn,
         check_out_date: form.checkOut,
         guests: Number(form.guests),
+        is_booking_for_other: form.isBookingForOther,
+        staying_guest_name: form.isBookingForOther ? form.stayingGuestName : '',
+        staying_guest_email: form.isBookingForOther ? form.stayingGuestEmail : '',
+        staying_guest_phone: form.isBookingForOther ? form.stayingGuestPhone : '',
+        staying_guest_note: form.isBookingForOther ? form.stayingGuestNote : '',
         message: [
           form.specialRequests,
           form.nationality ? `Nationality: ${form.nationality}` : '',
@@ -136,7 +152,17 @@ export default function Booking() {
           .join('\n'),
       });
 
-      setSubmitted(true);
+      const bookingId = booking.booking_id || booking.inquiry_id;
+      if (!bookingId) {
+        throw new Error('Booking was saved but the payment checkout could not start. Missing booking ID.');
+      }
+
+      const checkout = await createCheckoutSession(bookingId);
+      if (!checkout.checkout_url) {
+        throw new Error('Payment checkout could not start. Missing PayHere checkout URL.');
+      }
+
+      window.location.href = checkout.checkout_url;
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : 'Unable to submit booking request.');
     } finally {
@@ -155,7 +181,7 @@ export default function Booking() {
 
       <section className="section-padding bg-background">
         <div className="container-custom">
-          {submitted ? (
+          {false ? (
             <div className="max-w-2xl mx-auto text-center py-20">
               <div className="w-20 h-20 bg-deep-green flex items-center justify-center mx-auto mb-6 shadow-luxury">
                 <Check size={32} className="text-white" />
@@ -327,6 +353,70 @@ export default function Booking() {
                         />
                       </div>
                       <div className="md:col-span-2">
+                        <label className="flex items-center gap-3 text-sm text-dark">
+                          <input
+                            type="checkbox"
+                            name="isBookingForOther"
+                            checked={form.isBookingForOther}
+                            onChange={handleChange}
+                            className="h-4 w-4 accent-gold"
+                          />
+                          I am booking for another guest
+                        </label>
+                      </div>
+
+                      {form.isBookingForOther && (
+                        <>
+                          <div>
+                            <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">Staying Guest Name *</label>
+                            <input
+                              type="text"
+                              name="stayingGuestName"
+                              value={form.stayingGuestName}
+                              onChange={handleChange}
+                              required={form.isBookingForOther}
+                              placeholder="Guest full name"
+                              className="w-full border border-border px-5 py-3.5 text-sm outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">Staying Guest Phone *</label>
+                            <input
+                              type="tel"
+                              name="stayingGuestPhone"
+                              value={form.stayingGuestPhone}
+                              onChange={handleChange}
+                              required={form.isBookingForOther}
+                              placeholder="Guest phone number"
+                              className="w-full border border-border px-5 py-3.5 text-sm outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">Staying Guest Email</label>
+                            <input
+                              type="email"
+                              name="stayingGuestEmail"
+                              value={form.stayingGuestEmail}
+                              onChange={handleChange}
+                              placeholder="guest@email.com"
+                              className="w-full border border-border px-5 py-3.5 text-sm outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">Staying Guest Note</label>
+                            <textarea
+                              name="stayingGuestNote"
+                              value={form.stayingGuestNote}
+                              onChange={handleChange}
+                              rows={3}
+                              placeholder="Any note about the staying guest..."
+                              className="w-full border border-border px-5 py-3.5 text-sm outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400 resize-none"
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      <div className="md:col-span-2">
                         <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">Nationality</label>
                         <input
                           type="text"
@@ -359,7 +449,7 @@ export default function Booking() {
                 )}
 
                 <button type="submit" className="btn-primary w-full justify-center py-4 text-xs" disabled={isSubmitting}>
-                  {isSubmitting ? 'Submitting...' : 'Submit Booking Request'}
+                  {isSubmitting ? 'Preparing Payment...' : 'Continue to Payment'}
                 </button>
               </form>
 
@@ -410,7 +500,7 @@ export default function Booking() {
                       </div>
                       {total > 0 && (
                         <p className="text-[10px] text-gray-400 mt-1 text-right">
-                          Taxes & fees may apply
+                          Final amount is verified by the backend before PayHere checkout
                         </p>
                       )}
                     </div>
@@ -427,7 +517,7 @@ export default function Booking() {
                         'No booking fees',
                         'Free cancellation',
                         'Personalised service',
-                        'Direct payment on arrival',
+                        'Secure online payment',
                       ].map((b) => (
                         <div key={b} className="flex items-center gap-3">
                           <Check size={12} className="text-gold shrink-0" />

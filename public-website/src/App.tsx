@@ -13,6 +13,7 @@ import Attractions from './pages/Attractions';
 import About from './pages/About';
 import Contact from './pages/Contact';
 import Booking from './pages/Booking';
+import BookingBill from './pages/BookingBill';
 
 function PageWrapper({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -48,6 +49,7 @@ function AppLayout() {
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/booking" element={<Booking />} />
+          <Route path="/booking-bill" element={<BookingBill />} />
         </Routes>
       </PageWrapper>
       <Footer />

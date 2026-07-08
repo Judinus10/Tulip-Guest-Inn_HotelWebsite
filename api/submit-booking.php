@@ -181,7 +181,7 @@ try {
     // Do not send user/admin confirmation emails here.
     // Payment is not verified yet. Success/failed emails are sent only from payments/payhere-notify.php.
 
-    json_response(true, 'Booking inquiry submitted successfully.', 201, [
+    json_response(true, 'Booking details saved. Continue to payment.', 201, [
         'inquiry_id' => $bookingId,
         'booking_id' => $bookingId,
         'booking_no' => 'BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT),
@@ -196,5 +196,5 @@ try {
     ]);
 } catch (Throwable $e) {
     error_log('Booking submit error: ' . $e->getMessage());
-    json_response(false, 'Unable to submit booking inquiry.', 500);
+    json_response(false, 'Unable to save booking details.', 500);
 }
