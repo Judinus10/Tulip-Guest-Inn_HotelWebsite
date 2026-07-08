@@ -945,21 +945,110 @@ function contact_support_block(): string
     </table>';
 }
 
-function contact_customer_email_html(string $name, string $ref, string $subject): string
+function contact_customer_email_html(string $name, string $email, string $phone, string $subject, string $message, string $ref): string
 {
+    $brand = email_brand_name();
     $safeName = trim($name) !== '' ? $name : 'Guest';
+    $logoUrl = email_logo_url();
+    $heroImage = email_public_url() . '/api/uploads/gallery/gallery_20260705_155125_34cdb3e8b90c.jpg';
+    $year = date('Y');
+    $website = email_contact_website();
+    $contactEmail = email_contact_email();
+    $contactPhone = email_contact_phone();
+    $address = email_contact_address();
 
-    $content = '<h1 style="margin:0 0 18px;color:#111111;font-size:28px;line-height:1.2;font-weight:800;">Thank you for contacting us</h1>
-    <p style="margin:0 0 18px;color:#111111;font-size:16px;line-height:1.6;">Hi ' . email_safe($safeName) . ',</p>
-    <p style="margin:0;color:#111111;font-size:16px;line-height:1.6;">Thank you for getting in touch with Tulip Guest Inn.<br>We have received your message and our team will<br>reply to you as soon as possible.</p>' .
-    contact_reference_pill($ref) .
-    contact_email_detail_card([
+    $detailRows = [
+        ['icon' => 'user', 'label' => 'Full Name', 'value' => $safeName],
+        ['icon' => 'mail', 'label' => 'Email Address', 'value' => $email],
+        ['icon' => 'phone', 'label' => 'Phone Number', 'value' => $phone],
+        ['icon' => 'message', 'label' => 'Enquiry Type', 'value' => $subject],
         ['icon' => 'ref', 'label' => 'Reference ID', 'value' => $ref],
-        ['icon' => 'mail', 'label' => 'Subject', 'value' => $subject],
-    ]) .
-    contact_support_block();
+        ['icon' => 'message', 'label' => 'Message', 'value' => $message],
+    ];
 
-    return contact_email_shell('Thank you for contacting us', $content, 'We received your message at Tulip Guest Inn.');
+    $rowsHtml = '';
+    foreach ($detailRows as $row) {
+        $value = trim((string) $row['value']);
+        if ($value === '') { continue; }
+        $rowsHtml .= '<tr>
+            <td style="width:28px;padding:8px 10px 8px 0;vertical-align:top;color:#bd8f3c;font-size:15px;line-height:20px;">' . booking_email_icon($row['icon'], 15) . '</td>
+            <td style="width:150px;padding:8px 14px 8px 0;vertical-align:top;color:#071529;font-size:13px;line-height:20px;font-weight:700;">' . email_safe($row['label']) . '</td>
+            <td style="padding:8px 0;vertical-align:top;color:#102033;font-size:13px;line-height:20px;word-break:break-word;">' . nl2br(email_safe($value)) . '</td>
+        </tr>';
+    }
+
+    return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Thank You for Contacting ' . email_safe($brand) . '</title>' . email_icon_font_css() . '
+<style>
+@media only screen and (max-width:640px){
+  .contact-wrap{padding:0!important;background:#ffffff!important;}
+  .contact-card{width:100%!important;border-radius:0!important;box-shadow:none!important;}
+  .contact-pad{padding-left:20px!important;padding-right:20px!important;}
+  .contact-header td{display:block!important;width:100%!important;text-align:center!important;padding:0!important;}
+  .contact-header .contact-line{display:none!important;}
+  .contact-title{font-size:28px!important;line-height:1.12!important;text-align:center!important;}
+  .contact-intro-table td{display:block!important;width:100%!important;padding:0!important;}
+  .contact-intro-img{margin-top:18px!important;width:100%!important;max-width:100%!important;height:auto!important;}
+  .details-label{display:none!important;}
+  .next-table td{display:block!important;width:100%!important;padding:8px 0!important;border-right:0!important;}
+  .assist-table td{display:block!important;width:100%!important;text-align:center!important;padding:8px 0!important;}
+  .footer-table td{display:block!important;width:100%!important;text-align:left!important;padding:12px 0!important;border-right:0!important;}
+}
+</style></head>
+<body style="margin:0;padding:0;background:#f7f3ec;font-family:Arial,Helvetica,sans-serif;color:#071529;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">We received your enquiry and will get back to you soon.</div>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" class="contact-wrap" style="width:100%;background:#f7f3ec;padding:28px 12px;">
+<tr><td align="center">
+<table role="presentation" width="760" cellspacing="0" cellpadding="0" class="contact-card" style="width:760px;max-width:100%;background:#ffffff;border-radius:7px;overflow:hidden;box-shadow:0 16px 40px rgba(15,23,42,.15);">
+<tr><td style="background:#06182a;padding:26px 38px;border-bottom:4px solid #bd8f3c;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" class="contact-header"><tr>
+    <td style="vertical-align:middle;"><img src="' . email_safe($logoUrl) . '" width="170" alt="' . email_safe($brand) . '" style="display:block;width:170px;height:auto;border:0;"><div style="margin-top:6px;color:#ffffff;font-size:12px;letter-spacing:.04em;">Luxury Boutique Hotel</div></td>
+    <td class="contact-line" style="width:1px;background:rgba(255,255,255,.28);font-size:0;line-height:0;">&nbsp;</td>
+    <td align="right" style="vertical-align:middle;color:#ffffff;font-size:13px;line-height:1.9;">' . booking_email_icon('phone', 14) . ' &nbsp;' . email_safe($contactPhone) . '<br>' . booking_email_icon('mail', 14) . ' &nbsp;' . email_safe($contactEmail) . '</td>
+  </tr></table>
+</td></tr>
+<tr><td class="contact-pad" style="padding:42px 38px 30px;background:#ffffff;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" class="contact-intro-table"><tr>
+    <td style="vertical-align:top;padding-right:28px;">
+      <h1 class="contact-title" style="margin:0 0 28px;color:#071529;font-family:Georgia,Times New Roman,serif;font-size:34px;line-height:1.14;font-weight:800;">Thank You for Contacting<br><span style="color:#bd8f3c;">' . email_safe($brand) . '</span></h1>
+      <p style="margin:0 0 18px;color:#071529;font-size:15px;line-height:1.65;font-weight:800;">Dear ' . email_safe($safeName) . ',</p>
+      <p style="margin:0;color:#102033;font-size:15px;line-height:1.65;">Thank you for reaching out to ' . email_safe($brand) . '.<br>We have received your enquiry and our team will get back to you <strong>as soon as possible.</strong></p>
+      <p style="margin:18px 0 0;color:#102033;font-size:15px;line-height:1.65;">We look forward to assisting you!</p>
+    </td>
+    <td width="260" style="width:260px;vertical-align:top;"><img src="' . email_safe($heroImage) . '" width="260" class="contact-intro-img" alt="' . email_safe($brand) . '" style="display:block;width:260px;height:205px;object-fit:cover;border-radius:14px;border:0;"></td>
+  </tr></table>
+</td></tr>
+<tr><td class="contact-pad" style="padding:0 38px 28px;background:#ffffff;">
+  <div style="border-top:1px solid #e7ded3;padding-top:22px;">
+    <div style="font-size:14px;font-weight:900;text-transform:uppercase;color:#071529;margin-bottom:12px;">' . booking_email_icon('user', 18) . ' &nbsp; Your Enquiry Details</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #ead9bf;border-radius:12px;background:#ffffff;padding:10px 18px;">' . $rowsHtml . '</table>
+  </div>
+</td></tr>
+<tr><td class="contact-pad" style="padding:0 38px 26px;background:#ffffff;">
+  <div style="font-size:14px;font-weight:900;text-transform:uppercase;color:#071529;margin-bottom:12px;">' . booking_email_icon('info', 18) . ' &nbsp; What Happens Next?</div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" class="next-table" style="border:1px solid #eee5d8;border-radius:12px;background:#ffffff;"><tr>
+    <td width="33.33%" style="padding:18px 14px;text-align:center;border-right:1px solid #eee5d8;color:#102033;font-size:12px;line-height:1.4;"><div style="width:42px;height:42px;border-radius:50%;background:#fbf4e8;margin:0 auto 8px;line-height:42px;color:#bd8f3c;">' . booking_email_icon('check', 20) . '</div>We have received your enquiry.</td>
+    <td width="33.33%" style="padding:18px 14px;text-align:center;border-right:1px solid #eee5d8;color:#102033;font-size:12px;line-height:1.4;"><div style="width:42px;height:42px;border-radius:50%;background:#fbf4e8;margin:0 auto 8px;line-height:42px;color:#bd8f3c;">' . booking_email_icon('user', 20) . '</div>Our team will review your request.</td>
+    <td width="33.33%" style="padding:18px 14px;text-align:center;color:#102033;font-size:12px;line-height:1.4;"><div style="width:42px;height:42px;border-radius:50%;background:#fbf4e8;margin:0 auto 8px;line-height:42px;color:#bd8f3c;">' . booking_email_icon('mail', 20) . '</div>We will contact you very soon.</td>
+  </tr></table>
+</td></tr>
+<tr><td class="contact-pad" style="padding:0 38px 30px;background:#ffffff;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" class="assist-table" style="background:#fbf4e8;border-radius:10px;"><tr>
+    <td style="padding:20px 24px;vertical-align:middle;"><table role="presentation" cellspacing="0" cellpadding="0"><tr><td style="width:54px;height:54px;border-radius:50%;background:#06182a;color:#ffffff;text-align:center;line-height:54px;">' . booking_email_icon('headset', 24) . '</td><td style="padding-left:16px;color:#102033;"><strong style="font-size:16px;color:#071529;">Need Immediate Assistance?</strong><br><span style="font-size:13px;line-height:1.6;">If your enquiry is urgent, please contact us directly.</span></td></tr></table></td>
+    <td align="right" style="padding:20px 24px;vertical-align:middle;"><a href="mailto:' . email_safe($contactEmail) . '" style="display:inline-block;background:#06182a;color:#ffffff;text-decoration:none;border-radius:6px;padding:14px 28px;font-size:14px;font-weight:800;">Contact Us &nbsp;→</a></td>
+  </tr></table>
+</td></tr>
+<tr><td style="background:#06182a;padding:28px 38px 20px;color:#ffffff;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" class="footer-table"><tr>
+    <td width="36%" style="width:36%;vertical-align:top;padding-right:24px;"><img src="' . email_safe($logoUrl) . '" width="140" alt="' . email_safe($brand) . '" style="display:block;width:140px;height:auto;border:0;"><p style="margin:16px 0 0;color:#ffffff;font-size:13px;line-height:1.7;">Experience peaceful accommodation, modern comfort and genuine Sri Lankan hospitality in beautiful Point Pedro.</p></td>
+    <td width="22%" style="width:22%;vertical-align:top;padding:0 22px;border-right:1px solid rgba(255,255,255,.12);border-left:1px solid rgba(255,255,255,.12);"><strong style="font-size:13px;color:#ffffff;">Quick Links</strong><br><span style="font-size:13px;line-height:2;color:#d8e2ee;">Rooms<br>Facilities<br>Gallery<br>Attractions</span></td>
+    <td width="28%" style="width:28%;vertical-align:top;padding:0 22px;"><strong style="font-size:13px;color:#ffffff;">Contact Us</strong><br><span style="font-size:13px;line-height:1.9;color:#d8e2ee;">' . booking_email_icon('location', 13) . ' ' . email_safe($address) . '<br>' . booking_email_icon('phone', 13) . ' ' . email_safe($contactPhone) . '<br>' . booking_email_icon('mail', 13) . ' ' . email_safe($contactEmail) . '</span></td>
+    <td align="center" style="vertical-align:top;"><strong style="font-size:13px;color:#ffffff;">Follow Us</strong><br><span style="display:inline-block;margin-top:13px;color:#ffffff;font-size:17px;letter-spacing:10px;">f ◎ ☎</span></td>
+  </tr></table>
+  <div style="margin-top:26px;border-top:1px solid rgba(255,255,255,.12);padding-top:16px;text-align:center;color:#d8e2ee;font-size:12px;">&copy; ' . $year . ' ' . email_safe($brand) . '. All rights reserved.</div>
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>';
 }
 
 function contact_admin_email_html(string $name, string $email, string $phone, string $subject, string $message, string $ref): string
@@ -1719,7 +1808,7 @@ function booking_admin_notification_email_html(array $booking, array $payment = 
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;background:#f7f3ec;padding:20px 0;"><tr><td align="center" style="padding:20px 10px;">
 <table role="presentation" width="760" cellspacing="0" cellpadding="0" style="width:760px;max-width:100%;border-collapse:collapse;background:#ffffff;border-radius:6px;overflow:hidden;box-shadow:0 18px 40px rgba(7,21,41,.10);">
 <tr><td style="background:#06182a;padding:18px 24px;color:#ffffff;">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td style="vertical-align:middle;"><img src="' . email_safe($logoUrl) . '" width="132" alt="' . email_safe($brand) . '" style="display:block;width:132px;max-width:48%;height:auto;border:0;"></td><td align="right" style="font-size:13px;line-height:1.45;color:#d5ad68;font-weight:800;">New Booking Received&nbsp;&nbsp;' . booking_email_icon('bell', 18) . '</td></tr></table>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td style="vertical-align:middle;"><img src="' . email_safe($logoUrl) . '" width="132" alt="' . email_safe($brand) . '" style="display:block;width:132px;max-width:48%;height:auto;border:0;"></td><td align="right" style="font-size:13px;line-height:1.45;color:#d5ad68;font-weight:800;">New Booking Received&nbsp;&nbsp;' . booking_email_icon('info', 18) . '</td></tr></table>
 </td></tr>
 <tr><td background="' . email_safe($heroImage) . '" style="background:#071529 url(' . email_safe($heroImage) . ') center/cover no-repeat;padding:52px 24px 42px;text-align:center;color:#ffffff;">
 <div style="background:rgba(7,21,41,.55);padding:16px 10px;"><div style="width:58px;height:58px;border-radius:999px;border:1px solid #d5ad68;margin:0 auto 18px;color:#d5ad68;line-height:58px;font-size:24px;">' . booking_email_icon('calendar', 26) . '</div><h1 style="margin:0 0 10px;font-size:32px;line-height:1.18;font-weight:800;color:#ffffff;">' . email_safe($heading) . '</h1><p style="margin:0;font-size:16px;line-height:1.45;color:#ffffff;">A new booking has been made on your website.</p><div style="margin:16px auto 0;width:40px;border-top:1px solid #d5ad68;font-size:0;line-height:0;">&nbsp;</div></div>
@@ -2560,7 +2649,7 @@ function send_contact_enquiry_emails(PDO $pdo, int $enquiryId, string $name, str
     }
 
     if (filter_var($email, FILTER_VALIDATE_EMAIL) && !contact_email_already_sent($pdo, $enquiryId, 'contact_auto_reply')) {
-        $customerBody = contact_customer_email_html($name, $ref, $subject);
+        $customerBody = contact_customer_email_html($name, $email, $phone, $subject, $message, $ref);
 
         send_tracked_email(
             $pdo,
