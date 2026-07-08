@@ -28,8 +28,8 @@ if (!$isCli) {
 function payment_pending_email_delay_minutes(): int
 {
     $value = function_exists('jebal_env_value')
-        ? (int) jebal_env_value('PAYMENT_PENDING_EMAIL_DELAY_MINUTES', '20')
-        : 20;
+        ? (int) jebal_env_value('PAYMENT_PENDING_EMAIL_DELAY_MINUTES', '10')
+        : 10;
 
     return max(5, min(180, $value));
 }

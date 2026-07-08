@@ -262,9 +262,35 @@ try {
 
     $pdo->commit();
 
-    // No email is sent at checkout creation.
-    // The customer is already moving to PayHere, so sending a pending email here creates duplicate/noisy mail.
-    // Final success/failed emails are queued after PayHere confirms the payment outcome.
+    // Queue the one-time payment-pending emails now, but delay delivery using available_at.
+    // This makes the queue visible immediately and the existing cron sends it only after the configured delay.
+    try {
+        $pendingDelayMinutes = function_exists('jebal_env_value')
+            ? (int) jebal_env_value('PAYMENT_PENDING_EMAIL_DELAY_MINUTES', '10')
+            : 10;
+        $pendingDelayMinutes = max(5, min(180, $pendingDelayMinutes));
+        $pendingAvailableAt = (new DateTimeImmutable())->modify('+' . $pendingDelayMinutes . ' minutes')->format('Y-m-d H:i:s');
+
+        $bookingForEmail = $booking;
+        $bookingForEmail['amount'] = $amount;
+        $bookingForEmail['currency'] = $currency;
+        $bookingForEmail['payment_status'] = 'Payment Pending';
+        $bookingForEmail['status'] = 'Pending';
+
+        queue_payment_pending_emails_once($pdo, $bookingForEmail, [
+            'order_id' => $orderId,
+            'amount' => $amount,
+            'currency' => $currency,
+            'status' => 'Payment Pending',
+            'method' => 'PayHere',
+            'bill_url' => $returnUrl,
+            'available_at' => $pendingAvailableAt,
+        ]);
+    } catch (Throwable $emailQueueError) {
+        error_log('Payment pending email queue failed for booking #' . $bookingId . ': ' . $emailQueueError->getMessage());
+    }
+
+    // Final success/failed emails are still queued after PayHere confirms the payment outcome.
 
     $baseApiUrl = API_BASE_URL !== '' ? API_BASE_URL : rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/api/payments')), '/');
     $checkoutUrl = $baseApiUrl . '/payments/payhere-redirect.php?order_id=' . rawurlencode($orderId) . '&booking_id=' . $bookingId . '&token=' . rawurlencode($checkoutToken);
