@@ -1845,66 +1845,128 @@ function booking_email_sent(PDO $pdo, int $bookingId, array $emailTypes): bool
     }
 }
 
-function send_booking_payment_pending_emails_once(PDO $pdo, array $booking, array $payment = []): void
+function payment_pending_email_already_handled(PDO $pdo, int $bookingId): bool
 {
+    if ($bookingId < 1) {
+        return true;
+    }
+
+    try {
+        ensure_email_queue_table($pdo);
+
+        $stmt = $pdo->prepare(
+            "SELECT COUNT(*) FROM email_queue
+             WHERE related_type = 'booking'
+               AND related_id = :booking_id
+               AND email_type IN ('booking_payment_pending_customer', 'booking_payment_pending_admin', 'staying_guest_payment_pending')
+               AND status IN ('pending','processing','sent','Pending','Processing','Sent')"
+        );
+        $stmt->execute([':booking_id' => $bookingId]);
+
+        if ((int) $stmt->fetchColumn() > 0) {
+            return true;
+        }
+    } catch (Throwable $e) {
+        error_log('Payment pending queue duplicate check failed: ' . $e->getMessage());
+    }
+
+    return booking_email_sent($pdo, $bookingId, [
+        'booking_payment_pending_customer',
+        'booking_payment_pending_admin',
+        'staying_guest_payment_pending',
+    ]);
+}
+
+function queue_payment_pending_emails_once(PDO $pdo, array $booking, array $payment = []): int
+{
+    $queued = 0;
     $bookingId = (int) ($booking['id'] ?? 0);
 
     if ($bookingId < 1) {
-        return;
+        return 0;
     }
 
     $paymentStatus = (string) ($booking['payment_status'] ?? $payment['status'] ?? 'Payment Pending');
 
     if ($paymentStatus !== 'Payment Pending') {
-        return;
+        return 0;
+    }
+
+    // One booking gets the payment-pending reminder only one time.
+    if (payment_pending_email_already_handled($pdo, $bookingId)) {
+        return 0;
     }
 
     $amount = format_money_amount((float) ($payment['amount'] ?? $booking['amount'] ?? 0));
     $orderId = trim((string) ($payment['order_id'] ?? $booking['order_id'] ?? ''));
-    $billUrl = trim((string) ($payment['bill_url'] ?? ''));
+    $billUrl = trim((string) ($payment['bill_url'] ?? latest_booking_bill_url($pdo, $bookingId)));
     $billButton = $billUrl !== '' ? email_button('Resume Payment / View Booking Bill', $billUrl) : '';
 
     $customerType = 'booking_payment_pending_customer';
     $adminType = 'booking_payment_pending_admin';
 
-    if (!booking_email_sent($pdo, $bookingId, [$customerType])) {
-        $bodyCustomer = booking_email_html('pending', $booking, $payment, false, $billButton, [
-            'Order ID' => $orderId !== '' ? $orderId : '-',
-            'Amount Due' => $amount,
-        ]);
+    $bodyCustomer = booking_email_html('pending', $booking, $payment, false, $billButton, [
+        'Order ID' => $orderId !== '' ? $orderId : '-',
+        'Amount Due' => $amount,
+    ]);
 
-        send_tracked_email(
-            $pdo,
-            'booking',
-            $bookingId,
-            (string) ($booking['email'] ?? ''),
-            'Booking received - payment pending - Tulip Guest Inn #' . $bookingId,
-            $bodyCustomer,
-            $customerType
-        );
+    if (enqueue_email(
+        $pdo,
+        'booking',
+        $bookingId,
+        (string) ($booking['email'] ?? ''),
+        'Payment pending - complete your booking - Tulip Guest Inn #' . $bookingId,
+        $bodyCustomer,
+        $customerType,
+        null,
+        3,
+        booking_from_email(),
+        booking_from_name()
+    )) {
+        $queued++;
     }
 
-    if (!booking_email_sent($pdo, $bookingId, [$adminType])) {
+    $adminEmail = booking_admin_email();
+    if ($adminEmail !== '') {
         $bodyAdmin = booking_email_html('pending', $booking, $payment, true, $billButton, [
             'Order ID' => $orderId !== '' ? $orderId : '-',
+            'Action Needed' => 'Customer has not completed payment yet.',
         ]);
 
-        send_tracked_email(
+        if (enqueue_email(
             $pdo,
             'booking',
             $bookingId,
-            ADMIN_EMAIL,
-            'New booking received - payment pending - Tulip Guest Inn #' . $bookingId,
+            $adminEmail,
+            'Payment pending - Tulip Guest Inn booking #' . $bookingId,
             $bodyAdmin,
             $adminType,
-            $booking['email'] ?? null
-        );
+            $booking['email'] ?? null,
+            3,
+            booking_from_email(),
+            booking_from_name()
+        )) {
+            $queued++;
+        }
     }
 
-    update_booking_email_status($pdo, $bookingId, 'Payment Pending Email Sent');
-    booking_audit_log($pdo, $bookingId, 'pending_email_sent', 'Pending Email Sent', 'Booking pending emails were sent or had already been sent.', [
-        'order_id' => $orderId,
-    ]);
+    if (queue_staying_guest_booking_email($pdo, $booking, 'pending', $payment, 'staying_guest_payment_pending', 'Payment pending for your stay')) {
+        $queued++;
+    }
+
+    if ($queued > 0) {
+        update_booking_email_status($pdo, $bookingId, 'Payment Pending Email Queued');
+        booking_audit_log($pdo, $bookingId, 'pending_email_queued', 'Pending Email Queued', 'One-time payment pending emails were queued.', [
+            'order_id' => $orderId,
+        ]);
+    }
+
+    return $queued;
+}
+
+function send_booking_payment_pending_emails_once(PDO $pdo, array $booking, array $payment = []): void
+{
+    queue_payment_pending_emails_once($pdo, $booking, $payment);
 }
 
 
@@ -2157,6 +2219,10 @@ function queue_payment_failed_email(PDO $pdo, array $booking): int
         )) {
             $queued++;
         }
+    }
+
+    if (queue_staying_guest_booking_email($pdo, $booking, 'failed', [], 'staying_guest_payment_failed', 'Payment failed for your stay')) {
+        $queued++;
     }
 
     if ($queued > 0) {
