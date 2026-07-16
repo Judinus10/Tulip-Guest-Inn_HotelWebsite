@@ -632,3 +632,12 @@ CREATE TABLE IF NOT EXISTS external_calendar_sync_status (
 ALTER TABLE bookings
   MODIFY status ENUM('Pending','Confirmed','Checked In','Checked Out','Cancelled','No Show') NOT NULL DEFAULT 'Pending',
   MODIFY payment_status ENUM('Payment Pending','Paid','Failed','Cancelled','Refunded','No Pay') NOT NULL DEFAULT 'Payment Pending';
+
+-- Run once for Tulip quick-action workflow persistence.
+-- No columns are added or removed; only the allowed ENUM values are extended.
+ALTER TABLE bookings
+  MODIFY status ENUM('Pending','Confirmed','Checked In','Checked Out','Cancelled','No Show') NOT NULL DEFAULT 'Pending',
+  MODIFY payment_status ENUM('Payment Pending','Paid','Failed','Cancelled','Refunded','No Pay') NOT NULL DEFAULT 'Payment Pending';
+
+ALTER TABLE payments
+  MODIFY status ENUM('Payment Pending','Paid','Failed','Cancelled','Refunded','No Pay') NOT NULL DEFAULT 'Payment Pending';

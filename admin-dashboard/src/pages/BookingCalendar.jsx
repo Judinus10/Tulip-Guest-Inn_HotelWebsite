@@ -17,6 +17,7 @@ const statusStyles = {
   cancelled: 'bg-red-100 text-red-900 border-red-300 hover:bg-red-200',
   canceled: 'bg-red-100 text-red-900 border-red-300 hover:bg-red-200',
   no_show: 'bg-purple-100 text-purple-900 border-purple-300 hover:bg-purple-200',
+  booking_com: 'bg-indigo-100 text-indigo-900 border-indigo-300 hover:bg-indigo-200',
 }
 
 const statusDotStyles = {
@@ -27,6 +28,7 @@ const statusDotStyles = {
   cancelled: 'bg-red-500',
   canceled: 'bg-red-500',
   no_show: 'bg-purple-500',
+  booking_com: 'bg-indigo-500',
 }
 
 const statusLegendItems = [
@@ -36,6 +38,7 @@ const statusLegendItems = [
   { key: 'checked_out', label: 'Checked Out', description: 'Guest has completed the stay.' },
   { key: 'cancelled', label: 'Cancelled', description: 'Booking was cancelled and should not be treated as active.' },
   { key: 'no_show', label: 'No Show', description: 'Guest did not arrive for the booking.' },
+  { key: 'booking_com', label: 'Booking.com', description: 'External reservation imported from Booking.com.' },
 ]
 
 const statusVariant = {
@@ -70,6 +73,16 @@ function normalizeStatus(status) {
   return String(status || '-')
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
+
+function isBookingComBooking(booking) {
+  return booking?.is_external === true
+    || String(booking?.source || '').toLowerCase() === 'booking.com'
+    || /^(?:BC|BDC)-/i.test(String(booking?.booking_no || ''))
+}
+
+function getCalendarStyleKey(booking) {
+  return isBookingComBooking(booking) ? 'booking_com' : getBookingStatusKey(booking?.booking_status)
 }
 
 function toDate(value) {
@@ -230,7 +243,7 @@ function FloatingBookingTooltip({ tooltip }) {
         <dt className="font-semibold text-slate-500">Adults</dt><dd>{booking.adults}</dd>
         <dt className="font-semibold text-slate-500">Children</dt><dd>{booking.children}</dd>
         <dt className="font-semibold text-slate-500">Payment</dt><dd>{normalizeStatus(booking.payment_status)}</dd>
-        <dt className="font-semibold text-slate-500">Amount</dt><dd>{currencyFormatter.format(booking.total_amount)}</dd>
+        <dt className="font-semibold text-slate-500">Amount</dt><dd>{isBookingComBooking(booking) ? 'Managed in Booking.com' : currencyFormatter.format(booking.total_amount)}</dd>
       </dl>
       {booking.special_request && (
         <div className="mt-3 rounded-lg bg-slate-50 p-3">
@@ -258,6 +271,15 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, updatingStatus 
   }, [booking, onClose])
 
   if (!booking) return null
+
+  const isBookingCom = isBookingComBooking(booking)
+  const bookingStatus = getBookingStatusKey(booking.booking_status)
+  const paymentStatus = getBookingStatusKey(booking.payment_status)
+  const paymentAllowsStayActions = paymentStatus === 'paid' || paymentStatus === 'no_pay'
+  const canConfirm = paymentAllowsStayActions && bookingStatus === 'pending'
+  const canCheckIn = paymentAllowsStayActions && bookingStatus === 'confirmed'
+  const canCheckOut = bookingStatus === 'checked_in'
+  const canCancel = !['cancelled', 'checked_out'].includes(bookingStatus)
 
   const handleBackdropClick = (event) => {
     if (event.target === event.currentTarget) {
@@ -305,9 +327,9 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, updatingStatus 
               <p><span className="font-semibold text-slate-500">Room:</span> {booking.room_name}</p>
               <p><span className="font-semibold text-slate-500">Room code:</span> {booking.room_code}</p>
               <p><span className="font-semibold text-slate-500">Property type:</span> {booking.property_type}</p>
-              <p><span className="font-semibold text-slate-500">Amount:</span> {currencyFormatter.format(booking.total_amount)}</p>
-              <p><span className="font-semibold text-slate-500">Booking status:</span> <Badge variant={statusVariant[getBookingStatusKey(booking.booking_status)] || 'secondary'}>{normalizeStatus(booking.booking_status)}</Badge></p>
-              <p><span className="font-semibold text-slate-500">Payment status:</span> <Badge variant={statusVariant[getBookingStatusKey(booking.payment_status)] || 'secondary'}>{normalizeStatus(booking.payment_status)}</Badge></p>
+              <p><span className="font-semibold text-slate-500">Amount:</span> {isBookingCom ? 'Managed in Booking.com' : currencyFormatter.format(booking.total_amount)}</p>
+              <div className="flex items-center gap-2"><span className="font-semibold text-slate-500">Booking status:</span> <Badge variant={statusVariant[getBookingStatusKey(booking.booking_status)] || 'secondary'}>{normalizeStatus(booking.booking_status)}</Badge></div>
+              <div className="flex items-center gap-2"><span className="font-semibold text-slate-500">Payment status:</span> <Badge variant={statusVariant[getBookingStatusKey(booking.payment_status)] || 'secondary'}>{normalizeStatus(booking.payment_status)}</Badge></div>
             </div>
           </div>
 
@@ -318,19 +340,19 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, updatingStatus 
             </div>
           )}
 
-          {!booking.is_external ? <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 md:col-span-2">
+          {!isBookingCom ? <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 md:col-span-2">
             <h3 className="text-sm font-bold text-blue-950">Quick Actions</h3>
             <div className="mt-3 flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" disabled={updatingStatus} onClick={() => onStatusChange(booking.id, 'confirmed')}>
+              <Button size="sm" variant="outline" disabled={updatingStatus || !canConfirm} title={!paymentAllowsStayActions ? 'Payment must be Paid or No Pay.' : !canConfirm ? 'Only pending bookings can be confirmed.' : ''} onClick={() => onStatusChange(booking.id, 'confirmed')}>
                 Confirm booking
               </Button>
-              <Button size="sm" variant="outline" disabled={updatingStatus} onClick={() => onStatusChange(booking.id, 'cancelled')}>
+              <Button size="sm" variant="outline" disabled={updatingStatus || !canCancel} onClick={() => onStatusChange(booking.id, 'cancelled')}>
                 Cancel booking
               </Button>
-              <Button size="sm" variant="outline" disabled={updatingStatus} onClick={() => onStatusChange(booking.id, 'checked_in')}>
+              <Button size="sm" variant="outline" disabled={updatingStatus || !canCheckIn} title={!paymentAllowsStayActions ? 'Payment must be Paid or No Pay.' : !canCheckIn ? 'Confirm the booking before check-in.' : ''} onClick={() => onStatusChange(booking.id, 'checked_in')}>
                 Mark checked in
               </Button>
-              <Button size="sm" variant="outline" disabled={updatingStatus} onClick={() => onStatusChange(booking.id, 'checked_out')}>
+              <Button size="sm" variant="outline" disabled={updatingStatus || !canCheckOut} title={!canCheckOut ? 'The booking must be checked in first.' : ''} onClick={() => onStatusChange(booking.id, 'checked_out')}>
                 Mark checked out
               </Button>
             </div>
@@ -506,7 +528,7 @@ export default function BookingCalendar() {
                         onMouseLeave={hideTooltip}
                         onFocus={(event) => showTooltip(event, booking)}
                         onBlur={hideTooltip}
-                        className={`absolute flex h-7 items-center border px-3 text-left text-xs font-bold shadow-sm transition ${roundedClass} ${statusStyles[getBookingStatusKey(booking.booking_status)] || statusStyles.pending}`}
+                        className={`absolute flex h-7 items-center border px-3 text-left text-xs font-bold shadow-sm transition ${roundedClass} ${statusStyles[getCalendarStyleKey(booking)] || statusStyles.pending}`}
                         style={{
                           left: `${(segment.startIndex / 7) * 100}%`,
                           width: `${(segment.span / 7) * 100}%`,

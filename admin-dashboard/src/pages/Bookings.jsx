@@ -1316,7 +1316,6 @@ export default function Bookings() {
             <>
               <div className="space-y-3 p-4 md:hidden">
                 {paginatedBookings.map((booking) => {
-                  const isBookingCom = isBookingComBooking(booking)
                   const shouldFlashBooking = Boolean(
                     flashBookingNo &&
                     [booking.booking_no, booking.bookingNo, booking.id].some(
@@ -1346,6 +1345,7 @@ export default function Bookings() {
 
               <div className="hidden divide-y divide-border md:block">
                 {paginatedBookings.map((booking) => {
+                  const isBookingCom = isBookingComBooking(booking)
                   const shouldFlashBooking = Boolean(
                     flashBookingNo &&
                     [booking.booking_no, booking.bookingNo, booking.id].some(
