@@ -597,3 +597,32 @@ CREATE TABLE IF NOT EXISTS `offers` (
   KEY `idx_offers_public` (`status`, `start_date`, `end_date`, `sort_order`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS external_calendar_events (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    room_id INT UNSIGNED NOT NULL,
+    provider VARCHAR(40) NOT NULL DEFAULT 'booking.com',
+    external_uid VARCHAR(255) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    summary VARCHAR(255) NULL,
+    status VARCHAR(40) NULL,
+    external_last_modified DATETIME NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    last_seen_at DATETIME NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_provider_room_uid (provider, room_id, external_uid),
+    KEY idx_external_room_dates (room_id, start_date, end_date, is_active),
+    CONSTRAINT fk_external_calendar_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS external_calendar_sync_status (
+    room_id INT UNSIGNED NOT NULL PRIMARY KEY,
+    provider VARCHAR(40) NOT NULL DEFAULT 'booking.com',
+    last_sync_started_at DATETIME NULL,
+    last_sync_completed_at DATETIME NULL,
+    last_sync_status VARCHAR(30) NULL,
+    last_sync_error TEXT NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_external_sync_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
