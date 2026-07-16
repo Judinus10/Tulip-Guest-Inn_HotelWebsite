@@ -81,6 +81,7 @@ $incomingPaymentStatus = payhere_status_for_db($statusCode);
 $sideEffects = [
     'send_success' => false,
     'send_failed' => false,
+    'failure_status' => '',
     'booking_id' => 0,
     'amount' => (float) $payhereAmount,
     'currency' => $payhereCurrency,
@@ -298,7 +299,8 @@ try {
     $pdo->commit();
 
     $sideEffects['send_success'] = $finalPaymentStatus === 'Paid' && $currentPaymentStatus !== 'Paid' && $finalBookingStatus === 'Confirmed';
-    $sideEffects['send_failed'] = in_array($finalPaymentStatus, ['Failed', 'Cancelled'], true) && !in_array($currentPaymentStatus, ['Failed', 'Cancelled'], true);
+    $sideEffects['send_failed'] = in_array($finalPaymentStatus, ['Failed', 'Cancelled', 'Refunded'], true) && $currentPaymentStatus !== $finalPaymentStatus;
+    $sideEffects['failure_status'] = $sideEffects['send_failed'] ? $finalPaymentStatus : '';
     $sideEffects['amount'] = (float) $payhereAmount;
     $sideEffects['currency'] = $payhereCurrency;
     $sideEffects['method'] = $method ?: 'PayHere';
@@ -318,6 +320,7 @@ if ($sideEffects['booking_id'] > 0) {
 
         if ($freshBooking) {
             if ($sideEffects['send_success']) {
+                cancel_pending_payment_email_jobs($pdo, (int) $sideEffects['booking_id'], 'Skipped because PayHere confirmed payment before the 10-minute reminder.');
                 booking_audit_log($pdo, (int) $sideEffects['booking_id'], 'invoice_generation_started', 'Invoice Generation Started', 'Creating invoice after verified PayHere payment.', []);
 
                 $invoice = generate_invoice_for_booking($pdo, (int) $sideEffects['booking_id'], [
@@ -342,7 +345,8 @@ if ($sideEffects['booking_id'] > 0) {
                 ]);
                 booking_audit_log($pdo, (int) $sideEffects['booking_id'], 'success_email_queued', 'Success Email Queued', 'Payment success emails were queued for cron delivery to customer/admin.', []);
             } elseif ($sideEffects['send_failed']) {
-                queue_payment_failed_email($pdo, $freshBooking);
+                cancel_pending_payment_email_jobs($pdo, (int) $sideEffects['booking_id'], 'Skipped because PayHere returned ' . (string) $sideEffects['failure_status'] . ' before the 10-minute reminder.');
+                queue_payment_failed_email($pdo, $freshBooking, (string) $sideEffects['failure_status']);
                 booking_audit_log($pdo, (int) $sideEffects['booking_id'], 'failed_email_queued', 'Failed Payment Email Queued', 'Payment failed/cancelled emails were queued for cron delivery.', []);
             }
         }

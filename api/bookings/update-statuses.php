@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../mail/email-helper.php';
 
 apply_cors_headers();
 
@@ -56,15 +57,18 @@ try {
     $pdo = get_db_connection();
     $pdo->beginTransaction();
 
-    $bookingStmt = $pdo->prepare('SELECT id FROM bookings WHERE id = :id LIMIT 1 FOR UPDATE');
+    $bookingStmt = $pdo->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1 FOR UPDATE');
     $bookingStmt->execute([':id' => $bookingId]);
-    if (!$bookingStmt->fetch()) {
+    $existingBooking = $bookingStmt->fetch();
+    if (!$existingBooking) {
         $pdo->rollBack();
         json_response(false, 'Booking not found.', 404);
     }
 
     $bookingStatus = $bookingMap[$bookingKey];
     $paymentStatus = $paymentMap[$paymentKey];
+    $oldBookingStatus = (string) ($existingBooking['status'] ?? 'Pending');
+    $oldPaymentStatus = (string) ($existingBooking['payment_status'] ?? 'Payment Pending');
     $updateBooking = $pdo->prepare(
         'UPDATE bookings SET status = :booking_status, payment_status = :payment_status, updated_at = NOW() WHERE id = :id'
     );
@@ -105,6 +109,34 @@ try {
     }
 
     $pdo->commit();
+
+    $becameSuccessful = $bookingStatus === 'Confirmed' && $paymentStatus === 'Paid'
+        && ($oldBookingStatus !== 'Confirmed' || $oldPaymentStatus !== 'Paid');
+    $becameUnsuccessful = in_array($paymentStatus, ['Failed', 'Cancelled', 'Refunded'], true)
+        && $oldPaymentStatus !== $paymentStatus;
+
+    if ($becameSuccessful || $becameUnsuccessful) {
+        try {
+            $freshStmt = $pdo->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1');
+            $freshStmt->execute([':id' => $bookingId]);
+            $freshBooking = $freshStmt->fetch() ?: $existingBooking;
+
+            if ($becameSuccessful) {
+                cancel_pending_payment_email_jobs($pdo, $bookingId, 'Skipped because payment was marked Paid before the pending reminder.');
+                queue_payment_success_emails($pdo, $freshBooking, [
+                    'amount' => (float) ($freshBooking['amount'] ?? 0),
+                    'currency' => (string) ($freshBooking['currency'] ?? PAYMENT_CURRENCY),
+                    'method' => $paymentMethod,
+                    'payment_id' => $reference,
+                ]);
+            } elseif ($becameUnsuccessful) {
+                cancel_pending_payment_email_jobs($pdo, $bookingId, 'Skipped because payment changed to ' . $paymentStatus . '.');
+                queue_payment_failed_email($pdo, $freshBooking, $paymentStatus);
+            }
+        } catch (Throwable $emailException) {
+            error_log('Status saved but status email queueing failed for booking #' . $bookingId . ': ' . $emailException->getMessage());
+        }
+    }
     json_response(true, 'Booking and payment statuses updated.', 200, [
         'data' => [
             'id' => $bookingId,

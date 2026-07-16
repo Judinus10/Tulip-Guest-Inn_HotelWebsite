@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../mail/email-helper.php';
 
 apply_cors_headers();
 
@@ -89,6 +90,24 @@ try {
     $update = $pdo->prepare('UPDATE bookings SET status = :status, updated_at = NOW() WHERE id = :id');
     $update->execute([':status' => $newStatus, ':id' => $bookingId]);
     $pdo->commit();
+
+    if ($requestedKey === 'confirmed' && $paymentAllowed && $currentStatus !== 'confirmed') {
+        try {
+            $freshStmt = $pdo->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1');
+            $freshStmt->execute([':id' => $bookingId]);
+            $freshBooking = $freshStmt->fetch();
+            if ($freshBooking) {
+                cancel_pending_payment_email_jobs($pdo, $bookingId, 'Skipped because the paid booking was confirmed before the pending reminder.');
+                queue_payment_success_emails($pdo, $freshBooking, [
+                    'amount' => (float) ($freshBooking['amount'] ?? 0),
+                    'currency' => (string) ($freshBooking['currency'] ?? PAYMENT_CURRENCY),
+                    'method' => 'Manual',
+                ]);
+            }
+        } catch (Throwable $emailException) {
+            error_log('Booking confirmed but confirmation emails could not be queued for booking #' . $bookingId . ': ' . $emailException->getMessage());
+        }
+    }
 
     json_response(true, 'Booking status updated.', 200, [
         'data' => [

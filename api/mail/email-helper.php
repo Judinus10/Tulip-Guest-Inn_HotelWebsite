@@ -1626,7 +1626,7 @@ function payment_pending_email_already_handled(PDO $pdo, int $bookingId): bool
             "SELECT COUNT(*) FROM email_queue
              WHERE related_type = 'booking'
                AND related_id = :booking_id
-               AND email_type IN ('booking_payment_pending_customer', 'booking_payment_pending_admin', 'staying_guest_payment_pending')
+               AND email_type IN ('booking_payment_pending_customer', 'booking_payment_pending_admin')
                AND status IN ('pending','processing','sent','Pending','Processing','Sent')"
         );
         $stmt->execute([':booking_id' => $bookingId]);
@@ -1641,7 +1641,6 @@ function payment_pending_email_already_handled(PDO $pdo, int $bookingId): bool
     return booking_email_sent($pdo, $bookingId, [
         'booking_payment_pending_customer',
         'booking_payment_pending_admin',
-        'staying_guest_payment_pending',
     ]);
 }
 
@@ -1722,10 +1721,6 @@ function queue_payment_pending_emails_once(PDO $pdo, array $booking, array $paym
         )) {
             $queued++;
         }
-    }
-
-    if (queue_staying_guest_booking_email($pdo, $booking, 'pending', $payment, 'staying_guest_payment_pending', 'Payment pending for your stay', $availableAt)) {
-        $queued++;
     }
 
     if ($queued > 0) {
@@ -1945,7 +1940,7 @@ function queue_payment_success_emails(PDO $pdo, array $booking, array $payment):
     return $queued;
 }
 
-function queue_payment_failed_email(PDO $pdo, array $booking): int
+function queue_payment_failed_email(PDO $pdo, array $booking, string $outcomeStatus = 'Failed'): int
 {
     $queued = 0;
     $bookingId = (int) ($booking['id'] ?? 0);
@@ -1954,17 +1949,34 @@ function queue_payment_failed_email(PDO $pdo, array $booking): int
         return 0;
     }
 
-    if (!booking_email_sent($pdo, $bookingId, ['payment_failed'])) {
-        $body = booking_email_html('failed', $booking, [], false, email_button('Retry Payment', latest_booking_bill_url($pdo, $bookingId)));
+    $statusKey = strtolower(trim($outcomeStatus));
+    $statusKey = $statusKey === 'canceled' ? 'cancelled' : $statusKey;
+    if (!in_array($statusKey, ['failed', 'cancelled', 'refunded'], true)) {
+        $statusKey = 'failed';
+    }
+    $label = ucfirst($statusKey);
+    $customerType = 'payment_' . $statusKey . '_customer';
+    $adminType = 'payment_' . $statusKey . '_admin';
+    $templateState = $statusKey === 'cancelled' ? 'cancelled' : 'failed';
+    $customerHeading = $statusKey === 'refunded' ? 'Payment Refunded' : 'Payment ' . $label;
+    $customerMessage = match ($statusKey) {
+        'cancelled' => 'Your PayHere payment was cancelled. Your booking has not been confirmed.',
+        'refunded' => 'Your payment was refunded. Contact the hotel if you need more information.',
+        default => 'Your payment could not be completed. You can retry payment if the room is still available.',
+    };
+
+    if (!booking_email_sent($pdo, $bookingId, [$customerType])) {
+        $retryButton = $statusKey === 'failed' ? email_button('Retry Payment', latest_booking_bill_url($pdo, $bookingId)) : '';
+        $body = booking_email_html($templateState, $booking, [], false, $retryButton, [], $customerHeading, $customerMessage);
 
         if (enqueue_email(
             $pdo,
             'booking',
             $bookingId,
             (string) ($booking['email'] ?? ''),
-            'Payment failed - Tulip Guest Inn #' . $bookingId,
+            $customerHeading . ' - Tulip Guest Inn #' . $bookingId,
             $body,
-            'payment_failed',
+            $customerType,
             null,
             3,
             booking_from_email(),
@@ -1975,17 +1987,17 @@ function queue_payment_failed_email(PDO $pdo, array $booking): int
     }
 
     $adminEmail = booking_admin_email();
-    if ($adminEmail !== '' && !booking_email_sent($pdo, $bookingId, ['admin_payment_failed'])) {
-        $adminBody = booking_email_html('failed', $booking, [], true);
+    if ($adminEmail !== '' && !booking_email_sent($pdo, $bookingId, [$adminType])) {
+        $adminBody = booking_email_html($templateState, $booking, [], true, '', [], $customerHeading, $customerMessage);
 
         if (enqueue_email(
             $pdo,
             'booking',
             $bookingId,
             $adminEmail,
-            'Payment failed - Tulip Guest Inn #' . $bookingId,
+            $customerHeading . ' - Tulip Guest Inn #' . $bookingId,
             $adminBody,
-            'admin_payment_failed',
+            $adminType,
             $booking['email'] ?? null,
             3,
             booking_from_email(),
@@ -1995,15 +2007,49 @@ function queue_payment_failed_email(PDO $pdo, array $booking): int
         }
     }
 
-    if (queue_staying_guest_booking_email($pdo, $booking, 'failed', [], 'staying_guest_payment_failed', 'Payment failed for your stay')) {
-        $queued++;
-    }
-
     if ($queued > 0) {
         update_booking_email_status($pdo, $bookingId, 'Payment Failed Email Queued');
     }
 
     return $queued;
+}
+
+function cancel_pending_payment_email_jobs(PDO $pdo, int $bookingId, string $reason = 'Payment status changed before the reminder was due.'): void
+{
+    if ($bookingId < 1) {
+        return;
+    }
+
+    ensure_email_queue_table($pdo);
+    $stmt = $pdo->prepare(
+        "UPDATE email_queue
+         SET status = 'failed', locked_at = NULL, last_error = :reason, updated_at = NOW()
+         WHERE related_type = 'booking' AND related_id = :booking_id
+           AND email_type IN ('booking_payment_pending_customer','booking_payment_pending_admin','staying_guest_payment_pending')
+           AND status IN ('pending','processing','Pending','Processing')"
+    );
+    $stmt->execute([':reason' => mb_substr($reason, 0, 1000), ':booking_id' => $bookingId]);
+}
+
+function email_queue_job_should_be_skipped(PDO $pdo, array $job): bool
+{
+    $emailType = strtolower(trim((string) ($job['email_type'] ?? '')));
+    if (in_array($emailType, ['staying_guest_payment_pending', 'staying_guest_payment_failed'], true)) {
+        return true;
+    }
+
+    if (!in_array($emailType, ['booking_payment_pending_customer', 'booking_payment_pending_admin'], true)) {
+        return false;
+    }
+
+    $bookingId = (int) ($job['related_id'] ?? 0);
+    if ($bookingId < 1) {
+        return true;
+    }
+
+    $stmt = $pdo->prepare('SELECT payment_status FROM bookings WHERE id = :id LIMIT 1');
+    $stmt->execute([':id' => $bookingId]);
+    return (string) $stmt->fetchColumn() !== 'Payment Pending';
 }
 
 
@@ -2460,6 +2506,12 @@ function process_email_queue(PDO $pdo, int $limit = 10): array
         $replyTo = $job['reply_to_email'] !== null ? (string) $job['reply_to_email'] : null;
         $fromEmail = isset($job['from_email']) && $job['from_email'] !== null ? (string) $job['from_email'] : null;
         $fromName = isset($job['from_name']) && $job['from_name'] !== null ? (string) $job['from_name'] : null;
+
+        if (email_queue_job_should_be_skipped($pdo, $job)) {
+            $skip = $pdo->prepare("UPDATE email_queue SET status = 'failed', locked_at = NULL, last_error = 'Skipped because the payment status changed or this recipient is not allowed for this status.', updated_at = NOW() WHERE id = :id");
+            $skip->execute([':id' => $jobId]);
+            continue;
+        }
 
         if ($fromEmail === null || trim($fromEmail) === '') {
             [$fromEmail, $fromName] = email_sender_for_type($emailType, $relatedType);
