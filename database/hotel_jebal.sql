@@ -626,3 +626,9 @@ CREATE TABLE IF NOT EXISTS external_calendar_sync_status (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_external_sync_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Run once for Tulip quick-action workflow persistence.
+-- No columns are added or removed; only the allowed ENUM values are extended.
+ALTER TABLE bookings
+  MODIFY status ENUM('Pending','Confirmed','Checked In','Checked Out','Cancelled','No Show') NOT NULL DEFAULT 'Pending',
+  MODIFY payment_status ENUM('Payment Pending','Paid','Failed','Cancelled','Refunded','No Pay') NOT NULL DEFAULT 'Payment Pending';
