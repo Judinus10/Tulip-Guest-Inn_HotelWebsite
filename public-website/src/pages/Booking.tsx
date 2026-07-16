@@ -392,19 +392,18 @@ export default function Booking() {
                             />
                           </div>
                           <div>
-                            <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">Staying Guest Phone *</label>
+                            <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">Staying Guest Phone (Optional)</label>
                             <input
                               type="tel"
                               name="stayingGuestPhone"
                               value={form.stayingGuestPhone}
                               onChange={handleChange}
-                              required={form.isBookingForOther}
                               placeholder="Guest phone number"
                               className="w-full border border-border px-5 py-3.5 text-sm outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
                             />
                           </div>
                           <div className="md:col-span-2">
-                            <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">Staying Guest Email</label>
+                            <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">Staying Guest Email (Optional)</label>
                             <input
                               type="email"
                               name="stayingGuestEmail"
@@ -413,6 +412,7 @@ export default function Booking() {
                               placeholder="guest@email.com"
                               className="w-full border border-border px-5 py-3.5 text-sm outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
                             />
+                            <p className="mt-2 text-[10px] leading-relaxed text-gray-400">If provided, booking updates will also be emailed to the staying guest.</p>
                           </div>
                           <div className="md:col-span-2">
                             <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">Staying Guest Note</label>

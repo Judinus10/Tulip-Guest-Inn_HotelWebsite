@@ -38,8 +38,8 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     json_response(false, 'Please enter a valid email address.', 422);
 }
 
-if ($isBookingForOther && ($stayingGuestName === '' || $stayingGuestPhone === '')) {
-    json_response(false, 'Please fill in the staying guest name and phone number.', 422);
+if ($isBookingForOther && $stayingGuestName === '') {
+    json_response(false, 'Please enter the staying guest name.', 422);
 }
 
 if ($stayingGuestEmail !== '' && !filter_var($stayingGuestEmail, FILTER_VALIDATE_EMAIL)) {
