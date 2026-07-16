@@ -5,6 +5,7 @@ require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/mail/email-helper.php';
 require_once __DIR__ . '/bookings/booking-expiry-helper.php';
 require_once __DIR__ . '/bookings/booking-audit-helper.php';
+require_once __DIR__ . '/calendar/ics-helper.php';
 
 apply_cors_headers();
 
@@ -119,7 +120,7 @@ try {
         ':requested_check_out' => $checkOutDate,
     ]);
 
-    if ($conflict->fetch()) {
+    if ($conflict->fetch() || ics_room_conflict($pdo, (int) $room['id'], $checkInDate, $checkOutDate)) {
         json_response(false, 'Sorry, this room is not available for the selected dates.', 409, ['available' => false]);
     }
 

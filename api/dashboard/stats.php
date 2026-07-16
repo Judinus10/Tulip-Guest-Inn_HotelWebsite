@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../calendar/ics-helper.php';
 
 apply_cors_headers();
 
@@ -89,21 +90,40 @@ function month_short_name(int $monthNumber): string
 
 function build_monthly_booking_trend(PDO $pdo): array
 {
-    $rows = fetch_all_rows(
+    $websiteRows = fetch_all_rows(
         $pdo,
-        "SELECT MONTH(created_at) AS month_number, COUNT(*) AS total
+        "SELECT YEAR(check_in_date) AS year_number, MONTH(check_in_date) AS month_number, COUNT(*) AS total
          FROM bookings
-         WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 5 MONTH)
-         GROUP BY YEAR(created_at), MONTH(created_at)
-         ORDER BY YEAR(created_at), MONTH(created_at)"
+         WHERE check_in_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 5 MONTH), '%Y-%m-01')
+         GROUP BY YEAR(check_in_date), MONTH(check_in_date)"
+    );
+    $bookingComRows = fetch_all_rows(
+        $pdo,
+        "SELECT YEAR(start_date) AS year_number, MONTH(start_date) AS month_number, COUNT(*) AS total
+         FROM external_calendar_events
+         WHERE provider = 'booking.com'
+           AND start_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 5 MONTH), '%Y-%m-01')
+         GROUP BY YEAR(start_date), MONTH(start_date)"
     );
 
+    $indexed = [];
+    foreach ($websiteRows as $row) {
+        $key = $row['year_number'] . '-' . str_pad((string) $row['month_number'], 2, '0', STR_PAD_LEFT);
+        $indexed[$key] = ['websiteBookings' => (int) $row['total'], 'bookingComBookings' => 0];
+    }
+    foreach ($bookingComRows as $row) {
+        $key = $row['year_number'] . '-' . str_pad((string) $row['month_number'], 2, '0', STR_PAD_LEFT);
+        $indexed[$key] ??= ['websiteBookings' => 0, 'bookingComBookings' => 0];
+        $indexed[$key]['bookingComBookings'] = (int) $row['total'];
+    }
+
     $data = [];
-    foreach ($rows as $row) {
-        $data[] = [
-            'month' => month_short_name((int) $row['month_number']),
-            'bookings' => (int) $row['total'],
-        ];
+    for ($offset = 5; $offset >= 0; $offset--) {
+        $date = (new DateTimeImmutable('first day of this month'))->modify('-' . $offset . ' months');
+        $key = $date->format('Y-m');
+        $website = (int) ($indexed[$key]['websiteBookings'] ?? 0);
+        $bookingCom = (int) ($indexed[$key]['bookingComBookings'] ?? 0);
+        $data[] = ['month' => $date->format('M'), 'bookings' => $website + $bookingCom, 'websiteBookings' => $website, 'bookingComBookings' => $bookingCom];
     }
 
     return $data;
@@ -333,11 +353,15 @@ function build_latest_messages(PDO $pdo): array
 
 try {
     $pdo = get_db_connection();
+    ensure_ics_schema($pdo);
 
-    $totalBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings");
+    $websiteBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings");
+    $bookingComBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM external_calendar_events WHERE provider = 'booking.com'");
+    $totalBookings = $websiteBookings + $bookingComBookings;
     $pendingBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Pending'");
     $confirmedBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Confirmed'");
-    $cancelledBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Cancelled'");
+    $cancelledBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Cancelled'")
+        + (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM external_calendar_events WHERE provider = 'booking.com' AND is_active = 0");
 
     $totalEnquiries = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM enquiries");
     $newEnquiries = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM enquiries WHERE status = 'New'");
@@ -389,6 +413,8 @@ try {
         'data' => [
             'cards' => [
                 'totalBookings' => $totalBookings,
+                'websiteBookings' => $websiteBookings,
+                'bookingComBookings' => $bookingComBookings,
                 'pendingBookings' => $pendingBookings,
                 'confirmedBookings' => $confirmedBookings,
                 'cancelledBookings' => $cancelledBookings,

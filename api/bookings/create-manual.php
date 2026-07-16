@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../mail/email-helper.php';
+require_once __DIR__ . '/../calendar/ics-helper.php';
 
 apply_cors_headers();
 require_admin_auth();
@@ -126,7 +127,7 @@ try {
         ':requested_check_out' => $checkOutDate,
     ]);
 
-    if ($conflict->fetch()) {
+    if ($conflict->fetch() || ics_room_conflict($pdo, (int) $room['id'], $checkInDate, $checkOutDate)) {
         $pdo->rollBack();
         json_response(false, 'This room is not available for the selected dates.', 409, ['available' => false]);
     }

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/bookings/booking-expiry-helper.php';
+require_once __DIR__ . '/calendar/ics-helper.php';
 
 apply_cors_headers();
 
@@ -36,7 +37,7 @@ try {
     expire_pending_bookings($pdo, null, false);
 
     if ($roomId > 0) {
-        $roomStmt = $pdo->prepare('SELECT room_name FROM rooms WHERE id = :id LIMIT 1');
+        $roomStmt = $pdo->prepare('SELECT id, room_name FROM rooms WHERE id = :id LIMIT 1');
         $roomStmt->execute([':id' => $roomId]);
         $room = $roomStmt->fetch();
 
@@ -45,6 +46,14 @@ try {
         }
 
         $roomName = (string) $room['room_name'];
+    } else {
+        $roomStmt = $pdo->prepare('SELECT id, room_name FROM rooms WHERE room_name = :room_name LIMIT 1');
+        $roomStmt->execute([':room_name' => $roomName]);
+        $room = $roomStmt->fetch();
+        if (!$room) {
+            json_response(false, 'Room not found.', 404);
+        }
+        $roomId = (int) $room['id'];
     }
 
     $stmt = $pdo->prepare(
@@ -63,11 +72,13 @@ try {
         ':requested_check_out' => $availabilityCheckOutDate,
     ]);
     $conflict = $stmt->fetch();
+    $bookingComConflict = ics_room_conflict($pdo, $roomId, $checkInDate, $availabilityCheckOutDate);
+    $unavailable = (bool) $conflict || $bookingComConflict;
 
-    json_response(true, $conflict ? 'Room is unavailable for the selected dates.' : 'Room is available.', 200, [
-        'available' => !$conflict,
+    json_response(true, $unavailable ? 'Room is unavailable for the selected dates.' : 'Room is available.', 200, [
+        'available' => !$unavailable,
         'room_name' => $roomName,
-        'conflict' => $conflict ?: null,
+        'conflict' => $conflict ?: ($bookingComConflict ? ['source' => 'booking.com'] : null),
     ]);
 } catch (Throwable $e) {
     error_log('Availability check error: ' . $e->getMessage());

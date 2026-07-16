@@ -15,6 +15,7 @@ require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../bookings/booking-expiry-helper.php';
 require_once __DIR__ . '/../bookings/booking-audit-helper.php';
 require_once __DIR__ . '/../invoices/invoice-helper.php';
+require_once __DIR__ . '/../calendar/ics-helper.php';
 require_once __DIR__ . '/../mail/email-helper.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -206,7 +207,17 @@ try {
         );
         $conflictStatement->execute([':booking_id' => $bookingId]);
 
-        if ($conflictStatement->fetch()) {
+        $roomIdStmt = $pdo->prepare('SELECT id FROM rooms WHERE room_name = :room_name LIMIT 1');
+        $roomIdStmt->execute([':room_name' => (string) ($booking['room_name'] ?? '')]);
+        $roomId = (int) $roomIdStmt->fetchColumn();
+        $bookingComConflict = $roomId > 0 && ics_room_conflict(
+            $pdo,
+            $roomId,
+            (string) ($booking['check_in_date'] ?? ''),
+            (string) ($booking['check_out_date'] ?? '')
+        );
+
+        if ($conflictStatement->fetch() || $bookingComConflict) {
             $finalPaymentStatus = 'Paid';
             $finalBookingStatus = 'Pending';
             $statusMessage = trim($statusMessage . ' Paid but booking has a confirmed overlap; manual review required.');

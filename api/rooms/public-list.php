@@ -3,10 +3,11 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/_room_helpers.php';
 require_once __DIR__ . '/../bookings/booking-expiry-helper.php';
+require_once __DIR__ . '/../calendar/ics-helper.php';
 
 apply_cors_headers();
 
-function room_is_available_for_dates(PDO $pdo, string $roomName, string $checkInDate, string $checkOutDate): bool
+function room_is_available_for_dates(PDO $pdo, int $roomId, string $roomName, string $checkInDate, string $checkOutDate): bool
 {
     $stmt = $pdo->prepare(
         "SELECT id
@@ -24,7 +25,7 @@ function room_is_available_for_dates(PDO $pdo, string $roomName, string $checkIn
         ':requested_check_out' => $checkOutDate,
     ]);
 
-    return !$stmt->fetch();
+    return !$stmt->fetch() && !ics_room_conflict($pdo, $roomId, $checkInDate, $checkOutDate);
 }
 
 try {
@@ -60,7 +61,7 @@ try {
             $availabilityCheckOutDate = (new DateTimeImmutable($checkInDate))->modify('+1 day')->format('Y-m-d');
         }
 
-        $rooms = array_values(array_filter($rooms, static fn(array $room): bool => room_is_available_for_dates($pdo, (string) $room['name'], $checkInDate, $availabilityCheckOutDate)));
+        $rooms = array_values(array_filter($rooms, static fn(array $room): bool => room_is_available_for_dates($pdo, (int) ($room['id'] ?? 0), (string) $room['name'], $checkInDate, $availabilityCheckOutDate)));
     }
 
     json_response(true, 'Rooms loaded.', 200, [

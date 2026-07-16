@@ -41,7 +41,17 @@ function ensure_ics_schema(PDO $pdo): void
         return;
     }
 
-    $pdo->exec("CREATE TABLE IF NOT EXISTS external_calendar_events (
+    $tableCheck = $pdo->prepare(
+        "SELECT COUNT(*) FROM information_schema.tables
+         WHERE table_schema = DATABASE() AND table_name = :table_name"
+    );
+    $tableCheck->execute([':table_name' => 'external_calendar_events']);
+    $eventsTableExists = (int) $tableCheck->fetchColumn() > 0;
+    $tableCheck->execute([':table_name' => 'external_calendar_sync_status']);
+    $statusTableExists = (int) $tableCheck->fetchColumn() > 0;
+
+    if (!$eventsTableExists) {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS external_calendar_events (
         id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
         room_id INT UNSIGNED NOT NULL,
         provider VARCHAR(40) NOT NULL DEFAULT 'booking.com',
@@ -58,9 +68,11 @@ function ensure_ics_schema(PDO $pdo): void
         UNIQUE KEY uniq_provider_room_uid (provider, room_id, external_uid),
         KEY idx_external_room_dates (room_id, start_date, end_date, is_active),
         CONSTRAINT fk_external_calendar_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    }
 
-    $pdo->exec("CREATE TABLE IF NOT EXISTS external_calendar_sync_status (
+    if (!$statusTableExists) {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS external_calendar_sync_status (
         room_id INT UNSIGNED NOT NULL PRIMARY KEY,
         provider VARCHAR(40) NOT NULL DEFAULT 'booking.com',
         last_sync_started_at DATETIME NULL,
@@ -69,7 +81,8 @@ function ensure_ics_schema(PDO $pdo): void
         last_sync_error TEXT NULL,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT fk_external_sync_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    }
 
     $done = true;
 }
@@ -150,8 +163,55 @@ function validate_ics_url(string $url): bool
     return $host === 'admin.booking.com' || str_ends_with($host, '.booking.com');
 }
 
+function ics_test_mode_enabled(): bool
+{
+    return APP_ENV === 'local'
+        && filter_var(jebal_env_value('ICS_TEST_MODE', false), FILTER_VALIDATE_BOOLEAN);
+}
+
+function fetch_local_test_ics(string $source): string
+{
+    if (!ics_test_mode_enabled()) {
+        throw new RuntimeException('Local calendar test mode is disabled.');
+    }
+
+    $parts = parse_url($source);
+    if (!$parts || strtolower((string) ($parts['scheme'] ?? '')) !== 'test') {
+        throw new RuntimeException('Invalid local test calendar reference.');
+    }
+
+    // Only a basename inside api/calendar/test-feeds is accepted. This prevents
+    // test mode from being used to read arbitrary files from the computer.
+    $fileName = basename((string) (($parts['host'] ?? '') . ($parts['path'] ?? '')));
+    if (!preg_match('/^[a-zA-Z0-9_-]+\.ics$/', $fileName)) {
+        throw new RuntimeException('Invalid local test calendar filename.');
+    }
+
+    $testDirectory = realpath(__DIR__ . '/test-feeds');
+    $filePath = realpath(__DIR__ . '/test-feeds/' . $fileName);
+    if ($testDirectory === false || $filePath === false || dirname($filePath) !== $testDirectory || !is_file($filePath)) {
+        throw new RuntimeException('Local test calendar file was not found: ' . $fileName);
+    }
+
+    $maxBytes = max(1024, (int) jebal_env_value('ICS_MAX_RESPONSE_BYTES', 1048576));
+    $size = filesize($filePath);
+    if ($size === false || $size > $maxBytes) {
+        throw new RuntimeException('Local test calendar exceeds the allowed size.');
+    }
+
+    $body = file_get_contents($filePath);
+    if ($body === false || !str_contains($body, 'BEGIN:VCALENDAR')) {
+        throw new RuntimeException('Local test calendar is invalid.');
+    }
+    return $body;
+}
+
 function fetch_ics(string $url): string
 {
+    if (str_starts_with(strtolower(trim($url)), 'test://')) {
+        return fetch_local_test_ics(trim($url));
+    }
+
     if (!validate_ics_url($url)) {
         throw new RuntimeException('Untrusted Booking.com calendar URL.');
     }
