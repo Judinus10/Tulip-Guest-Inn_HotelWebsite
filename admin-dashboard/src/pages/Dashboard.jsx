@@ -42,6 +42,8 @@ const TABLE_LIMIT = 5
 const defaultDashboardData = {
   cards: {
     totalBookings: 0,
+    websiteBookings: 0,
+    bookingComBookings: 0,
     pendingBookings: 0,
     confirmedBookings: 0,
     cancelledBookings: 0,
@@ -174,6 +176,8 @@ function fillLastSixMonths(data = [], valueKey) {
     months.push({
       month: d.toLocaleString('en-US', { month: 'short' }),
       [valueKey]: 0,
+      websiteBookings: 0,
+      bookingComBookings: 0,
     })
   }
 
@@ -182,6 +186,8 @@ function fillLastSixMonths(data = [], valueKey) {
 
     if (existing) {
       existing[valueKey] = Number(item[valueKey] || 0)
+      existing.websiteBookings = Number(item.websiteBookings || 0)
+      existing.bookingComBookings = Number(item.bookingComBookings || 0)
     }
   })
 
@@ -192,6 +198,8 @@ function fillLastSixMonths(data = [], valueKey) {
 function buildDashboardReportRows(data, monthlyBookingTrend, revenueTrend) {
   const rows = [
     { Section: 'Bookings', Metric: 'Total Bookings', Value: data.cards.totalBookings },
+    { Section: 'Bookings', Metric: 'Booking.com Bookings', Value: data.cards.bookingComBookings },
+    { Section: 'Bookings', Metric: 'Website Bookings', Value: data.cards.websiteBookings },
     { Section: 'Bookings', Metric: 'Pending Bookings', Value: data.cards.pendingBookings },
     { Section: 'Bookings', Metric: 'Confirmed Bookings', Value: data.cards.confirmedBookings },
     { Section: 'Bookings', Metric: 'Cancelled Bookings', Value: data.cards.cancelledBookings },
@@ -472,8 +480,8 @@ export default function Dashboard() {
 
   const kpis = [
     { title: 'Total Bookings', value: dashboardData.cards.totalBookings, helper: 'All booking requests', icon: CalendarCheck, to: '/bookings' },
-    { title: 'Pending Bookings', value: dashboardData.cards.pendingBookings, helper: 'Need confirmation', icon: TrendingUp, to: '/bookings' },
-    { title: 'Confirmed Bookings', value: dashboardData.cards.confirmedBookings, helper: 'Confirmed stays', icon: CalendarCheck, to: '/bookings' },
+    { title: 'Booking.com Bookings', value: dashboardData.cards.bookingComBookings, helper: 'Includes pending imports', icon: TrendingUp, to: '/bookings' },
+    { title: 'Website Bookings', value: dashboardData.cards.websiteBookings, helper: 'Direct website bookings', icon: CalendarCheck, to: '/bookings' },
     { title: 'Cancelled Bookings', value: dashboardData.cards.cancelledBookings, helper: 'Cancelled requests', icon: BedDouble, to: '/bookings' },
     { title: 'Total Enquiries', value: dashboardData.cards.totalEnquiries, helper: 'Guest messages', icon: Mail, to: '/messages' },
     { title: 'Total Revenue', value: currencyFormatter.format(dashboardData.cards.totalRevenue), helper: 'Paid bookings only', icon: DollarSign, to: '/payments' },
@@ -584,7 +592,7 @@ export default function Dashboard() {
           <Card className="h-full cursor-pointer transition-all hover:border-blue-200 hover:shadow-md">
             <CardHeader>
               <CardTitle>Monthly Booking Trend</CardTitle>
-              <p className="text-sm text-muted">Reservation volume by month.</p>
+              <p className="text-sm text-muted">Total, Booking.com and website reservations by stay month.</p>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -599,7 +607,9 @@ export default function Dashboard() {
                   <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748B' }} />
                   <YAxis tick={{ fontSize: 12, fill: '#64748B' }} allowDecimals={false} />
                   <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '13px' }} />
-                  <Area type="monotone" dataKey="bookings" stroke="#2563EB" strokeWidth={2} fill="url(#bookingTrend)" />
+                  <Area type="monotone" name="Total Bookings" dataKey="bookings" stroke="#2563EB" strokeWidth={3} fill="url(#bookingTrend)" />
+                  <Area type="monotone" name="Booking.com Bookings" dataKey="bookingComBookings" stroke="#7C3AED" strokeWidth={2} fill="transparent" />
+                  <Area type="monotone" name="Website Bookings" dataKey="websiteBookings" stroke="#10B981" strokeWidth={2} fill="transparent" />
                 </AreaChart>
               </ResponsiveContainer>
             </CardContent>
