@@ -77,12 +77,18 @@ export function normalizeBooking(booking) {
   const checkOut = booking.check_out || booking.check_out_date || booking.checkOut || booking.departure_date || booking.departure || ''
   const guests = Number(booking.guests || booking.guest_count || booking.no_of_guests || booking.adults || 1)
   const totalNights = Number(booking.total_nights || booking.nights || calculateNights(checkIn, checkOut))
-  const amount = Number(booking.total_amount || booking.amount || booking.payment_amount || (Number(room?.price_per_night || 0) * totalNights) || 0)
+  const bookingNumber = booking.booking_no || booking.bookingNo || booking.booking_number || `BK-${String(booking.id || booking.booking_id || 0).padStart(5, '0')}`
+  const source = String(booking.source || '').trim().toLowerCase()
+  const externalFlag = booking.is_external === true || Number(booking.is_external) === 1
+  const isExternal = externalFlag || source === 'booking.com' || /^(?:BDC|BC)-/i.test(String(bookingNumber))
+  const amount = isExternal
+    ? 0
+    : Number(booking.total_amount || booking.amount || booking.payment_amount || (Number(room?.price_per_night || 0) * totalNights) || 0)
 
   return {
     id: Number(booking.id || booking.booking_id || 0),
-    booking_no: booking.booking_no || booking.bookingNo || booking.booking_number || `BK-${String(booking.id || booking.booking_id || 0).padStart(5, '0')}`,
-    guest_name: booking.guest_name || booking.staying_guest_name || booking.full_name || booking.customer_name || booking.name || 'Guest',
+    booking_no: bookingNumber,
+    guest_name: isExternal ? 'Booking.com reservation' : (booking.guest_name || booking.staying_guest_name || booking.full_name || booking.customer_name || booking.name || 'Guest'),
     guest_email: booking.guest_email || booking.staying_guest_email || booking.email || booking.customer_email || '',
     guest_phone: booking.guest_phone || booking.staying_guest_phone || booking.phone || booking.mobile || booking.customer_phone || '',
     booker_name: booking.booker_name || booking.full_name || booking.customer_name || booking.name || booking.guest_name || 'Guest',
@@ -118,6 +124,9 @@ export function normalizeBooking(booking) {
     email_status: booking.email_status || 'Pending',
     created_at: booking.created_at || booking.createdAt || booking.booking_date || booking.date || '',
     updated_at: booking.updated_at || booking.updatedAt || booking.modified_at || '',
+    source: isExternal ? 'booking.com' : (booking.source || 'website'),
+    is_external: isExternal,
+    external_uid: booking.external_uid || '',
   }
 }
 

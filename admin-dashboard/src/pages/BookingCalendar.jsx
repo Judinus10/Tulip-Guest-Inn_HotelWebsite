@@ -318,7 +318,7 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, updatingStatus 
             </div>
           )}
 
-          <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 md:col-span-2">
+          {!booking.is_external ? <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 md:col-span-2">
             <h3 className="text-sm font-bold text-blue-950">Quick Actions</h3>
             <div className="mt-3 flex flex-wrap gap-2">
               <Button size="sm" variant="outline" disabled={updatingStatus} onClick={() => onStatusChange(booking.id, 'confirmed')}>
@@ -334,7 +334,7 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, updatingStatus 
                 Mark checked out
               </Button>
             </div>
-          </div>
+          </div> : <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm font-semibold text-blue-800 md:col-span-2">This reservation is managed in Booking.com and updated automatically by calendar sync.</div>}
         </div>
       </div>
     </div>
@@ -563,4 +563,3 @@ export default function BookingCalendar() {
     </div>
   )
 }
-

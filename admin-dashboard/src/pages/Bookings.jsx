@@ -104,6 +104,12 @@ function formatMoney(amount) {
   return currencyFormatter.format(Number(amount || 0))
 }
 
+function isBookingComBooking(booking) {
+  return booking?.is_external === true
+    || String(booking?.source || '').toLowerCase() === 'booking.com'
+    || /^(?:BDC|BC)-/i.test(String(booking?.booking_no || ''))
+}
+
 function titleCaseStatus(value) {
   if (!value) return '-'
   return String(value)
@@ -300,11 +306,13 @@ function SummaryCard({ title, value, icon: Icon, description }) {
 }
 
 function MobileBookingCard({ booking, shouldFlashBooking, setRef, onView, onUpdateStatus, onCancel }) {
+  const isBookingCom = isBookingComBooking(booking)
   return (
     <div ref={setRef} className={`rounded-2xl border border-border bg-white p-4 shadow-sm ${shouldFlashBooking ? 'dashboard-focus-flash' : ''}`}>
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-bold text-text-primary">{booking.booking_no}</p>
+          {isBookingCom ? <p className="mt-1 text-xs font-bold text-blue-700">Booked via Booking.com</p> : null}
           <p className="mt-1 truncate text-sm font-semibold text-text-primary">{booking.room_name}</p>
           <p className="mt-1 text-xs text-text-secondary">Created {formatDate(booking.created_at)}</p>
         </div>
@@ -314,9 +322,8 @@ function MobileBookingCard({ booking, shouldFlashBooking, setRef, onView, onUpda
       <div className="mt-4 grid gap-3 text-sm">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Guest</p>
-          <p className="mt-1 truncate font-semibold text-text-primary">{booking.guest_name}</p>
-          <p className="mt-1 text-xs text-text-secondary">{booking.guest_phone}</p>
-          {booking.guest_email ? <p className="mt-1 truncate text-xs text-text-secondary">{booking.guest_email}</p> : null}
+          <p className="mt-1 truncate font-semibold text-text-primary">{isBookingCom ? 'Booking.com reservation' : booking.guest_name}</p>
+          {isBookingCom ? <p className="mt-1 text-xs text-text-secondary">External reservation</p> : <><p className="mt-1 text-xs text-text-secondary">{booking.guest_phone}</p>{booking.guest_email ? <p className="mt-1 truncate text-xs text-text-secondary">{booking.guest_email}</p> : null}</>}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -327,13 +334,13 @@ function MobileBookingCard({ booking, shouldFlashBooking, setRef, onView, onUpda
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Amount</p>
-            <p className="mt-1 font-bold text-text-primary">{formatMoney(booking.total_amount)}</p>
+            <p className="mt-1 font-bold text-text-primary">{isBookingCom ? '—' : formatMoney(booking.total_amount)}</p>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Badge variant={bookingStatusVariant[booking.booking_status] || 'warning'}>{humanizeBookingStatus(booking.booking_status)}</Badge>
-          <Badge variant={paymentStatusVariant[booking.payment_status] || 'warning'}>{humanizePaymentStatus(booking.payment_status)}</Badge>
+          <Badge variant={bookingStatusVariant[booking.booking_status] || 'warning'}>{isBookingCom && booking.booking_status !== 'cancelled' ? 'Booked' : humanizeBookingStatus(booking.booking_status)}</Badge>
+          <Badge variant={paymentStatusVariant[booking.payment_status] || 'warning'}>{isBookingCom ? 'Booking.com' : humanizePaymentStatus(booking.payment_status)}</Badge>
         </div>
       </div>
     </div>
@@ -375,6 +382,8 @@ function ActionsDropdown({ booking, onView, onUpdateStatus, onCancel }) {
             <Eye className="h-4 w-4 text-blue-700" />
             View Details
           </button>
+          {!isBookingComBooking(booking) ? (
+          <>
           <button type="button" onClick={() => handleAction(onUpdateStatus)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50">
             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
             Update Status
@@ -388,6 +397,8 @@ function ActionsDropdown({ booking, onView, onUpdateStatus, onCancel }) {
             <Trash2 className="h-4 w-4" />
             Delete Booking
           </button>
+          </>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -903,6 +914,7 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
 
 function BookingDetailsModal({ booking, rooms, onClose }) {
   const room = getRoom(booking.room_id, booking.room_name, rooms)
+  const isBookingCom = isBookingComBooking(booking)
 
   return (
     <Modal title="Booking details" description={booking.booking_no} onClose={onClose}>
@@ -939,10 +951,10 @@ function BookingDetailsModal({ booking, rooms, onClose }) {
               <div className="rounded-xl bg-blue-100 p-3 text-blue-700"><Hotel className="h-6 w-6" /></div>
               <div><p className="text-sm font-bold text-text-primary">{room?.room_name || booking.room_name || 'Unknown room'}</p><p className="text-sm text-text-secondary">{room?.room_type || booking.room_type} · Capacity {room?.capacity || '-'}</p></div>
             </div>
-            <div className="mt-5 grid gap-3 text-sm">
+            {!isBookingCom ? <div className="mt-5 grid gap-3 text-sm">
               <div className="flex justify-between border-t border-border pt-4"><span className="text-text-secondary">Price per night</span><span className="font-semibold text-text-primary">{formatMoney(room?.price_per_night)}</span></div>
               <div className="flex justify-between"><span className="text-text-secondary">Total amount</span><span className="text-lg font-bold text-text-primary">{formatMoney(booking.total_amount)}</span></div>
-            </div>
+            </div> : <p className="mt-5 border-t border-border pt-4 text-sm font-semibold text-blue-700">Booked via Booking.com · Price managed externally</p>}
           </section>
 
           <section className="rounded-2xl border border-border bg-white p-5">
@@ -1304,6 +1316,7 @@ export default function Bookings() {
             <>
               <div className="space-y-3 p-4 md:hidden">
                 {paginatedBookings.map((booking) => {
+                  const isBookingCom = isBookingComBooking(booking)
                   const shouldFlashBooking = Boolean(
                     flashBookingNo &&
                     [booking.booking_no, booking.bookingNo, booking.id].some(
@@ -1355,15 +1368,15 @@ export default function Bookings() {
                       <div>
                         <p className="sr-only">Booking</p>
                         <p className="font-bold text-text-primary">{booking.booking_no}</p>
+                        {isBookingCom ? <p className="mt-1 text-xs font-bold text-blue-700">Booked via Booking.com</p> : null}
                         <p className="mt-1 line-clamp-1 text-sm font-semibold text-text-primary">{booking.room_name}</p>
                         <p className="mt-1 text-xs text-text-secondary">Created {formatDate(booking.created_at)}</p>
                       </div>
 
                       <div>
                         <p className="sr-only">Guest</p>
-                        <p className="line-clamp-1 font-semibold text-text-primary">{booking.guest_name}</p>
-                        <p className="mt-1 text-xs text-text-secondary">{booking.guest_phone}</p>
-                        {booking.guest_email ? <p className="mt-1 line-clamp-1 text-xs text-text-secondary">{booking.guest_email}</p> : null}
+                        <p className="line-clamp-1 font-semibold text-text-primary">{isBookingCom ? 'Booking.com reservation' : booking.guest_name}</p>
+                        {isBookingCom ? <p className="mt-1 text-xs text-text-secondary">External reservation</p> : <><p className="mt-1 text-xs text-text-secondary">{booking.guest_phone}</p>{booking.guest_email ? <p className="mt-1 line-clamp-1 text-xs text-text-secondary">{booking.guest_email}</p> : null}</>}
                       </div>
 
                       <div>
@@ -1374,17 +1387,17 @@ export default function Bookings() {
 
                       <div>
                         <p className="sr-only">Amount</p>
-                        <p className="font-bold text-text-primary">{formatMoney(booking.total_amount)}</p>
+                        <p className="font-bold text-text-primary">{isBookingCom ? '—' : formatMoney(booking.total_amount)}</p>
                       </div>
 
                       <div>
                         <p className="sr-only">Booking Status</p>
-                        <Badge variant={bookingStatusVariant[booking.booking_status] || 'warning'}>{humanizeBookingStatus(booking.booking_status)}</Badge>
+                        <Badge variant={bookingStatusVariant[booking.booking_status] || 'warning'}>{isBookingCom && booking.booking_status !== 'cancelled' ? 'Booked' : humanizeBookingStatus(booking.booking_status)}</Badge>
                       </div>
 
                       <div>
                         <p className="sr-only">Payment Status</p>
-                        <Badge variant={paymentStatusVariant[booking.payment_status] || 'warning'}>{humanizePaymentStatus(booking.payment_status)}</Badge>
+                        <Badge variant={paymentStatusVariant[booking.payment_status] || 'warning'}>{isBookingCom ? 'Booking.com' : humanizePaymentStatus(booking.payment_status)}</Badge>
                       </div>
 
                       <ActionsDropdown booking={booking} onView={() => setSelectedBooking(booking)} onUpdateStatus={() => { setStatusFocus('booking'); setStatusBooking(booking) }} onCancel={() => setDeleteTargetBooking(booking)} />
