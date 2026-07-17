@@ -578,7 +578,8 @@ export default function Payments() {
     if (!focusedTransaction || loading) return
 
     const focusedIndex = filteredPayments.findIndex(
-      (payment) => String(payment.transaction_id) === String(focusedTransaction)
+      (payment) => [payment.transaction_id, payment.payment_id, payment.order_id, payment.id, payment.booking_no]
+        .some((value) => value != null && String(value) === String(focusedTransaction))
     )
 
     if (focusedIndex < 0) return
@@ -589,13 +590,21 @@ export default function Payments() {
   useEffect(() => {
     if (!focusedTransaction || loading) return
 
-    const element = focusRefs.current[focusedTransaction]
+    const focusedPayment = paginatedPayments.find((payment) =>
+      [payment.transaction_id, payment.payment_id, payment.order_id, payment.id, payment.booking_no]
+        .some((value) => value != null && String(value) === String(focusedTransaction))
+    )
+    const element = focusedPayment
+      ? [focusedPayment.transaction_id, focusedPayment.payment_id, focusedPayment.order_id, focusedPayment.id, focusedPayment.booking_no]
+          .map((value) => focusRefs.current[String(value)])
+          .find(Boolean)
+      : null
     if (!element) return
 
     const timer = window.setTimeout(() => {
       element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      setFlashTransaction(focusedTransaction)
-      window.setTimeout(() => setFlashTransaction(''), 1200)
+      setFlashTransaction(String(focusedPayment.transaction_id))
+      window.setTimeout(() => setFlashTransaction(''), 1900)
       setFocusedTransaction('')
     }, 150)
 
@@ -796,7 +805,11 @@ export default function Payments() {
                     <tr
                       key={payment.id}
                       ref={(element) => {
-                        if (element) focusRefs.current[payment.transaction_id] = element
+                        if (element) {
+                          [payment.transaction_id, payment.payment_id, payment.order_id, payment.id, payment.booking_no]
+                            .filter((value) => value != null && String(value) !== '')
+                            .forEach((value) => { focusRefs.current[String(value)] = element })
+                        }
                       }}
                       className={`transition hover:bg-blue-50/40 ${flashTransaction === payment.transaction_id ? 'dashboard-payment-focus-row' : 'border-b border-border last:border-0'}`}
                     >

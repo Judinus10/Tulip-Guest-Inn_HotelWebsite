@@ -119,6 +119,9 @@ const statusVariant = {
   Occupied: 'secondary',
   Pending: 'warning',
   Confirmed: 'success',
+  'Checked In': 'default',
+  'Checked Out': 'secondary',
+  'No Show': 'purple',
   Cancelled: 'destructive',
   Completed: 'default',
   Paid: 'success',
@@ -130,6 +133,20 @@ const statusVariant = {
   Replied: 'success',
   Active: 'success',
   Scheduled: 'warning',
+}
+
+function displayStatus(value, fallback = 'Pending') {
+  const text = String(value || '').trim()
+  return text || fallback
+}
+
+function DashboardStatusBadge({ status, fallback = 'Pending' }) {
+  const label = displayStatus(status, fallback)
+  return (
+    <Badge className="min-w-[76px] justify-center whitespace-nowrap px-3" variant={statusVariant[label] || 'secondary'}>
+      {label}
+    </Badge>
+  )
 }
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
@@ -355,7 +372,7 @@ function ListRow({ title, subtitle, right, badge, to }) {
         <p className="line-clamp-1 font-semibold text-charcoal">{title}</p>
         {subtitle && <p className="mt-1 line-clamp-1 text-sm text-muted">{subtitle}</p>}
       </div>
-      <div className="flex shrink-0 items-center gap-2 text-right">
+      <div className="flex min-w-[88px] shrink-0 items-center justify-end gap-2 text-right">
         {badge}
         {right && <span className="font-semibold text-charcoal">{right}</span>}
       </div>
@@ -394,7 +411,7 @@ function PaymentListRow({ payment }) {
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2 text-right sm:flex-row sm:items-center">
-          <Badge variant={statusVariant[payment.status] || 'secondary'}>{payment.status}</Badge>
+          <DashboardStatusBadge status={payment.status} fallback="Payment Pending" />
           <span className="whitespace-nowrap font-semibold text-charcoal">
             {currencyFormatter.format(payment.amount)}
           </span>
@@ -658,7 +675,7 @@ export default function Dashboard() {
               title={`${booking.guest} • ${booking.room}`}
               subtitle={`${booking.bookingNo} • Check-in ${formatDate(booking.checkIn)}`}
               // right={currencyFormatter.format(booking.amount)}
-              badge={<Badge variant={statusVariant[booking.status] || 'secondary'}>{booking.status}</Badge>}
+              badge={<DashboardStatusBadge status={booking.status} />}
               to={`/bookings?focus=${encodeURIComponent(booking.bookingNo)}`}
             />
           )}
@@ -675,7 +692,7 @@ export default function Dashboard() {
               key={booking.bookingNo}
               title={`${formatDate(booking.checkIn)} • ${booking.guest}`}
               subtitle={`${booking.room} • ${booking.nights} night${booking.nights > 1 ? 's' : ''}`}
-              badge={<Badge variant={statusVariant[booking.status] || 'secondary'}>{booking.status}</Badge>}
+              badge={<DashboardStatusBadge status={booking.status} />}
               to={`/bookings?focus=${encodeURIComponent(booking.bookingNo)}`}
             />
           )}
@@ -703,8 +720,8 @@ export default function Dashboard() {
               key={message.id}
               title={message.subject}
               subtitle={`${message.from} • ${message.message}`}
-              badge={<Badge variant={statusVariant[message.status] || 'secondary'}>{message.status}</Badge>}
-              to={`/messages?focus=${encodeURIComponent(message.id)}`}
+              badge={<DashboardStatusBadge status={message.status} fallback="New" />}
+              to={`/messages?focus=${encodeURIComponent(message.focusId || message.id)}`}
             />
           )}
         />

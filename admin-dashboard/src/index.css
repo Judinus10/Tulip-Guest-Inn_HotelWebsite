@@ -93,35 +93,35 @@
     background-color: transparent;
     box-shadow: none;
   }
-  20%, 65% {
-    background-color: rgba(148, 163, 184, 0.28);
-    box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.35);
+  15%, 72% {
+    background-color: rgba(148, 163, 184, 0.34);
+    box-shadow: inset 0 0 0 2px rgba(100, 116, 139, 0.38);
   }
 }
 
 .dashboard-focus-flash {
-  animation: dashboardFocusFlash 1.35s ease-in-out;
+  animation: dashboardFocusFlash 1.8s ease-in-out;
 }
 
 .dashboard-focus-flash > td {
-  animation: dashboardFocusFlash 1.35s ease-in-out;
+  animation: dashboardFocusFlash 1.8s ease-in-out;
 }
 
 @keyframes dashboardPaymentFocusFlash {
   0%, 100% {
     background-color: transparent;
   }
-  18%, 70% {
-    background-color: rgba(148, 163, 184, 0.20);
+  15%, 72% {
+    background-color: rgba(148, 163, 184, 0.34);
   }
 }
 
 .dashboard-payment-focus-row {
-  animation: dashboardPaymentFocusFlash 1.35s ease-in-out;
+  animation: dashboardPaymentFocusFlash 1.8s ease-in-out;
 }
 
 .dashboard-payment-focus-row > td {
-  animation: dashboardPaymentFocusFlash 1.35s ease-in-out;
+  animation: dashboardPaymentFocusFlash 1.8s ease-in-out;
 }
 
 
@@ -129,15 +129,15 @@
   0%, 100% {
     background-color: transparent;
   }
-  18%, 70% {
-    background-color: rgba(148, 163, 184, 0.20);
+  15%, 72% {
+    background-color: rgba(148, 163, 184, 0.34);
   }
 }
 
 .dashboard-message-focus-row {
-  animation: dashboardMessageFocusFlash 1.35s ease-in-out;
+  animation: dashboardMessageFocusFlash 1.8s ease-in-out;
 }
 
 .dashboard-message-focus-row > td {
-  animation: dashboardMessageFocusFlash 1.35s ease-in-out;
+  animation: dashboardMessageFocusFlash 1.8s ease-in-out;
 }

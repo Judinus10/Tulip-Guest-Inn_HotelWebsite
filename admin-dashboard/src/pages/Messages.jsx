@@ -183,8 +183,10 @@ export default function Messages() {
     if (!focusedInquiryId || isLoading) return
 
     const focusedIndex = filteredInquiries.findIndex((item) => {
+      const numericFocus = String(focusedInquiryId).match(/(\d+)$/)?.[1] || ''
       const values = [item.id, item.inquiry_id]
       return values.some((value) => String(value || '') === String(focusedInquiryId))
+        || (numericFocus !== '' && Number(item.id) === Number(numericFocus))
     })
 
     if (focusedIndex < 0) return
@@ -195,17 +197,26 @@ export default function Messages() {
   useEffect(() => {
     if (!focusedInquiryId || isLoading) return
 
-    const element = focusRefs.current[focusedInquiryId]
+    const numericFocus = String(focusedInquiryId).match(/(\d+)$/)?.[1] || ''
+    const focusedInquiry = paginatedInquiries.find((item) =>
+      [item.id, item.inquiry_id].some((value) => String(value || '') === String(focusedInquiryId))
+        || (numericFocus !== '' && Number(item.id) === Number(numericFocus))
+    )
+    const element = focusedInquiry
+      ? [focusedInquiry.id, focusedInquiry.inquiry_id, `MSG-${String(focusedInquiry.id).padStart(4, '0')}`]
+          .map((value) => focusRefs.current[String(value)])
+          .find(Boolean)
+      : null
     if (!element) return
 
     const timer = window.setTimeout(() => {
       element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      setFlashInquiryId(String(focusedInquiryId))
+      setFlashInquiryId(String(focusedInquiry.id))
       window.setTimeout(() => {
         setFlashInquiryId('')
         setFocusedInquiryId('')
         focusRequestRef.current = ''
-      }, 1400)
+      }, 1900)
     }, 300)
 
     return () => window.clearTimeout(timer)
@@ -462,6 +473,7 @@ export default function Messages() {
                         if (element) {
                           if (item.id) focusRefs.current[item.id] = element
                           if (item.inquiry_id) focusRefs.current[item.inquiry_id] = element
+                          if (item.id) focusRefs.current[`MSG-${String(item.id).padStart(4, '0')}`] = element
                         }
                       }}
                       className={`hover:bg-blue-50/40 ${shouldFlashInquiry ? 'dashboard-message-focus-row' : ''}`}

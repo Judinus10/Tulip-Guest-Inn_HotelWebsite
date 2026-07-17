@@ -1121,17 +1121,25 @@ export default function Bookings() {
   useEffect(() => {
     if (!focusedBookingNo || isLoading) return
 
-    const element = focusRefs.current[focusedBookingNo]
+    const focusedBooking = paginatedBookings.find((booking) =>
+      [booking.booking_no, booking.bookingNo, booking.id]
+        .some((value) => value != null && String(value) === String(focusedBookingNo))
+    )
+    const element = focusedBooking
+      ? [focusedBooking.booking_no, focusedBooking.bookingNo, focusedBooking.id]
+          .map((value) => focusRefs.current[String(value)])
+          .find(Boolean)
+      : null
     if (!element) return
 
     const timer = window.setTimeout(() => {
       element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      setFlashBookingNo(String(focusedBookingNo))
+      setFlashBookingNo(String(focusedBooking.booking_no || focusedBooking.bookingNo || focusedBooking.id))
       window.setTimeout(() => {
         setFlashBookingNo('')
         setFocusedBookingNo('')
         focusRequestRef.current = ''
-      }, 1400)
+      }, 1900)
     }, 300)
 
     return () => window.clearTimeout(timer)

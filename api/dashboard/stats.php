@@ -221,7 +221,16 @@ function build_recent_bookings(PDO $pdo): array
             room_name,
             check_in_date,
             check_out_date,
-            status,
+            CASE UPPER(REPLACE(REPLACE(TRIM(COALESCE(status, '')), '_', ' '), '-', ' '))
+                WHEN 'PENDING' THEN 'Pending'
+                WHEN 'CONFIRMED' THEN 'Confirmed'
+                WHEN 'CHECKED IN' THEN 'Checked In'
+                WHEN 'CHECKED OUT' THEN 'Checked Out'
+                WHEN 'CANCELLED' THEN 'Cancelled'
+                WHEN 'CANCELED' THEN 'Cancelled'
+                WHEN 'NO SHOW' THEN 'No Show'
+                ELSE 'Pending'
+            END AS status,
             payment_status,
             created_at
          FROM bookings
@@ -241,7 +250,7 @@ function build_recent_bookings(PDO $pdo): array
         );
 
         $data[] = [
-            'bookingNo' => 'BK-' . str_pad((string) $row['id'], 4, '0', STR_PAD_LEFT),
+            'bookingNo' => 'BK-' . str_pad((string) $row['id'], 5, '0', STR_PAD_LEFT),
             'guest' => $row['full_name'],
             'room' => $row['room_name'],
             'checkIn' => $row['check_in_date'],
@@ -277,7 +286,7 @@ function build_upcoming_checkins(PDO $pdo): array
     $data = [];
     foreach ($rows as $row) {
         $data[] = [
-            'bookingNo' => 'BK-' . str_pad((string) $row['id'], 4, '0', STR_PAD_LEFT),
+            'bookingNo' => 'BK-' . str_pad((string) $row['id'], 5, '0', STR_PAD_LEFT),
             'guest' => $row['full_name'],
             'room' => $row['room_name'],
             'checkIn' => $row['check_in_date'],
@@ -340,6 +349,7 @@ function build_latest_messages(PDO $pdo): array
     foreach ($rows as $row) {
         $data[] = [
             'id' => 'MSG-' . str_pad((string) $row['id'], 4, '0', STR_PAD_LEFT),
+            'focusId' => (string) $row['id'],
             'from' => $row['name'],
             'subject' => $row['subject'],
             'message' => mb_strlen($row['message']) > 90 ? mb_substr($row['message'], 0, 90) . '...' : $row['message'],
