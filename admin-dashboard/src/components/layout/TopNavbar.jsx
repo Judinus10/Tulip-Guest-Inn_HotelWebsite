@@ -296,7 +296,7 @@ export function TopNavbar({ collapsed, onMenuClick, onToggleCollapse }) {
                 </div>
                 <DropdownLabel>Account</DropdownLabel>
                 <DropdownItem onClick={() => { close(); navigate('/website-settings') }}><User className="h-4 w-4 text-slate-500" />Profile</DropdownItem>
-                <DropdownItem onClick={() => { close(); navigate('/website-settings') }}><Settings className="h-4 w-4 text-slate-500" />Settings</DropdownItem>
+                <DropdownItem onClick={() => { close(); navigate('/admin-password') }}><Settings className="h-4 w-4 text-slate-500" />Settings</DropdownItem>
                 <DropdownSeparator />
                 <DropdownItem destructive onClick={() => { close(); handleLogout() }}><LogOut className="h-4 w-4" />Logout</DropdownItem>
               </>

@@ -97,12 +97,17 @@ const chartColors = ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']
 const bookingStatusColors = {
   Pending: '#F59E0B',
   Confirmed: '#10B981',
+  'Checked In': '#3B82F6',
+  'Checked Out': '#64748B',
   Cancelled: '#EF4444',
+  'No Show': '#A855F7',
+  'Booking.com': '#6366F1',
 }
 
 const paymentStatusColors = {
   Paid: '#10B981',
   'Payment Pending': '#F59E0B',
+  'No Pay': '#0EA5E9',
   Cancelled: '#EF4444',
   Refunded: '#8B5CF6',
   Failed: '#6B7280',
@@ -118,6 +123,7 @@ const statusVariant = {
   Available: 'success',
   Occupied: 'secondary',
   Pending: 'warning',
+  Booked: 'success',
   Confirmed: 'success',
   'Checked In': 'default',
   'Checked Out': 'secondary',
@@ -711,7 +717,7 @@ export default function Dashboard() {
 
         <CompactList
           title="Latest Messages"
-          description="Latest 5 guest inquiries only. Click to view messages."
+          description="Latest 5 guest inquiries. Click to view messages."
           emptyText="No messages found."
           items={dashboardData.lists.latestMessages}
           to="/messages"

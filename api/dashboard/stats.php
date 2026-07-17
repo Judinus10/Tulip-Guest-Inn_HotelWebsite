@@ -57,15 +57,34 @@ function fetch_all_rows(PDO $pdo, string $sql, array $params = []): array
 
 function normalize_payment_status(?string $status): string
 {
-    $status = trim((string) $status);
+    $status = normalize_status_text($status);
 
-    return match ($status) {
-        'Paid' => 'Paid',
-        'Failed' => 'Failed',
-        'Cancelled' => 'Cancelled',
-        'Refunded' => 'Refunded',
-        default => 'Payment Pending',
-    };
+    if (in_array($status, ['PAID', 'SUCCESS', 'COMPLETED'], true)) return 'Paid';
+    if (in_array($status, ['FAILED', 'FAILURE'], true)) return 'Failed';
+    if (in_array($status, ['CANCELLED', 'CANCELED'], true)) return 'Cancelled';
+    if (in_array($status, ['REFUNDED', 'REFUND'], true)) return 'Refunded';
+    if (in_array($status, ['NO PAY', 'NOPAY', 'NOT APPLICABLE'], true)) return 'No Pay';
+
+    return 'Payment Pending';
+}
+
+function normalize_status_text(?string $status): string
+{
+    $value = strtoupper(trim((string) $status));
+    return preg_replace('/[\s_-]+/', ' ', $value) ?? $value;
+}
+
+function normalize_booking_status(?string $status): string
+{
+    $status = normalize_status_text($status);
+
+    if (in_array($status, ['CONFIRMED', 'BOOKED'], true)) return 'Confirmed';
+    if (in_array($status, ['CHECKED IN', 'CHECKEDIN'], true)) return 'Checked In';
+    if (in_array($status, ['CHECKED OUT', 'CHECKEDOUT', 'COMPLETED'], true)) return 'Checked Out';
+    if (in_array($status, ['CANCELLED', 'CANCELED'], true)) return 'Cancelled';
+    if (in_array($status, ['NO SHOW', 'NOSHOW'], true)) return 'No Show';
+
+    return 'Pending';
 }
 
 function calculate_nights_safe(?string $checkInDate, ?string $checkOutDate): int
@@ -154,7 +173,7 @@ function build_revenue_trend(PDO $pdo): array
 
 function build_booking_status_distribution(PDO $pdo): array
 {
-    $statuses = ['Pending', 'Confirmed', 'Cancelled'];
+    $statuses = ['Pending', 'Confirmed', 'Checked In', 'Checked Out', 'Cancelled', 'No Show', 'Booking.com'];
     $rows = fetch_all_rows(
         $pdo,
         "SELECT status, COUNT(*) AS total
@@ -164,9 +183,20 @@ function build_booking_status_distribution(PDO $pdo): array
 
     $counts = array_fill_keys($statuses, 0);
     foreach ($rows as $row) {
-        if (array_key_exists($row['status'], $counts)) {
-            $counts[$row['status']] = (int) $row['total'];
-        }
+        $status = normalize_booking_status($row['status'] ?? 'Pending');
+        $counts[$status] += (int) $row['total'];
+    }
+
+    $externalRows = fetch_all_rows(
+        $pdo,
+        "SELECT is_active, COUNT(*) AS total
+         FROM external_calendar_events
+         WHERE provider = 'booking.com'
+         GROUP BY is_active"
+    );
+    foreach ($externalRows as $row) {
+        $status = (int) $row['is_active'] === 1 ? 'Booking.com' : 'Cancelled';
+        $counts[$status] += (int) $row['total'];
     }
 
     $total = array_sum($counts);
@@ -184,19 +214,13 @@ function build_booking_status_distribution(PDO $pdo): array
 
 function build_payment_status_distribution(PDO $pdo): array
 {
-    $statuses = ['Paid', 'Payment Pending', 'Failed', 'Cancelled', 'Refunded'];
-    $rows = fetch_all_rows(
-        $pdo,
-        "SELECT payment_status, COUNT(*) AS total
-         FROM bookings
-         GROUP BY payment_status"
-    );
+    $statuses = ['Paid', 'Payment Pending', 'No Pay', 'Failed', 'Cancelled', 'Refunded'];
+    $counts = array_merge(array_fill_keys($statuses, 0), build_payment_status_counts($pdo));
 
-    $counts = array_fill_keys($statuses, 0);
-    foreach ($rows as $row) {
-        $status = normalize_payment_status($row['payment_status'] ?? 'Payment Pending');
-        $counts[$status] += (int) $row['total'];
-    }
+    $counts['No Pay'] += (int) fetch_single_value(
+        $pdo,
+        "SELECT COUNT(*) FROM external_calendar_events WHERE provider = 'booking.com'"
+    );
 
     $total = array_sum($counts);
     $data = [];
@@ -211,9 +235,34 @@ function build_payment_status_distribution(PDO $pdo): array
     return $data;
 }
 
+function build_payment_status_counts(PDO $pdo): array
+{
+    $counts = [
+        'Paid' => 0,
+        'Payment Pending' => 0,
+        'No Pay' => 0,
+        'Failed' => 0,
+        'Cancelled' => 0,
+        'Refunded' => 0,
+    ];
+    $rows = fetch_all_rows(
+        $pdo,
+        "SELECT status, COUNT(*) AS total
+         FROM payments
+         GROUP BY status"
+    );
+
+    foreach ($rows as $row) {
+        $status = normalize_payment_status($row['status'] ?? 'Payment Pending');
+        $counts[$status] += (int) $row['total'];
+    }
+
+    return $counts;
+}
+
 function build_recent_bookings(PDO $pdo): array
 {
-    $rows = fetch_all_rows(
+    $websiteRows = fetch_all_rows(
         $pdo,
         "SELECT
             id,
@@ -235,11 +284,11 @@ function build_recent_bookings(PDO $pdo): array
             created_at
          FROM bookings
          ORDER BY created_at DESC
-         LIMIT 5"
+         LIMIT 10"
     );
 
     $data = [];
-    foreach ($rows as $row) {
+    foreach ($websiteRows as $row) {
         $amount = (float) fetch_single_value(
             $pdo,
             "SELECT COALESCE(SUM(amount), 0)
@@ -261,7 +310,44 @@ function build_recent_bookings(PDO $pdo): array
         ];
     }
 
-    return $data;
+    $externalRows = fetch_all_rows(
+        $pdo,
+        "SELECT e.id, e.summary, e.start_date, e.end_date, e.status,
+                e.is_active, e.created_at, e.updated_at, r.room_name
+         FROM external_calendar_events e
+         INNER JOIN rooms r ON r.id = e.room_id
+         WHERE e.provider = 'booking.com'
+         ORDER BY e.created_at DESC, e.updated_at DESC
+         LIMIT 10"
+    );
+
+    foreach ($externalRows as $row) {
+        $externalStatus = strtoupper(trim((string) ($row['status'] ?? '')));
+        $status = (int) $row['is_active'] !== 1
+            ? 'Cancelled'
+            : ($externalStatus === 'PENDING' ? 'Pending' : 'Booked');
+
+        $data[] = [
+            'bookingNo' => 'BC-' . str_pad((string) $row['id'], 5, '0', STR_PAD_LEFT),
+            'guest' => trim((string) ($row['summary'] ?? '')) ?: 'Booking.com Guest',
+            'room' => $row['room_name'],
+            'checkIn' => $row['start_date'],
+            'nights' => calculate_nights_safe($row['start_date'], $row['end_date']),
+            'amount' => 0,
+            'status' => $status,
+            'createdAt' => $row['created_at'],
+            'updatedAt' => $row['updated_at'],
+            'source' => 'booking.com',
+        ];
+    }
+
+    usort($data, static function (array $left, array $right): int {
+        $leftTime = (string) ($left['createdAt'] ?? $left['updatedAt'] ?? '');
+        $rightTime = (string) ($right['createdAt'] ?? $right['updatedAt'] ?? '');
+        return strcmp($rightTime, $leftTime);
+    });
+
+    return array_slice($data, 0, 5);
 }
 
 function build_upcoming_checkins(PDO $pdo): array
@@ -342,7 +428,7 @@ function build_latest_messages(PDO $pdo): array
         "SELECT id, name, subject, message, status, created_at
          FROM enquiries
          ORDER BY created_at DESC
-         LIMIT 4"
+         LIMIT 5"
     );
 
     $data = [];
@@ -378,10 +464,11 @@ try {
     $readEnquiries = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM enquiries WHERE status = 'Read'");
     $repliedEnquiries = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM enquiries WHERE status = 'Replied'");
 
-    $paidBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE payment_status = 'Paid'");
-    $paymentPendingBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE payment_status = 'Payment Pending'");
-    $failedPayments = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE payment_status = 'Failed'");
-    $refundedPayments = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE payment_status = 'Refunded'");
+    $paymentStatusCounts = build_payment_status_counts($pdo);
+    $paidBookings = $paymentStatusCounts['Paid'];
+    $paymentPendingBookings = $paymentStatusCounts['Payment Pending'];
+    $failedPayments = $paymentStatusCounts['Failed'];
+    $refundedPayments = $paymentStatusCounts['Refunded'];
 
     $todayRevenue = (float) fetch_single_value(
         $pdo,
