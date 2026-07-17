@@ -159,6 +159,19 @@ function send_html_email(string $to, string $subject, string $htmlBody, ?string 
             }
         }
 
+        if (str_contains($htmlBody, 'cid:tulip-email-image')) {
+            $emailImagePath = email_image_path();
+            if ($emailImagePath !== '') {
+                $mail->addEmbeddedImage(
+                    $emailImagePath,
+                    'tulip-email-image',
+                    basename($emailImagePath),
+                    'base64',
+                    email_image_mime_type($emailImagePath)
+                );
+            }
+        }
+
         email_embed_used_icons($mail, $htmlBody);
 
         $mail->Subject = $subject;
@@ -196,6 +209,11 @@ function email_icon_file_map(): array
         'time' => $base . '/time.png',
         'open' => $base . '/open.png',
         'location' => $base . '/location.png',
+        'bell' => $base . '/bell.png',
+        'clipboard' => $base . '/clipboard.png',
+        'card' => $base . '/card.png',
+        'room' => $base . '/bed.png',
+        'chart' => $base . '/chart.png',
     ];
 }
 
@@ -430,6 +448,21 @@ function email_company_logo_path(): string
     ]);
 }
 
+function email_image_path(): string
+{
+    return email_asset_file([
+        'api/mail/assets/email_image.png',
+        'api/mail/assets/email_image.jpg',
+        'api/mail/assets/email_image.jpeg',
+        'api/mail/assets/email_image.webp',
+    ]);
+}
+
+function email_image_url(): string
+{
+    return email_image_path() !== '' ? 'cid:tulip-email-image' : '';
+}
+
 function email_image_mime_type(string $path): string
 {
     $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
@@ -538,12 +571,18 @@ function email_tulip_logo_html(int $width = 150, bool $center = false): string
 
 function email_online_hero_image(): string
 {
-    return 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80';
+    $localImage = email_image_url();
+    return $localImage !== ''
+        ? $localImage
+        : 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=80';
 }
 
 function email_online_room_image(): string
 {
-    return 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=700&q=80';
+    $localImage = email_image_url();
+    return $localImage !== ''
+        ? $localImage
+        : 'https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=700&q=80';
 }
 
 function email_social_links_html(): string
@@ -1170,7 +1209,15 @@ function latest_booking_bill_url(PDO $pdo, int $bookingId): string
 
 function booking_email_icon(string $icon, int $size = 24): string
 {
-    // Email-safe pseudo icons: plain text labels avoid emoji rendering and broken CID/stored assets.
+    $files = email_icon_file_map();
+    $path = $files[$icon] ?? '';
+    if ($path !== '' && is_file($path)) {
+        $safeSize = max(12, min(40, $size));
+        $cid = 'jebal-email-icon-' . $icon;
+        return '<img src="cid:' . email_safe($cid) . '" width="' . $safeSize . '" height="' . $safeSize . '" alt="" style="display:inline-block;width:' . $safeSize . 'px;height:' . $safeSize . 'px;object-fit:contain;border:0;outline:none;text-decoration:none;vertical-align:middle;">';
+    }
+
+    // Keep readable fallback letters only when an expected icon file is missing.
     $map = [
         'check' => 'OK', 'calendar' => 'DT', 'bed' => 'RM', 'wallet' => 'PY', 'user' => 'GU',
         'headset' => 'HP', 'mail' => 'EM', 'phone' => 'PH', 'web' => 'WB', 'alert' => 'AL',
