@@ -5,6 +5,12 @@ import PageHero from '../components/ui/PageHero';
 import SectionTitle from '../components/ui/SectionTitle';
 import CTASection from '../components/ui/CTASection';
 import AnimatedSection from '../components/ui/AnimatedSection';
+import bannerAbout from '../assets/images/banners/banner-about.jpg';
+import aboutStory01 from '../assets/images/about/about-story-01.jpg';
+import aboutStory02 from '../assets/images/about/about-story-02.jpg';
+import aboutStory03 from '../assets/images/about/about-story-03.jpg';
+import aboutStory04 from '../assets/images/about/about-story-04.jpg';
+import aboutWhyChooseUs from '../assets/images/about/about-why-choose-us.jpg';
 
 const values = [
   {
@@ -39,10 +45,10 @@ const whyChooseUs = [
 ];
 
 const galleryImages = [
-  'https://images.pexels.com/photos/261102/pexels-photo-261102.jpeg?auto=compress&cs=tinysrgb&w=800',
-  'https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=800',
-  'https://images.pexels.com/photos/1366919/pexels-photo-1366919.jpeg?auto=compress&cs=tinysrgb&w=800',
-  'https://images.pexels.com/photos/2096983/pexels-photo-2096983.jpeg?auto=compress&cs=tinysrgb&w=800',
+  aboutStory01,
+  aboutStory02,
+  aboutStory03,
+  aboutStory04,
 ];
 
 export default function About() {
@@ -51,7 +57,7 @@ export default function About() {
       <PageHero
         title="Our Story"
         subtitle="A family-run boutique property dedicated to genuine luxury and Sri Lankan hospitality."
-        image="https://images.pexels.com/photos/1838554/pexels-photo-1838554.jpeg?auto=compress&cs=tinysrgb&w=1600"
+        image={bannerAbout}
         breadcrumb="About Us"
       />
 
@@ -154,7 +160,7 @@ export default function About() {
             <AnimatedSection direction="left">
               <div className="relative overflow-hidden shadow-luxury-lg">
                 <img
-                  src="https://images.pexels.com/photos/338504/pexels-photo-338504.jpeg?auto=compress&cs=tinysrgb&w=1200"
+                  src={aboutWhyChooseUs}
                   alt="Tulip Guest Inn"
                   className="w-full h-96 object-cover"
                   loading="lazy"

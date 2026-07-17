@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import AnimatedSection from './AnimatedSection';
+import footerBookingCta from '../../assets/images/shared/footer-booking-cta.jpg';
 
 interface CTASectionProps {
   image?: string;
@@ -14,7 +15,7 @@ interface CTASectionProps {
 }
 
 export default function CTASection({
-  image = 'https://images.pexels.com/photos/338504/pexels-photo-338504.jpeg?auto=compress&cs=tinysrgb&w=1600',
+  image = footerBookingCta,
   eyebrow = 'Reserve Your Room',
   title,
   subtitle,

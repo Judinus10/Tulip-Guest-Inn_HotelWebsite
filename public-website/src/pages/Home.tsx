@@ -32,11 +32,18 @@ import {
   getPublicOffers,
   getPublicRooms,
 } from "../services/publicApi";
+import homeHero01 from "../assets/images/home/home-hero-01.jpg";
+import homeHero02 from "../assets/images/home/home-hero-02.jpg";
+import homeHero03 from "../assets/images/home/home-hero-03.jpg";
+import homeWelcome01 from "../assets/images/home/home-welcome-01.jpg";
+import homeWelcome02 from "../assets/images/home/home-welcome-02.jpg";
+import homeWelcome03 from "../assets/images/home/home-welcome-03.jpg";
+import homeLuxuryExperience from "../assets/images/home/home-luxury-experience.jpg";
 
 const heroImages = [
-  "https://images.pexels.com/photos/338504/pexels-photo-338504.jpeg?auto=compress&cs=tinysrgb&w=1920",
-  "https://images.pexels.com/photos/261102/pexels-photo-261102.jpeg?auto=compress&cs=tinysrgb&w=1920",
-  "https://images.pexels.com/photos/1838554/pexels-photo-1838554.jpeg?auto=compress&cs=tinysrgb&w=1920",
+  homeHero01,
+  homeHero02,
+  homeHero03,
 ];
 
 const welcomeFeatures = [
@@ -357,7 +364,7 @@ export default function Home() {
             >
               <div className="absolute top-0 right-0 w-64 h-72 overflow-hidden shadow-luxury-lg">
                 <img
-                  src="https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=800"
+                  src={homeWelcome01}
                   alt="Deluxe Room"
                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
                   loading="lazy"
@@ -365,7 +372,7 @@ export default function Home() {
               </div>
               <div className="absolute bottom-0 right-16 w-72 h-52 overflow-hidden shadow-luxury-lg">
                 <img
-                  src="https://images.pexels.com/photos/261102/pexels-photo-261102.jpeg?auto=compress&cs=tinysrgb&w=800"
+                  src={homeWelcome02}
                   alt="Swimming Pool"
                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
                   loading="lazy"
@@ -373,7 +380,7 @@ export default function Home() {
               </div>
               <div className="absolute top-20 left-0 w-52 h-64 overflow-hidden shadow-luxury-lg">
                 <img
-                  src="https://images.pexels.com/photos/1366919/pexels-photo-1366919.jpeg?auto=compress&cs=tinysrgb&w=800"
+                  src={homeWelcome03}
                   alt="Tropical Garden"
                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
                   loading="lazy"
@@ -429,7 +436,7 @@ export default function Home() {
           {/* Image Side */}
           <div className="relative overflow-hidden">
             <motion.img
-              src="https://images.pexels.com/photos/261102/pexels-photo-261102.jpeg?auto=compress&cs=tinysrgb&w=1200"
+              src={homeLuxuryExperience}
               alt="Swimming Pool"
               className="w-full h-full object-cover min-h-[400px]"
               whileInView={{ scale: 1 }}

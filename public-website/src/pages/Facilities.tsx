@@ -7,6 +7,10 @@ import FacilityCard from '../components/ui/FacilityCard';
 import CTASection from '../components/ui/CTASection';
 import AnimatedSection from '../components/ui/AnimatedSection';
 import { facilities } from '../data/facilities';
+import bannerFacilities from '../assets/images/banners/banner-facilities.jpg';
+import facilitiesFeaturePool from '../assets/images/facilities/facilities-feature-pool.jpg';
+import facilitiesFeatureGarden from '../assets/images/facilities/facilities-feature-garden.jpg';
+import facilitiesFeatureComfort from '../assets/images/facilities/facilities-feature-comfort.jpg';
 
 const iconMap: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
   Waves,
@@ -27,21 +31,21 @@ const alternatingFacilities = [
     title: 'Swimming Pool',
     description:
       'Our outdoor swimming pool is a serene oasis, surrounded by lush tropical greenery and comfortable sun loungers. Cool off after a day of exploring the Jaffna Peninsula or simply float in peace.',
-    image: 'https://images.pexels.com/photos/261102/pexels-photo-261102.jpeg?auto=compress&cs=tinysrgb&w=1200',
+    image: facilitiesFeaturePool,
   },
   {
     id: 'garden',
     title: 'Tropical Garden',
     description:
       'Wander through our beautifully maintained tropical garden — a green sanctuary in the heart of Point Pedro. Morning walks among the plants and birdsong make for the perfect start to any day.',
-    image: 'https://images.pexels.com/photos/1366919/pexels-photo-1366919.jpeg?auto=compress&cs=tinysrgb&w=1200',
+    image: facilitiesFeatureGarden,
   },
   {
     id: 'outdoor',
     title: 'Outdoor Terrace',
     description:
       'Our shaded outdoor terrace is the ideal place to unwind with a cup of tea and take in the tropical surroundings. Comfortable seating and gentle breezes make this a favourite spot for our guests.',
-    image: 'https://images.pexels.com/photos/2029722/pexels-photo-2029722.jpeg?auto=compress&cs=tinysrgb&w=1200',
+    image: facilitiesFeatureComfort,
   },
 ];
 
@@ -51,7 +55,7 @@ export default function Facilities() {
       <PageHero
         title="Facilities"
         subtitle="Everything you need for a comfortable, peaceful and memorable stay."
-        image="https://images.pexels.com/photos/258154/pexels-photo-258154.jpeg?auto=compress&cs=tinysrgb&w=1600"
+        image={bannerFacilities}
         breadcrumb="Hotel Facilities"
       />
 

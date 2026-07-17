@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Phone, Mail, MapPin, Instagram, Facebook } from 'lucide-react';
 import { getPublicContactSettings, fetchPublicRooms, type ContactSettings } from '../../services/publicApi';
+import footerBackground from '../../assets/images/shared/footer-background.jpg';
 
 const quickLinks = [
   { label: 'Home', path: '/' },
@@ -98,7 +99,7 @@ export default function Footer() {
       {/* Hero Strip */}
       <div className="relative h-56 overflow-hidden">
         <img
-          src="https://images.pexels.com/photos/338504/pexels-photo-338504.jpeg?auto=compress&cs=tinysrgb&w=1600"
+          src={footerBackground}
           alt="Tulip Guest Inn"
           className="w-full h-full object-cover opacity-40"
           loading="lazy"

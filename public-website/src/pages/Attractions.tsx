@@ -7,6 +7,7 @@ import CTASection from '../components/ui/CTASection';
 import AnimatedSection from '../components/ui/AnimatedSection';
 import { attractions as fallbackAttractions } from '../data/attractions';
 import { getPublicAttractions } from '../services/publicApi';
+import bannerAttractions from '../assets/images/banners/banner-attractions.jpg';
 
 export default function Attractions() {
   const [attractions, setAttractions] = useState(fallbackAttractions);
@@ -36,7 +37,7 @@ export default function Attractions() {
       <PageHero
         title="Nearby Attractions"
         subtitle="Discover the natural beauty, history and culture of Northern Sri Lanka from our doorstep."
-        image="https://images.pexels.com/photos/1032650/pexels-photo-1032650.jpeg?auto=compress&cs=tinysrgb&w=1600"
+        image={bannerAttractions}
         breadcrumb="Explore"
       />
 

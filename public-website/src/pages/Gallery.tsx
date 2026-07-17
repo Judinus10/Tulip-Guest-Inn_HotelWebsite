@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import PageHero from '../components/ui/PageHero';
 import { getPublicGallery, type PublicGalleryFolder } from '../services/publicApi';
+import bannerGallery from '../assets/images/banners/banner-gallery.jpg';
 
 type GalleryItem = {
   id: string;
@@ -93,7 +94,7 @@ export default function Gallery() {
       <PageHero
         title="Gallery"
         subtitle="A visual journey through Tulip Guest Inn — our rooms, gardens, pool and surroundings."
-        image="https://images.pexels.com/photos/1743229/pexels-photo-1743229.jpeg?auto=compress&cs=tinysrgb&w=1600"
+        image={bannerGallery}
         breadcrumb="Photo Gallery"
       />
 

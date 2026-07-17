@@ -6,6 +6,7 @@ import CTASection from '../components/ui/CTASection';
 import { rooms as fallbackRooms } from '../data/rooms';
 import type { Room } from '../data/rooms';
 import { fetchPublicRooms } from '../services/publicApi';
+import bannerRooms from '../assets/images/banners/banner-rooms.jpg';
 
 type Category = 'all' | Room['category'];
 
@@ -70,7 +71,7 @@ export default function Rooms() {
       <PageHero
         title="Our Rooms"
         subtitle="Thoughtfully appointed spaces designed for comfort, elegance and peaceful rest."
-        image="https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=1600"
+        image={bannerRooms}
         breadcrumb="Accommodation"
       />
 
