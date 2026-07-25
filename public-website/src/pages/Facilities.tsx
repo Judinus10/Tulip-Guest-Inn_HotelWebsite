@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Waves, Wifi, Car, Wind, Bath, Monitor, Leaf, Sparkles, Clock, Sun } from 'lucide-react';
 import PageHero from '../components/ui/PageHero';
 import SectionTitle from '../components/ui/SectionTitle';
 import FacilityCard from '../components/ui/FacilityCard';
@@ -8,43 +7,29 @@ import CTASection from '../components/ui/CTASection';
 import AnimatedSection from '../components/ui/AnimatedSection';
 import { facilities } from '../data/facilities';
 import bannerFacilities from '../assets/images/banners/banner-facilities.jpg';
-import facilitiesFeaturePool from '../assets/images/facilities/facilities-feature-pool.jpg';
 import facilitiesFeatureGarden from '../assets/images/facilities/facilities-feature-garden.jpg';
 import facilitiesFeatureComfort from '../assets/images/facilities/facilities-feature-comfort.jpg';
 
-const iconMap: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
-  Waves,
-  Wifi,
-  Car,
-  Wind,
-  Bath,
-  Monitor,
-  Leaf,
-  Sparkles,
-  Clock,
-  Sun,
-};
-
 const alternatingFacilities = [
   {
-    id: 'pool',
-    title: 'Swimming Pool',
-    description:
-      'Our outdoor swimming pool is a serene oasis, surrounded by lush tropical greenery and comfortable sun loungers. Cool off after a day of exploring the Jaffna Peninsula or simply float in peace.',
-    image: facilitiesFeaturePool,
-  },
-  {
     id: 'garden',
-    title: 'Tropical Garden',
+    title: 'Peaceful Garden',
     description:
-      'Wander through our beautifully maintained tropical garden — a green sanctuary in the heart of Point Pedro. Morning walks among the plants and birdsong make for the perfect start to any day.',
+      'Our spacious garden is shaded by tall coconut trees and offers comfortable seating for quiet moments. It is a peaceful place to slow down, enjoy the ocean breeze and unwind after exploring Point Pedro.',
     image: facilitiesFeatureGarden,
   },
   {
-    id: 'outdoor',
-    title: 'Outdoor Terrace',
+    id: 'family-rooms',
+    title: 'Clean, Fresh Family Rooms',
     description:
-      'Our shaded outdoor terrace is the ideal place to unwind with a cup of tea and take in the tropical surroundings. Comfortable seating and gentle breezes make this a favourite spot for our guests.',
+      'Our comfortable family rooms sleep up to three guests and each includes an en suite bathroom. Every room is prepared spotless on arrival, most include a flat screen TV, and housekeeping is available during your stay on request.',
+    image: facilitiesFeatureComfort,
+  },
+  {
+    id: 'shared-kitchen',
+    title: 'Shared Kitchen',
+    description:
+      'A shared kitchen is available for guests who prefer to prepare their own meals, giving you extra flexibility and a comfortable, practical option during your stay.',
     image: facilitiesFeatureComfort,
   },
 ];
@@ -65,7 +50,7 @@ export default function Facilities() {
           <SectionTitle
             eyebrow="What We Offer"
             title="Our Amenities"
-            subtitle="From our outdoor pool to complimentary WiFi, we have everything you need for a perfect stay."
+            subtitle="From free WiFi and a shared kitchen to a peaceful garden and a host who is always on hand, we have the essentials for a restful, easy stay in Point Pedro."
           />
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5">
             {facilities.map((facility, i) => (

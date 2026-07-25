@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { Heart, Eye, Star, Shield } from 'lucide-react';
 import PageHero from '../components/ui/PageHero';
 import SectionTitle from '../components/ui/SectionTitle';
@@ -15,33 +14,38 @@ import aboutWhyChooseUs from '../assets/images/about/about-why-choose-us.jpg';
 const values = [
   {
     icon: Heart,
-    title: 'Genuine Hospitality',
-    description: 'We welcome every guest as a friend, offering warm, personalised service that reflects the true spirit of Sri Lankan hospitality.',
-  },
-  {
-    icon: Star,
-    title: 'Boutique Quality',
-    description: 'Every detail of our property — from the linens to the gardens — is maintained to the highest standards of boutique luxury.',
+    title: 'Family Warmth',
+    description: 'You are not a booking number here. From the moment you arrive, you are welcomed as part of the family and treated with genuine care throughout your stay.',
   },
   {
     icon: Shield,
-    title: 'Trust & Comfort',
-    description: 'Your safety, privacy and comfort are our absolute priority. We provide a secure, peaceful environment for all our guests.',
+    title: 'Always Here for You',
+    description: 'Whatever you need, whenever you need it, our host is on hand around the clock. From a late arrival to a local tip, help is never more than a moment away.',
+  },
+  {
+    icon: Star,
+    title: 'Natural Tranquility',
+    description: 'You slow down the moment you step into our garden. Under the shade of tall coconut trees, with the ocean breeze nearby, you find the kind of quiet that is hard to come by.',
   },
   {
     icon: Eye,
-    title: 'Mindful Experience',
-    description: 'We are deeply connected to the beauty of Northern Sri Lanka and believe in providing experiences that are thoughtful and authentic.',
+    title: 'Local Connection',
+    description: 'You experience the real Point Pedro, not the tourist version. We guide you to family-run eateries and hidden gems most visitors never find, so you taste and see the north as we know it.',
+  },
+  {
+    icon: Heart,
+    title: 'Personal Attention',
+    description: 'You are never one of a crowd. With just ten rooms, you get our full attention and a stay shaped around what you need.',
   },
 ];
 
 const whyChooseUs = [
-  { label: 'Prime Location', desc: 'Walking distance to Point Pedro Beach and major landmarks.' },
-  { label: 'Boutique Scale', desc: 'Intimate, personalised service that larger hotels simply cannot match.' },
-  { label: 'Premium Comfort', desc: 'Carefully curated rooms with quality furnishings and premium linens.' },
-  { label: 'Transparent Pricing', desc: 'No hidden fees. What you see is what you pay.' },
-  { label: 'Locally Owned', desc: 'A family-run property with deep roots in the Northern Sri Lanka community.' },
-  { label: 'Sustainable Practices', desc: 'We care for our environment and community with responsible practices.' },
+  { label: 'Steps from the Coast', desc: 'Point Pedro Beach and the historic 1916 lighthouse are just a short stroll away, with the northern tip of Sri Lanka right on your doorstep.' },
+  { label: 'A True Home Base', desc: 'Set beside the Point Pedro bus stand, we connect you easily to Jaffna town, the temples, and beyond. Our host is available around the clock to arrange a tuktuk, a bicycle or a driver whenever you need one.' },
+  { label: 'Restored Heritage', desc: 'Sleep in a lovingly renovated century-old building where original character meets a spotless, modern, air-conditioned room.' },
+  { label: 'Local Flavours at Your Door', desc: 'No standard hotel menu here. We recommend the best local eateries nearby, and our host is happy to collect a meal for you so you can dine in comfort and taste the real north.' },
+  { label: 'Transparent & Fair', desc: 'No hidden fees and no surprises. What you see is what you pay, with honest local advice included.' },
+  { label: 'Family Run, Deeply Rooted', desc: 'A family with real roots in Point Pedro, ready to share the hidden gems most visitors walk straight past.' },
 ];
 
 const galleryImages = [
@@ -68,17 +72,17 @@ export default function About() {
             <AnimatedSection direction="left">
               <p className="text-[10px] tracking-[0.35em] uppercase text-gold font-medium mb-4">Our Story</p>
               <h2 className="font-serif text-4xl md:text-5xl font-light text-dark mb-5 leading-tight">
-                A Passion for<br />Boutique Hospitality
+                A Tale of<br />Two Homes
               </h2>
               <div className="w-10 h-[1px] bg-gold mb-6" />
               <p className="text-sm text-gray-500 leading-relaxed mb-5">
-                Tulip Guest Inn was founded with a simple but powerful vision: to create a space where guests could experience the very best of Northern Sri Lanka — its beauty, its culture and its warmth — without ever feeling like a tourist.
+                Tulip Guest Inn was born from a blend of cultures and a deep love for Northern Sri Lanka. As a family with roots right here in Point Pedro and a second home in the Netherlands, we named the inn 'Tulip' to symbolize the bridge between our two worlds. We founded it with a simple idea: to create a place where guests experience the very best of the north, never as a standard tourist, but as a welcome friend.
               </p>
               <p className="text-sm text-gray-500 leading-relaxed mb-5">
-                Located in the historic town of Point Pedro at the northernmost tip of Sri Lanka, our property has grown from a small family guesthouse into a premium boutique inn celebrated for its elegantly appointed rooms, tranquil pool and genuine care for every guest.
+                When we found our century-old heritage building, it was full of character but had seen better days. We chose to restore it with care rather than replace it, preserving the authentic architecture and history while quietly adding the comforts of a modern stay.
               </p>
               <p className="text-sm text-gray-500 leading-relaxed">
-                Today, Tulip Guest Inn stands as one of the finest boutique accommodation options in the Jaffna Peninsula — a place where luxury meets authenticity, and where every guest leaves feeling truly at home.
+                Tranquility is at the heart of what we offer. Our spacious front garden is a true oasis, where guests unwind under the cooling shade of tall coconut trees, enjoying the gentle ocean breeze and the calm of the surroundings. Today, Tulip Guest Inn is a place where history and comfort meet, and where every guest leaves feeling truly at home. We would love to welcome you into our story.
               </p>
             </AnimatedSection>
 
@@ -105,21 +109,21 @@ export default function About() {
             <AnimatedSection direction="left" className="bg-deep-green p-10 lg:p-14">
               <p className="text-[9px] tracking-[0.3em] uppercase text-gold font-medium mb-4">Our Mission</p>
               <h3 className="font-serif text-3xl font-light text-white mb-5">
-                To Deliver Genuine Luxury
+                Authentic Heritage &amp; Genuine Comfort
               </h3>
               <div className="w-10 h-[1px] bg-gold mb-5" />
               <p className="text-gray-300 text-sm leading-relaxed">
-                Our mission is to provide every guest with a premium boutique experience in Northern Sri Lanka — combining elegant accommodation, warm personalised service and a deep respect for the culture and natural beauty of our region.
+                Our mission is to give every guest an authentic experience of Northern Sri Lanka. We bring together the charm of our restored heritage home, warm and personal service, and a deep respect for the culture and natural beauty of Point Pedro.
               </p>
             </AnimatedSection>
             <AnimatedSection direction="right" className="bg-background border border-border p-10 lg:p-14">
               <p className="text-[9px] tracking-[0.3em] uppercase text-gold font-medium mb-4">Our Vision</p>
               <h3 className="font-serif text-3xl font-light text-dark mb-5">
-                Sri Lanka's Finest Boutique Stay
+                A Home You Remember
               </h3>
               <div className="w-10 h-[1px] bg-gold mb-5" />
               <p className="text-gray-500 text-sm leading-relaxed">
-                We envision Tulip Guest Inn as the definitive luxury boutique destination in the Jaffna Peninsula — a property that sets the standard for thoughtful hospitality, sustainable tourism and authentic Sri Lankan excellence.
+                We envision Tulip Guest Inn as the most beloved heritage stay in the Jaffna Peninsula. A place that honors its roots, celebrates the local community and shows guests the real north: its history, its warmth and its quiet beauty. Not a hotel you pass through, but a home you remember.
               </p>
             </AnimatedSection>
           </div>
