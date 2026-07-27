@@ -21,8 +21,8 @@ const contactCards = [
   {
     icon: MapPin,
     label: 'Address',
-    value: 'V.M Road 189',
-    subValue: 'Point Pedro, Northern Sri Lanka',
+    value: '189 V.M. Road',
+    subValue: 'Point Pedro, Northern Province, Sri Lanka',
   },
   {
     icon: Clock,
@@ -40,7 +40,7 @@ const openingHours = [
 
 const fallbackContactSettings: ContactSettings = {
   business_name: 'Tulip Guest Inn',
-  address: 'V.M Road 189, Point Pedro, Northern Sri Lanka',
+  address: '189 V.M. Road, Point Pedro, Northern Province, Sri Lanka',
   phone: '+94 212 261 186',
   reception_contact_number: '+94 212 261 186',
   whatsapp_reservation_number: '+94 212 261 186',
@@ -195,10 +195,10 @@ export default function Contact() {
   return (
     <main>
       <PageHero
-        title="Contact Us"
-        subtitle="We would love to hear from you. Reach out for bookings, enquiries or any assistance."
+        title="Contact Tulip Guest Inn"
+        subtitle="Contact our guest house in Point Pedro for room bookings, directions and enquiries."
         image="https://images.pexels.com/photos/237371/pexels-photo-237371.jpeg?auto=compress&cs=tinysrgb&w=1600"
-        breadcrumb="Get in Touch"
+        breadcrumb="Point Pedro, Sri Lanka"
       />
 
       {/* Contact Cards */}

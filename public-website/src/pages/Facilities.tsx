@@ -38,10 +38,10 @@ export default function Facilities() {
   return (
     <main>
       <PageHero
-        title="Facilities"
-        subtitle="Everything you need for a comfortable, peaceful and memorable stay."
+        title="Guest House Facilities"
+        subtitle="Everything you need for a comfortable stay at Tulip Guest Inn in Point Pedro."
         image={bannerFacilities}
-        breadcrumb="Hotel Facilities"
+        breadcrumb="Point Pedro Accommodation"
       />
 
       {/* Facility Cards Grid */}

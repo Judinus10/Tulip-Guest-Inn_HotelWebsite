@@ -238,9 +238,9 @@ export default function Home() {
             transition={{ delay: 0.6, duration: 0.9 }}
             className="font-serif text-5xl md:text-6xl lg:text-7xl text-white font-light leading-[1.05] mb-6 text-shadow"
           >
-            Boutique Comfort in the
+            Guest House &amp; Rooms in
             <br />
-            <span className="text-gold italic">Heart of Point Pedro</span>
+            <span className="text-gold italic">Point Pedro</span>
           </motion.h1>
           <motion.div
             initial={{ scaleX: 0 }}
@@ -332,8 +332,8 @@ export default function Home() {
                 </h2>
                 <div className="gold-line-left" />
                 <p className="text-sm text-gray-500 leading-relaxed mb-5">
-                  Nestled in the heart of Point Pedro in Northern Sri Lanka,
-                  Tulip Guest Inn is a premium boutique property designed for
+                  Located at 189 V.M. Road in Point Pedro, Northern Province,
+                  Tulip Guest Inn is a family-run guest house designed for
                   guests who appreciate genuine comfort, thoughtful service and
                   serene surroundings.
                 </p>

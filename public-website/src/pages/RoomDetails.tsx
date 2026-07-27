@@ -69,6 +69,83 @@ export default function RoomDetails() {
     };
   }, [id]);
 
+  useEffect(() => {
+    const scriptId = 'room-structured-data';
+    let script = document.getElementById(scriptId) as HTMLScriptElement | null;
+
+    if (!room) {
+      script?.remove();
+      return;
+    }
+
+    if (!script) {
+      script = document.createElement('script');
+      script.id = scriptId;
+      script.type = 'application/ld+json';
+      document.head.appendChild(script);
+    }
+
+    const roomUrl = `https://www.tulipguestinn.com/rooms/${room.slug}`;
+    script.textContent = JSON.stringify([
+      {
+        '@context': 'https://schema.org',
+        '@type': 'HotelRoom',
+        '@id': `${roomUrl}#room`,
+        name: room.name,
+        url: roomUrl,
+        description: room.longDescription,
+        image: room.images,
+        occupancy: {
+          '@type': 'QuantitativeValue',
+          maxValue: room.guests,
+        },
+        bed: room.beds,
+        numberOfBathroomsTotal: room.bathrooms,
+        floorSize: {
+          '@type': 'QuantitativeValue',
+          value: room.size,
+          unitCode: 'MTK',
+        },
+        amenityFeature: room.amenities.map((amenity) => ({
+          '@type': 'LocationFeatureSpecification',
+          name: amenity,
+          value: true,
+        })),
+        containedInPlace: {
+          '@id': 'https://www.tulipguestinn.com/#lodging-business',
+        },
+      },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          {
+            '@type': 'ListItem',
+            position: 1,
+            name: 'Home',
+            item: 'https://www.tulipguestinn.com/',
+          },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: 'Rooms',
+            item: 'https://www.tulipguestinn.com/rooms',
+          },
+          {
+            '@type': 'ListItem',
+            position: 3,
+            name: room.name,
+            item: roomUrl,
+          },
+        ],
+      },
+    ]);
+
+    return () => {
+      document.getElementById(scriptId)?.remove();
+    };
+  }, [room]);
+
   if (!room && loading) return <main />;
   if (!room) return <Navigate to="/rooms" replace />;
 

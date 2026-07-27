@@ -3,6 +3,17 @@ import { useLocation } from 'react-router-dom';
 
 const SITE_URL = 'https://www.tulipguestinn.com';
 const DEFAULT_IMAGE = `${SITE_URL}/assets/tulip-logo.png`;
+const MAP_URL = 'https://maps.app.goo.gl/y76uNqinTRjg6Hic6';
+
+const routeNames: Record<string, string> = {
+  '/rooms': 'Rooms',
+  '/facilities': 'Facilities',
+  '/gallery': 'Gallery',
+  '/attractions': 'Nearby Attractions',
+  '/about': 'About',
+  '/contact': 'Contact',
+  '/booking': 'Book a Room',
+};
 
 type SeoConfig = {
   title: string;
@@ -77,6 +88,21 @@ function setCanonical(url: string) {
   canonical.href = url;
 }
 
+function setJsonLd(id: string, data: Record<string, unknown> | Record<string, unknown>[]) {
+  let script = document.head.querySelector<HTMLScriptElement>(`script[data-seo-jsonld="${id}"]`);
+  if (!script) {
+    script = document.createElement('script');
+    script.type = 'application/ld+json';
+    script.dataset.seoJsonld = id;
+    document.head.appendChild(script);
+  }
+  script.textContent = JSON.stringify(data);
+}
+
+function removeJsonLd(id: string) {
+  document.head.querySelector(`script[data-seo-jsonld="${id}"]`)?.remove();
+}
+
 export default function SeoManager() {
   const { pathname } = useLocation();
 
@@ -117,6 +143,55 @@ export default function SeoManager() {
     setMeta('meta[name="twitter:title"]', { name: 'twitter:title', content: config.title });
     setMeta('meta[name="twitter:description"]', { name: 'twitter:description', content: config.description });
     setMeta('meta[name="twitter:image"]', { name: 'twitter:image', content: DEFAULT_IMAGE });
+
+    setJsonLd('lodging-business', {
+      '@context': 'https://schema.org',
+      '@type': 'LodgingBusiness',
+      '@id': `${SITE_URL}/#lodging-business`,
+      name: 'Tulip Guest Inn',
+      url: `${SITE_URL}/`,
+      image: DEFAULT_IMAGE,
+      logo: DEFAULT_IMAGE,
+      description:
+        'A family-run guest house offering clean, comfortable rooms in Point Pedro, Northern Province, Sri Lanka.',
+      telephone: '+94 21 226 1186',
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: '189 V.M. Road',
+        addressLocality: 'Point Pedro',
+        addressRegion: 'Northern Province',
+        postalCode: '40000',
+        addressCountry: 'LK',
+      },
+      hasMap: MAP_URL,
+      amenityFeature: [
+        { '@type': 'LocationFeatureSpecification', name: 'Free WiFi', value: true },
+        { '@type': 'LocationFeatureSpecification', name: 'Free on-site parking', value: true },
+        { '@type': 'LocationFeatureSpecification', name: 'Family rooms', value: true },
+        { '@type': 'LocationFeatureSpecification', name: 'Air conditioning', value: true },
+        { '@type': 'LocationFeatureSpecification', name: 'Shared kitchen', value: true },
+        { '@type': 'LocationFeatureSpecification', name: 'Garden', value: true },
+        { '@type': 'LocationFeatureSpecification', name: 'Non-smoking rooms', value: true },
+      ],
+      sameAs: [
+        'https://www.booking.com/hotel/lk/tulip-guest-inn.html',
+        'https://www.tripadvisor.com/Hotel_Review-g3646677-d9886016-Reviews-Tulip_Guest_Inn-Point_Pedro_Northern_Province.html',
+      ],
+    });
+
+    const routeName = routeNames[normalizedPath];
+    if (routeName) {
+      setJsonLd('breadcrumbs', {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE_URL}/` },
+          { '@type': 'ListItem', position: 2, name: routeName, item: canonicalUrl },
+        ],
+      });
+    } else {
+      removeJsonLd('breadcrumbs');
+    }
   }, [pathname]);
 
   return null;

@@ -6,8 +6,8 @@ import footerBackground from '../../assets/images/shared/footer-background.jpg';
 
 const quickLinks = [
   { label: 'Home', path: '/' },
-  { label: 'Our Rooms', path: '/rooms' },
-  { label: 'Facilities', path: '/facilities' },
+  { label: 'Rooms in Point Pedro', path: '/rooms' },
+  { label: 'Guest House Facilities', path: '/facilities' },
   { label: 'Gallery', path: '/gallery' },
   { label: 'Nearby Attractions', path: '/attractions' },
   { label: 'About Us', path: '/about' },
@@ -23,7 +23,7 @@ const fallbackRoomLinks = [
 
 const fallbackContactSettings: ContactSettings = {
   business_name: 'Tulip Guest Inn',
-  address: 'V.M Road 189\nPoint Pedro\nNorthern Sri Lanka',
+  address: '189 V.M. Road\nPoint Pedro\nNorthern Province, Sri Lanka',
   phone: '0212 261 186',
   reception_contact_number: '0212 261 186',
   whatsapp_reservation_number: '',
@@ -92,7 +92,7 @@ export default function Footer() {
   const displayEmail = contactSettings.email || fallbackContactSettings.email;
   const displayAddress = contactSettings.address || fallbackContactSettings.address;
   const openingHours = contactSettings.business_hours || fallbackContactSettings.business_hours;
-  const footerLocation = addressLines(displayAddress).slice(-2).join(', ') || 'Point Pedro, Northern Sri Lanka';
+  const footerLocation = addressLines(displayAddress).slice(-3).join(', ') || 'Point Pedro, Northern Province, Sri Lanka';
 
   return (
     <footer className="bg-dark text-white">
@@ -126,7 +126,7 @@ export default function Footer() {
               />
             </Link>
             <p className="text-gray-400 text-sm leading-relaxed mb-6">
-              A premium boutique guest house in Point Pedro, Northern Sri Lanka. Discover luxury accommodation, peaceful gardens and genuine Sri Lankan hospitality.
+              A family-run guest house offering clean, comfortable rooms at 189 V.M. Road, Point Pedro, Northern Province, Sri Lanka.
             </p>
             <div className="flex items-center gap-3">
               <a

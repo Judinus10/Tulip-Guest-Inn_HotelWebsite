@@ -69,8 +69,8 @@ export default function Rooms() {
   return (
     <main>
       <PageHero
-        title="Our Rooms"
-        subtitle="Thoughtfully appointed spaces designed for comfort, elegance and peaceful rest."
+        title="Rooms in Point Pedro"
+        subtitle="Clean, comfortable accommodation for individuals, couples and families in Northern Province, Sri Lanka."
         image={bannerRooms}
         breadcrumb="Accommodation"
       />
