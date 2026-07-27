@@ -170,7 +170,7 @@ export default function Home() {
               img.folder_slug,
               img.folder_name,
             ),
-            width: (index % 5 === 0 ? "wide" : "normal") as const,
+            width: (index % 5 === 0 ? "wide" : "normal") as "wide" | "normal",
           }));
 
         if (normalizedGalleryImages.length > 0) {

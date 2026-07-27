@@ -10,6 +10,7 @@ const quickLinks = [
   { label: 'Guest House Facilities', path: '/facilities' },
   { label: 'Gallery', path: '/gallery' },
   { label: 'Nearby Attractions', path: '/attractions' },
+  { label: 'Point Pedro Accommodation', path: '/accommodation-point-pedro' },
   { label: 'About Us', path: '/about' },
   { label: 'Contact', path: '/contact' },
 ];

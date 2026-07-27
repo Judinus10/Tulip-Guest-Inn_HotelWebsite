@@ -10,6 +10,7 @@ const routeNames: Record<string, string> = {
   '/facilities': 'Facilities',
   '/gallery': 'Gallery',
   '/attractions': 'Nearby Attractions',
+  '/accommodation-point-pedro': 'Point Pedro Accommodation',
   '/about': 'About',
   '/contact': 'Contact',
   '/booking': 'Book a Room',
@@ -46,6 +47,11 @@ const pages: Record<string, SeoConfig> = {
     title: 'Things to Do Near Point Pedro | Tulip Guest Inn',
     description:
       'Discover beaches, temples, landmarks and attractions near Tulip Guest Inn in Point Pedro and across Northern Sri Lanka.',
+  },
+  '/accommodation-point-pedro': {
+    title: 'Accommodation in Point Pedro | Tulip Guest Inn',
+    description:
+      'Stay at Tulip Guest Inn for clean, comfortable rooms in Point Pedro, Northern Province, Sri Lanka. Check in from 1 PM and check out by 12 PM.',
   },
   '/about': {
     title: 'About Tulip Guest Inn | Point Pedro, Sri Lanka',
@@ -164,6 +170,8 @@ export default function SeoManager() {
         addressCountry: 'LK',
       },
       hasMap: MAP_URL,
+      checkinTime: '13:00',
+      checkoutTime: '12:00',
       amenityFeature: [
         { '@type': 'LocationFeatureSpecification', name: 'Free WiFi', value: true },
         { '@type': 'LocationFeatureSpecification', name: 'Free on-site parking', value: true },
@@ -191,6 +199,41 @@ export default function SeoManager() {
       });
     } else {
       removeJsonLd('breadcrumbs');
+    }
+
+    if (normalizedPath === '/accommodation-point-pedro') {
+      setJsonLd('faq', {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: [
+          {
+            '@type': 'Question',
+            name: 'Where is Tulip Guest Inn located?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Tulip Guest Inn is at 189 V.M. Road, Point Pedro, Northern Province, Sri Lanka.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'What are the check-in and check-out times?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Check-in is available from 1:00 PM, and check-out is by 12:00 PM.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'Can I book a room directly?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Yes. Guests can check room options and book directly through the Tulip Guest Inn website.',
+            },
+          },
+        ],
+      });
+    } else {
+      removeJsonLd('faq');
     }
   }, [pathname]);
 

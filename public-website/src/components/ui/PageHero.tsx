@@ -17,7 +17,14 @@ export default function PageHero({ title, subtitle, image, breadcrumb }: PageHer
         transition={{ duration: 1.5, ease: 'easeOut' }}
         className="absolute inset-0"
       >
-        <img src={image} alt={title} className="w-full h-full object-cover" loading="eager" />
+        <img
+          src={image}
+          alt={title}
+          className="w-full h-full object-cover"
+          loading="eager"
+          decoding="async"
+          fetchPriority="high"
+        />
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/60" />
       </motion.div>
 
