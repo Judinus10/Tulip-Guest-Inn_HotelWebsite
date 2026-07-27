@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /booking-bill
+
+Sitemap: https://www.tulipguestinn.com/sitemap.xml

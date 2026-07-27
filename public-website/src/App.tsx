@@ -14,6 +14,8 @@ import About from './pages/About';
 import Contact from './pages/Contact';
 import Booking from './pages/Booking';
 import BookingBill from './pages/BookingBill';
+import NotFound from './pages/NotFound';
+import SeoManager from './components/seo/SeoManager';
 
 function PageWrapper({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -37,6 +39,7 @@ function AppLayout() {
   return (
     <>
       <ScrollRestorer />
+      <SeoManager />
       <Navbar />
       <PageWrapper key={location.pathname}>
         <Routes location={location}>
@@ -50,6 +53,7 @@ function AppLayout() {
           <Route path="/contact" element={<Contact />} />
           <Route path="/booking" element={<Booking />} />
           <Route path="/booking-bill" element={<BookingBill />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </PageWrapper>
       <Footer />
