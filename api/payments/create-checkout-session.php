@@ -42,7 +42,20 @@ function generate_payhere_order_id(int $bookingId): string
 
 function create_checkout_token(string $orderId, int $bookingId, string $amount): string
 {
-    return hash_hmac('sha256', $orderId . '|' . $bookingId . '|' . $amount, PAYHERE_MERCHANT_SECRET);
+    return create_public_token('payhere-checkout', [
+        'order_id' => $orderId,
+        'booking_id' => $bookingId,
+        'amount' => $amount,
+    ], BOOKING_LINK_TTL_SECONDS);
+}
+
+function create_booking_status_token(string $orderId, int $bookingId, string $amount): string
+{
+    return create_public_token('booking-status', [
+        'order_id' => $orderId,
+        'booking_id' => $bookingId,
+        'amount' => $amount,
+    ], BOOKING_LINK_TTL_SECONDS);
 }
 
 function get_public_base_url(): string
@@ -194,7 +207,8 @@ try {
     $orderId = generate_payhere_order_id($bookingId);
 
     $checkoutToken = create_checkout_token($orderId, $bookingId, $amountFormatted);
-    $returnUrl = build_booking_bill_url($bookingId, $orderId, $checkoutToken);
+    $statusToken = create_booking_status_token($orderId, $bookingId, $amountFormatted);
+    $returnUrl = build_booking_bill_url($bookingId, $orderId, $statusToken);
     $cancelUrl = build_room_details_url($pdo, $roomName, $bookingId, $orderId, 'failed');
     $notifyUrl = (API_BASE_URL !== '' ? API_BASE_URL : '') . '/payments/payhere-notify.php';
 

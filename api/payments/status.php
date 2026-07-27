@@ -24,14 +24,20 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     json_response(false, 'Only GET requests are allowed.', 405);
 }
 
+rate_limit_or_fail('payment_status_lookup', 30, 15);
+
 function public_checkout_token(string $orderId, int $bookingId, string $amount): string
 {
-    return hash_hmac('sha256', $orderId . '|' . $bookingId . '|' . $amount, PAYHERE_MERCHANT_SECRET);
+    return create_public_token('booking-status', [
+        'order_id' => $orderId,
+        'booking_id' => $bookingId,
+        'amount' => $amount,
+    ], BOOKING_LINK_TTL_SECONDS);
 }
 
 function public_invoice_download_token(int $bookingId): string
 {
-    return hash_hmac('sha256', (string) $bookingId, PAYHERE_MERCHANT_SECRET);
+    return create_public_token('invoice-download', ['booking_id' => $bookingId], INVOICE_LINK_TTL_SECONDS);
 }
 
 
@@ -115,7 +121,7 @@ function public_room_main_image(PDO $pdo, string $roomName): string
 
 $bookingId = (int) ($_GET['booking_id'] ?? 0);
 $orderId = clean_string($_GET['order_id'] ?? '', 100);
-$token = clean_string($_GET['token'] ?? '', 128);
+$token = clean_string($_GET['token'] ?? '', 512);
 
 if ($bookingId < 1 || $orderId === '' || $token === '') {
     json_response(false, 'Booking ID, order ID, and token are required.', 422);
@@ -153,9 +159,16 @@ try {
     }
 
     $amountForToken = number_format((float) ($record['paid_amount'] ?? $record['amount'] ?? 0), 2, '.', '');
-    $expectedToken = public_checkout_token($orderId, $bookingId, $amountForToken);
-
-    if (!hash_equals($expectedToken, $token)) {
+    $validToken = verify_public_token($token, 'booking-status', [
+        'order_id' => $orderId,
+        'booking_id' => $bookingId,
+        'amount' => $amountForToken,
+    ]);
+    if (!$validToken && legacy_public_tokens_allowed()) {
+        $legacyToken = hash_hmac('sha256', $orderId . '|' . $bookingId . '|' . $amountForToken, PAYHERE_MERCHANT_SECRET);
+        $validToken = hash_equals($legacyToken, $token);
+    }
+    if (!$validToken) {
         json_response(false, 'Invalid bill access token.', 403);
     }
 

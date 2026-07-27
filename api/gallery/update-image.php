@@ -33,18 +33,22 @@ try {
 
     if (!empty($_FILES['image']) && ($_FILES['image']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
         $uploadDir = gallery_upload_dir();
-        if (!is_dir($uploadDir) && !mkdir($uploadDir, 0775, true)) json_response(false, 'Upload folder could not be created.', 500);
+        if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) json_response(false, 'Upload folder could not be created.', 500);
         if (!is_writable($uploadDir)) json_response(false, 'Upload folder is not writable.', 500);
 
         $tmp = (string) $_FILES['image']['tmp_name'];
         try {
-            [, $extension] = gallery_validate_uploaded_image($_FILES['image']);
+            gallery_validate_uploaded_image($_FILES['image']);
         } catch (RuntimeException $validationError) {
             json_response(false, $validationError->getMessage(), 422);
         }
 
-        $filename = 'gallery_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $extension;
-        if (!move_uploaded_file($tmp, $uploadDir . '/' . $filename)) json_response(false, 'Unable to save uploaded image.', 500);
+        try {
+            $result = secure_image_upload($_FILES['image'], $uploadDir, 'gallery');
+        } catch (RuntimeException $validationError) {
+            json_response(false, $validationError->getMessage(), 422);
+        }
+        $filename = $result['filename'];
         gallery_delete_file_if_local($storedPath);
         $storedPath = $filename;
         $originalName = basename((string) $_FILES['image']['name']);
@@ -74,5 +78,5 @@ try {
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) $pdo->rollBack();
     error_log('Gallery update image error: ' . $e->getMessage());
-    json_response(false, 'Unable to update image: ' . $e->getMessage(), 500);
+    json_response(false, 'Unable to update image.', 500);
 }

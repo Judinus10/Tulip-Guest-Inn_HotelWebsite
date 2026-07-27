@@ -16,7 +16,7 @@ try {
     if (empty($_FILES['images'])) json_response(false, 'Select at least one image.', 422);
 
     $uploadDir = gallery_upload_dir();
-    if (!is_dir($uploadDir) && !mkdir($uploadDir, 0775, true)) json_response(false, 'Upload folder could not be created.', 500);
+    if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) json_response(false, 'Upload folder could not be created.', 500);
     if (!is_writable($uploadDir)) json_response(false, 'Upload folder is not writable.', 500);
 
     $pdo = get_db_connection();
@@ -27,6 +27,7 @@ try {
     $files = $_FILES['images'];
     $count = is_array($files['name']) ? count($files['name']) : 0;
     if ($count === 0) json_response(false, 'Select at least one image.', 422);
+    if ($count > 20) json_response(false, 'Upload no more than 20 images at once.', 422);
 
     $saved = [];
 
@@ -45,7 +46,7 @@ try {
 
         $tmp = (string) $files['tmp_name'][$i];
         $original = basename((string) $files['name'][$i]);
-        [, $extension] = gallery_validate_uploaded_image([
+        gallery_validate_uploaded_image([
             'tmp_name' => $tmp,
             'size' => $files['size'][$i] ?? 0,
         ]);
@@ -53,9 +54,12 @@ try {
         $title = clean_string($_POST['titles'][$i] ?? pathinfo($original, PATHINFO_FILENAME), 180);
         if ($title === '') $title = 'Gallery Image';
 
-        $filename = 'gallery_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $extension;
-        $destination = $uploadDir . '/' . $filename;
-        if (!move_uploaded_file($tmp, $destination)) throw new RuntimeException('Unable to save uploaded image.');
+        $result = secure_image_upload([
+            'error' => $files['error'][$i] ?? UPLOAD_ERR_NO_FILE,
+            'tmp_name' => $tmp,
+            'size' => $files['size'][$i] ?? 0,
+        ], $uploadDir, 'gallery');
+        $filename = $result['filename'];
 
         $insert->execute([
             ':folder_id' => $folderId,
@@ -75,5 +79,5 @@ try {
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) $pdo->rollBack();
     error_log('Gallery upload error: ' . $e->getMessage());
-    json_response(false, 'Unable to upload gallery images: ' . $e->getMessage(), 500);
+    json_response(false, 'Unable to upload gallery images.', 500);
 }

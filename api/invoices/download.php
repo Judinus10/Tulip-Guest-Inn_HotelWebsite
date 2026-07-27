@@ -32,10 +32,17 @@ if ($bookingId < 1) {
 
 function invoice_download_token(int $bookingId): string
 {
-    return hash_hmac('sha256', (string) $bookingId, PAYHERE_MERCHANT_SECRET);
+    return create_public_token('invoice-download', ['booking_id' => $bookingId], INVOICE_LINK_TTL_SECONDS);
 }
 
-$hasGuestToken = $token !== '' && hash_equals(invoice_download_token($bookingId), $token);
+$hasGuestToken = false;
+if ($token !== '') {
+    rate_limit_or_fail('invoice_download', 12, 15);
+    $hasGuestToken = verify_public_token($token, 'invoice-download', ['booking_id' => $bookingId]);
+    if (!$hasGuestToken && legacy_public_tokens_allowed()) {
+        $hasGuestToken = hash_equals(hash_hmac('sha256', (string) $bookingId, PAYHERE_MERCHANT_SECRET), $token);
+    }
+}
 
 if (!$hasGuestToken) {
     require_admin_auth();

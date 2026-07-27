@@ -9,6 +9,7 @@ apply_cors_headers();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(false, 'Only POST requests are allowed.', 405);
 }
+rate_limit_or_fail('password_otp_resend', 4, 30);
 
 function ensure_admin_password_otp_table(PDO $pdo): void
 {

@@ -126,35 +126,17 @@ function offer_upload_image(string $fieldName = 'image'): ?string
         offer_json(['success' => false, 'message' => 'Invalid uploaded image.'], 400);
     }
 
-    $maxSize = 5 * 1024 * 1024;
-    if ((int) ($file['size'] ?? 0) > $maxSize) {
-        offer_json(['success' => false, 'message' => 'Image must be 5MB or smaller.'], 400);
-    }
-
-    $mime = mime_content_type($tmpName) ?: '';
-    $extensions = [
-        'image/jpeg' => 'jpg',
-        'image/png' => 'png',
-        'image/webp' => 'webp',
-    ];
-
-    if (!isset($extensions[$mime])) {
-        offer_json(['success' => false, 'message' => 'Only JPG, PNG, and WebP images are allowed.'], 400);
-    }
-
     $uploadDir = __DIR__ . '/../uploads/offers';
     if (!ensure_directory_exists($uploadDir)) {
         offer_json(['success' => false, 'message' => 'Offer upload folder is not writable.'], 500);
     }
 
-    $filename = 'offer_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $extensions[$mime];
-    $targetPath = $uploadDir . '/' . $filename;
-
-    if (!move_uploaded_file($tmpName, $targetPath)) {
-        offer_json(['success' => false, 'message' => 'Unable to save uploaded image.'], 500);
+    try {
+        $result = secure_image_upload($file, $uploadDir, 'offer');
+    } catch (RuntimeException $exception) {
+        offer_json(['success' => false, 'message' => $exception->getMessage()], 422);
     }
-
-    return 'uploads/offers/' . $filename;
+    return 'uploads/offers/' . $result['filename'];
 }
 
 function offer_parse_details(mixed $details): array

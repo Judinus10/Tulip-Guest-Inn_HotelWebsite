@@ -36,7 +36,7 @@ function gallery_upload_dir(): string
     $dir = __DIR__ . '/../uploads/gallery';
 
     if (!is_dir($dir)) {
-        @mkdir($dir, 0775, true);
+        @mkdir($dir, 0755, true);
     }
 
     return $dir;

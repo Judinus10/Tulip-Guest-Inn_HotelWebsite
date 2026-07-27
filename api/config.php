@@ -112,7 +112,12 @@ $defaultRoomRates = [
     'Private Cottage' => 18000.00,
 ];
 
-jebal_define('APP_ENV', (string) jebal_env_value('APP_ENV', 'local'));
+$configuredAppEnv = strtolower(trim((string) jebal_env_value('APP_ENV', '')));
+if (!in_array($configuredAppEnv, ['local', 'staging', 'production'], true)) {
+    http_response_code(500);
+    exit('APP_ENV must be explicitly configured as local, staging, or production.');
+}
+jebal_define('APP_ENV', $configuredAppEnv);
 jebal_define('APP_TIMEZONE', $appTimezone);
 $frontendUrl = rtrim((string) jebal_env_value('FRONTEND_URL', jebal_env_value('PUBLIC_APP_URL', jebal_env_value('APP_BASE_URL', ''))), '/');
 $publicAppUrl = $frontendUrl;
@@ -125,11 +130,11 @@ jebal_define('APP_BASE_URL', $publicAppUrl);
 jebal_define('PUBLIC_APP_URL', $publicAppUrl);
 jebal_define('ADMIN_APP_URL', $adminAppUrl);
 jebal_define('API_BASE_URL', $apiBaseUrl);
-jebal_define('ASSET_BASE_URL', $assetBaseUrl !== '' ? $assetBaseUrl : ($apiBaseUrl !== '' ? $apiBaseUrl : 'http://localhost/HotelWebsite/api'));
+jebal_define('ASSET_BASE_URL', $assetBaseUrl !== '' ? $assetBaseUrl : $apiBaseUrl);
 
-jebal_define('DB_HOST', (string) jebal_env_value('DB_HOST', 'localhost'));
-jebal_define('DB_NAME', (string) jebal_env_value('DB_NAME', 'hotel_jebal'));
-jebal_define('DB_USER', (string) jebal_env_value('DB_USER', 'root'));
+jebal_define('DB_HOST', (string) jebal_env_value('DB_HOST', ''));
+jebal_define('DB_NAME', (string) jebal_env_value('DB_NAME', ''));
+jebal_define('DB_USER', (string) jebal_env_value('DB_USER', ''));
 jebal_define('DB_PASS', (string) jebal_env_value('DB_PASS', ''));
 jebal_define('DB_CHARSET', (string) jebal_env_value('DB_CHARSET', 'utf8mb4'));
 
@@ -194,10 +199,47 @@ jebal_define('ADMIN_SESSION_HOURS', (int) jebal_env_value('ADMIN_SESSION_HOURS',
 jebal_define('ADMIN_SESSION_IDLE_MINUTES', max(5, (int) jebal_env_value('ADMIN_SESSION_IDLE_MINUTES', 30)));
 jebal_define('PUBLIC_RATE_LIMIT_MAX', (int) jebal_env_value('PUBLIC_RATE_LIMIT_MAX', 8));
 jebal_define('PUBLIC_RATE_LIMIT_WINDOW_MINUTES', (int) jebal_env_value('PUBLIC_RATE_LIMIT_WINDOW_MINUTES', 15));
+jebal_define('PUBLIC_TOKEN_SECRET', (string) jebal_env_value('PUBLIC_TOKEN_SECRET', ''));
+jebal_define('BOOKING_LINK_TTL_SECONDS', max(300, (int) jebal_env_value('BOOKING_LINK_TTL_SECONDS', 86400)));
+jebal_define('INVOICE_LINK_TTL_SECONDS', max(300, (int) jebal_env_value('INVOICE_LINK_TTL_SECONDS', 604800)));
+jebal_define('ALLOW_LEGACY_PUBLIC_TOKENS_UNTIL', (string) jebal_env_value('ALLOW_LEGACY_PUBLIC_TOKENS_UNTIL', ''));
+jebal_define('MAX_REQUEST_BODY_BYTES', max(1024, (int) jebal_env_value('MAX_REQUEST_BODY_BYTES', 1048576)));
+jebal_define('MAX_UPLOAD_BYTES', max(1024, (int) jebal_env_value('MAX_UPLOAD_BYTES', 8388608)));
+jebal_define('MAX_IMAGE_WIDTH', max(1, (int) jebal_env_value('MAX_IMAGE_WIDTH', 6000)));
+jebal_define('MAX_IMAGE_HEIGHT', max(1, (int) jebal_env_value('MAX_IMAGE_HEIGHT', 6000)));
+jebal_define('MAX_IMAGE_PIXELS', max(1, (int) jebal_env_value('MAX_IMAGE_PIXELS', 24000000)));
 
 jebal_define('ROOM_RATES', jebal_env_json_array('ROOM_RATES', $defaultRoomRates));
 
-if (defined('APP_ENV') && APP_ENV === 'production') {
+if (APP_ENV === 'production') {
+    $requiredProductionValues = [
+        'FRONTEND_URL' => FRONTEND_URL,
+        'ADMIN_APP_URL' => ADMIN_APP_URL,
+        'API_BASE_URL' => API_BASE_URL,
+        'DB_HOST' => DB_HOST,
+        'DB_NAME' => DB_NAME,
+        'DB_USER' => DB_USER,
+        'DB_PASS' => DB_PASS,
+        'PAYHERE_MERCHANT_ID' => PAYHERE_MERCHANT_ID,
+        'PAYHERE_MERCHANT_SECRET' => PAYHERE_MERCHANT_SECRET,
+        'PUBLIC_TOKEN_SECRET' => PUBLIC_TOKEN_SECRET,
+    ];
+    foreach ($requiredProductionValues as $key => $value) {
+        if (trim((string) $value) === '') {
+            http_response_code(500);
+            exit('Required production configuration is missing.');
+        }
+    }
+    if (strtolower(DB_USER) === 'root') {
+        http_response_code(500);
+        exit('The production database user must not be root.');
+    }
+    foreach ([FRONTEND_URL, ADMIN_APP_URL, API_BASE_URL] as $productionUrl) {
+        if (parse_url($productionUrl, PHP_URL_SCHEME) !== 'https') {
+            http_response_code(500);
+            exit('Production application URLs must use HTTPS.');
+        }
+    }
     ini_set('display_errors', '0');
     ini_set('display_startup_errors', '0');
     ini_set('log_errors', '1');

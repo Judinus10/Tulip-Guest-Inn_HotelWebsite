@@ -183,51 +183,15 @@ function experience_upload_image(string $field = 'image'): ?string
         ], 400);
     }
 
-    $tmpPath = (string) ($_FILES[$field]['tmp_name'] ?? '');
-    $size = (int) ($_FILES[$field]['size'] ?? 0);
-    $allowed = experience_allowed_image_types();
-
-    if ($tmpPath === '' || !is_uploaded_file($tmpPath)) {
+    try {
+        $result = secure_image_upload($_FILES[$field], experience_upload_dir(), 'experience');
+    } catch (RuntimeException $exception) {
         experience_json([
             'success' => false,
-            'message' => 'Invalid uploaded image. Please choose the image again.',
-        ], 400);
+            'message' => $exception->getMessage(),
+        ], 422);
     }
-
-    if ($size <= 0) {
-        experience_json([
-            'success' => false,
-            'message' => 'Uploaded image is empty.',
-        ], 400);
-    }
-
-    if ($size > 8388608) {
-        experience_json([
-            'success' => false,
-            'message' => 'Image must be below 8MB.',
-        ], 400);
-    }
-
-    $mime = experience_detect_image_mime($tmpPath);
-
-    if (!isset($allowed[$mime])) {
-        experience_json([
-            'success' => false,
-            'message' => 'Only JPG, PNG, and WEBP images are allowed.',
-        ], 400);
-    }
-
-    $filename = 'experience_' . time() . '_' . bin2hex(random_bytes(6)) . '.' . $allowed[$mime];
-    $target = experience_upload_dir() . '/' . $filename;
-
-    if (!move_uploaded_file($tmpPath, $target)) {
-        experience_json([
-            'success' => false,
-            'message' => 'Failed to save uploaded image.',
-        ], 500);
-    }
-
-    return $filename;
+    return $result['filename'];
 }
 
 function experience_delete_file(?string $path): void

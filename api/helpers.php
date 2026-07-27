@@ -124,6 +124,7 @@ function json_response(bool $success, string $message, int $statusCode = 200, ar
 
 function read_request_data(): array
 {
+    enforce_request_body_limit();
     $raw = file_get_contents('php://input');
     $data = json_decode($raw ?: '', true);
 
@@ -132,6 +133,123 @@ function read_request_data(): array
     }
 
     return $_POST ?: [];
+}
+
+function enforce_request_body_limit(?int $maxBytes = null): void
+{
+    $maxBytes ??= defined('MAX_REQUEST_BODY_BYTES') ? MAX_REQUEST_BODY_BYTES : 1048576;
+    $contentLength = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
+    if ($contentLength > $maxBytes) {
+        json_response(false, 'Request body is too large.', 413);
+    }
+}
+
+function public_token_secret(): string
+{
+    $secret = defined('PUBLIC_TOKEN_SECRET') ? trim((string) PUBLIC_TOKEN_SECRET) : '';
+    if ($secret === '') {
+        throw new RuntimeException('Public token secret is not configured.');
+    }
+    return $secret;
+}
+
+function create_public_token(string $purpose, array $claims, int $ttlSeconds): string
+{
+    $payload = array_merge($claims, [
+        'purpose' => $purpose,
+        'exp' => time() + max(300, $ttlSeconds),
+    ]);
+    $encoded = rtrim(strtr(base64_encode(json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)), '+/', '-_'), '=');
+    $signature = hash_hmac('sha256', $encoded, public_token_secret());
+    return $encoded . '.' . $signature;
+}
+
+function verify_public_token(string $token, string $purpose, array $requiredClaims): bool
+{
+    $parts = explode('.', $token, 2);
+    if (count($parts) !== 2 || !hash_equals(hash_hmac('sha256', $parts[0], public_token_secret()), $parts[1])) {
+        return false;
+    }
+    $padding = strlen($parts[0]) % 4;
+    $decoded = base64_decode(strtr($parts[0] . ($padding ? str_repeat('=', 4 - $padding) : ''), '-_', '+/'), true);
+    $payload = is_string($decoded) ? json_decode($decoded, true) : null;
+    if (!is_array($payload) || ($payload['purpose'] ?? '') !== $purpose || (int) ($payload['exp'] ?? 0) < time()) {
+        return false;
+    }
+    foreach ($requiredClaims as $key => $value) {
+        if (!array_key_exists($key, $payload) || !hash_equals((string) $value, (string) $payload[$key])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function legacy_public_tokens_allowed(): bool
+{
+    $until = defined('ALLOW_LEGACY_PUBLIC_TOKENS_UNTIL') ? trim((string) ALLOW_LEGACY_PUBLIC_TOKENS_UNTIL) : '';
+    if ($until === '') return false;
+    $timestamp = strtotime($until);
+    return $timestamp !== false && $timestamp >= time();
+}
+
+function secure_image_upload(array $file, string $targetDir, string $filenamePrefix): array
+{
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        throw new RuntimeException('Image upload failed.');
+    }
+    $tmp = (string) ($file['tmp_name'] ?? '');
+    $size = (int) ($file['size'] ?? 0);
+    if ($tmp === '' || !is_uploaded_file($tmp) || $size <= 0) {
+        throw new RuntimeException('Invalid uploaded image.');
+    }
+    if ($size > MAX_UPLOAD_BYTES) {
+        throw new RuntimeException('Image exceeds the upload size limit.');
+    }
+    $info = @getimagesize($tmp);
+    $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
+    $mime = strtolower((string) ($info['mime'] ?? ''));
+    $width = (int) ($info[0] ?? 0);
+    $height = (int) ($info[1] ?? 0);
+    if (!isset($allowed[$mime]) || $width < 1 || $height < 1) {
+        throw new RuntimeException('Only valid JPEG, PNG, and WebP images are allowed.');
+    }
+    if ($width > MAX_IMAGE_WIDTH || $height > MAX_IMAGE_HEIGHT || $width * $height > MAX_IMAGE_PIXELS) {
+        throw new RuntimeException('Image dimensions are too large.');
+    }
+    if (!extension_loaded('gd')) {
+        throw new RuntimeException('The GD image extension is required for secure uploads.');
+    }
+    $source = match ($mime) {
+        'image/jpeg' => @imagecreatefromjpeg($tmp),
+        'image/png' => @imagecreatefrompng($tmp),
+        'image/webp' => function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($tmp) : false,
+        default => false,
+    };
+    if (!$source) throw new RuntimeException('Unable to decode uploaded image.');
+    if (!is_dir($targetDir) && !mkdir($targetDir, 0755, true)) {
+        imagedestroy($source);
+        throw new RuntimeException('Upload directory could not be created.');
+    }
+    if (!is_writable($targetDir)) {
+        imagedestroy($source);
+        throw new RuntimeException('Upload directory is not writable.');
+    }
+    $extension = $allowed[$mime];
+    $filename = preg_replace('/[^a-z0-9_-]/i', '_', $filenamePrefix) . '_' . bin2hex(random_bytes(12)) . '.' . $extension;
+    $target = rtrim($targetDir, '/\\') . DIRECTORY_SEPARATOR . $filename;
+    $written = match ($mime) {
+        'image/jpeg' => imagejpeg($source, $target, 88),
+        'image/png' => imagepng($source, $target, 7),
+        'image/webp' => function_exists('imagewebp') ? imagewebp($source, $target, 88) : false,
+        default => false,
+    };
+    imagedestroy($source);
+    if (!$written) {
+        if (is_file($target)) @unlink($target);
+        throw new RuntimeException('Unable to store the re-encoded image.');
+    }
+    @chmod($target, 0644);
+    return ['filename' => $filename, 'mime' => $mime, 'extension' => $extension, 'width' => $width, 'height' => $height];
 }
 
 function clean_string(mixed $value, int $maxLength = 1000): string

@@ -175,7 +175,9 @@ function save_room_images(PDO $pdo, int $roomId, array $files): void
     if (!isset($files['name']) || $files['name'] === []) return;
 
     $uploadDir = __DIR__ . '/../uploads/rooms';
-    if (!is_dir($uploadDir)) mkdir($uploadDir, 0775, true);
+    if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
+        throw new RuntimeException('Room upload folder could not be created.');
+    }
 
     $names = is_array($files['name']) ? $files['name'] : [$files['name']];
     $tmpNames = is_array($files['tmp_name']) ? $files['tmp_name'] : [$files['tmp_name']];
@@ -194,12 +196,12 @@ function save_room_images(PDO $pdo, int $roomId, array $files): void
         $tmpName = $tmpNames[$index] ?? '';
         if (!is_uploaded_file($tmpName)) continue;
 
-        $extension = strtolower(pathinfo((string) $originalName, PATHINFO_EXTENSION));
-        if (!in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true)) continue;
-
-        $filename = 'room_' . $roomId . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $extension;
-        $target = $uploadDir . '/' . $filename;
-        if (!move_uploaded_file($tmpName, $target)) continue;
+        $result = secure_image_upload([
+            'error' => $errors[$index] ?? UPLOAD_ERR_NO_FILE,
+            'tmp_name' => $tmpName,
+            'size' => is_array($files['size'] ?? null) ? ($files['size'][$index] ?? 0) : ($files['size'] ?? 0),
+        ], $uploadDir, 'room_' . $roomId);
+        $filename = $result['filename'];
 
         $relativePath = 'uploads/rooms/' . $filename;
         $sortOrder++;
