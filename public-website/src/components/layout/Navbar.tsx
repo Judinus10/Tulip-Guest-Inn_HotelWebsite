@@ -49,21 +49,12 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
             {/* Logo */}
-            <Link to="/" className="flex flex-col leading-none">
-              <span
-                className={`font-serif text-2xl font-light tracking-[0.05em] transition-colors duration-300 ${
-                  scrolled ? 'text-deep-green' : 'text-white'
-                }`}
-              >
-                Tulip
-              </span>
-              <span
-                className={`text-[10px] tracking-[0.3em] uppercase font-light transition-colors duration-300 ${
-                  scrolled ? 'text-gold' : 'text-gold'
-                }`}
-              >
-                Guest Inn
-              </span>
+            <Link to="/" className="flex items-center" aria-label="Tulip Guest Inn home">
+              <img
+                src="/assets/tulip-logo.png"
+                alt="Tulip Guest Inn"
+                className="h-14 w-auto object-contain"
+              />
             </Link>
 
             {/* Desktop Nav */}
@@ -136,10 +127,13 @@ export default function Navbar() {
               className="fixed top-0 right-0 h-full w-[280px] bg-white z-50 lg:hidden shadow-luxury-lg flex flex-col"
             >
               <div className="flex items-center justify-between p-6 border-b border-border">
-                <div className="flex flex-col leading-none">
-                  <span className="font-serif text-xl font-light tracking-wide text-deep-green">Tulip</span>
-                  <span className="text-[9px] tracking-[0.3em] uppercase text-gold">Guest Inn</span>
-                </div>
+                <Link to="/" aria-label="Tulip Guest Inn home">
+                  <img
+                    src="/assets/tulip-logo.png"
+                    alt="Tulip Guest Inn"
+                    className="h-12 w-auto object-contain"
+                  />
+                </Link>
                 <button onClick={() => setMobileOpen(false)} className="text-dark p-1">
                   <X size={20} />
                 </button>

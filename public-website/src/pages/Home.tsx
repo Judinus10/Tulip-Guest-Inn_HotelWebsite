@@ -5,7 +5,7 @@ import {
   ChevronDown,
   Wifi,
   Car,
-  Waves,
+  CookingPot,
   Users,
   Shield,
   Coffee,
@@ -47,7 +47,7 @@ const heroImages = [
 ];
 
 const welcomeFeatures = [
-  { icon: Waves, label: "Swimming Pool" },
+  { icon: CookingPot, label: "Shared Kitchen" },
   { icon: Wifi, label: "Free WiFi" },
   { icon: Car, label: "Free Parking" },
   { icon: Users, label: "Family Friendly" },
@@ -338,7 +338,7 @@ export default function Home() {
                   serene surroundings.
                 </p>
                 <p className="text-sm text-gray-500 leading-relaxed mb-8">
-                  From our tranquil outdoor pool and lush tropical gardens to
+                  From our practical shared kitchen and lush tropical gardens to
                   our elegantly appointed rooms, every detail has been carefully
                   considered to ensure a stay that is as restful as it is
                   memorable.
@@ -373,7 +373,7 @@ export default function Home() {
               <div className="absolute bottom-0 right-16 w-72 h-52 overflow-hidden shadow-luxury-lg">
                 <img
                   src={homeWelcome02}
-                  alt="Swimming Pool"
+                  alt="Tulip Guest Inn guest area"
                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
                   loading="lazy"
                 />
@@ -437,7 +437,7 @@ export default function Home() {
           <div className="relative overflow-hidden">
             <motion.img
               src={homeLuxuryExperience}
-              alt="Swimming Pool"
+              alt="Tulip Guest Inn garden and guest facilities"
               className="w-full h-full object-cover min-h-[400px]"
               whileInView={{ scale: 1 }}
               initial={{ scale: 1.08 }}
@@ -461,7 +461,7 @@ export default function Home() {
               <p className="text-gray-300 text-sm leading-relaxed mb-8">
                 Escape the busy city and enjoy comfortable accommodation
                 surrounded by peaceful gardens and modern facilities. Our
-                outdoor swimming pool, shaded terraces and lush gardens create a
+                comfortable rooms, shaded terraces and lush gardens create a
                 sanctuary of calm in the heart of Point Pedro.
               </p>
               <Link to="/rooms" className="btn-white">

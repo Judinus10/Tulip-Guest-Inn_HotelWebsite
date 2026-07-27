@@ -118,10 +118,13 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
           {/* About */}
           <div>
-            <div className="flex flex-col leading-none mb-6">
-              <span className="font-serif text-2xl font-light tracking-wide text-white">Tulip</span>
-              <span className="text-[9px] tracking-[0.3em] uppercase text-gold">Guest Inn</span>
-            </div>
+            <Link to="/" className="inline-block mb-6" aria-label="Tulip Guest Inn home">
+              <img
+                src="/assets/tulip-logo-white.png"
+                alt="Tulip Guest Inn"
+                className="h-16 w-auto object-contain"
+              />
+            </Link>
             <p className="text-gray-400 text-sm leading-relaxed mb-6">
               A premium boutique guest house in Point Pedro, Northern Sri Lanka. Discover luxury accommodation, peaceful gardens and genuine Sri Lankan hospitality.
             </p>

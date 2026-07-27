@@ -51,7 +51,7 @@ export const facilities: Facility[] = [
   {
     id: '5',
     name: 'Clean, Fresh Family Rooms',
-    icon: 'Monitor',
+    icon: 'BedDouble',
     description: 'Spotless family rooms for up to three guests, each with an en suite bathroom.',
     longDescription:
       'Comfortable family rooms sleep up to three guests and each includes an en suite bathroom. Every room is prepared spotless on arrival, most include a flat screen TV, and housekeeping is available during your stay on request.',
@@ -71,7 +71,7 @@ export const facilities: Facility[] = [
   {
     id: '7',
     name: 'Bicycle Rental',
-    icon: 'Sun',
+    icon: 'Bike',
     description: 'Explore Point Pedro, the beach and the lighthouse at your own pace.',
     longDescription:
       'Explore Point Pedro, the beach and the lighthouse at your own pace with a rental bicycle.',
@@ -91,7 +91,7 @@ export const facilities: Facility[] = [
   {
     id: '9',
     name: 'Shared Kitchen',
-    icon: 'Bath',
+    icon: 'CookingPot',
     description: 'A shared kitchen is available for guests who prefer to prepare their own meals.',
     longDescription:
       'A shared kitchen is available for guests who prefer to prepare their own meals.',

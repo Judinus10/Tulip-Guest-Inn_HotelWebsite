@@ -1,18 +1,28 @@
 import { motion } from 'framer-motion';
-import { Waves, Wifi, Car, Wind, Bath, Monitor, Leaf, Sparkles, Clock, Sun } from 'lucide-react';
+import {
+  BedDouble,
+  Bike,
+  Car,
+  Clock,
+  CookingPot,
+  Leaf,
+  Sparkles,
+  Wifi,
+  Wind,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type { Facility } from '../../data/facilities';
 
-const iconMap: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
-  Waves,
+const iconMap: Record<string, LucideIcon> = {
   Wifi,
   Car,
   Wind,
-  Bath,
-  Monitor,
+  BedDouble,
+  Bike,
+  CookingPot,
   Leaf,
   Sparkles,
   Clock,
-  Sun,
 };
 
 interface FacilityCardProps {
