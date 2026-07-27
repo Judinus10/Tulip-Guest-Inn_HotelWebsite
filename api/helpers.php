@@ -17,6 +17,7 @@ use PHPMailer\PHPMailer\Exception;
 
 function apply_security_headers(): void
 {
+    header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
     header('X-Content-Type-Options: nosniff');
     header('X-Frame-Options: DENY');
     header('Referrer-Policy: strict-origin-when-cross-origin');
@@ -96,11 +97,12 @@ function apply_cors_headers(): void
 
     if ($origin !== '' && is_cors_origin_allowed($origin)) {
         header('Access-Control-Allow-Origin: ' . $origin, true);
+        header('Access-Control-Allow-Credentials: true', true);
         header('Vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers', true);
     }
 
     header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS', true);
-    header('Access-Control-Allow-Headers: Origin, Content-Type, Accept, Authorization, X-Requested-With, Cache-Control, Pragma, X-HTTP-Method-Override', true);
+    header('Access-Control-Allow-Headers: Origin, Content-Type, Accept, X-CSRF-Token, X-Requested-With, Cache-Control, Pragma, X-HTTP-Method-Override', true);
     header('Access-Control-Max-Age: 86400', true);
     header('Content-Type: application/json; charset=utf-8', true);
 
@@ -177,40 +179,100 @@ function rate_limit_or_fail(string $action, int $maxAttempts = PUBLIC_RATE_LIMIT
     ]);
 }
 
-function get_bearer_token(): ?string
+function is_https_request(): bool
 {
-    $headers = [];
-
-    if (function_exists('getallheaders')) {
-        $headers = getallheaders();
+    if (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') {
+        return true;
     }
 
-    $authorization = $headers['Authorization']
-        ?? $headers['authorization']
-        ?? $_SERVER['HTTP_AUTHORIZATION']
-        ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION']
-        ?? '';
-
-    if ($authorization === '' && function_exists('apache_request_headers')) {
-        $apacheHeaders = apache_request_headers();
-        $authorization = $apacheHeaders['Authorization']
-            ?? $apacheHeaders['authorization']
-            ?? '';
-    }
-
-    if (!preg_match('/Bearer\s+(.+)/i', $authorization, $matches)) {
-        return null;
-    }
-
-    return trim($matches[1]);
+    return strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
 }
+
+function admin_session_cookie_name(): string
+{
+    return 'tulip_admin_session';
+}
+
+function admin_csrf_cookie_name(): string
+{
+    return 'tulip_admin_csrf';
+}
+
+function get_admin_session_token(): ?string
+{
+    $token = trim((string) ($_COOKIE[admin_session_cookie_name()] ?? ''));
+    return $token !== '' ? $token : null;
+}
+
+function admin_csrf_token_for_session(string $sessionToken): string
+{
+    return hash_hmac('sha256', 'tulip-admin-csrf', $sessionToken);
+}
+
+function set_admin_auth_cookies(string $sessionToken, bool $rememberMe): void
+{
+    $secure = is_https_request() || (defined('APP_ENV') && APP_ENV === 'production');
+    $expires = $rememberMe ? time() + (max(1, (int) ADMIN_SESSION_HOURS) * 3600) : 0;
+    $common = [
+        'expires' => $expires,
+        'path' => '/',
+        'secure' => $secure,
+        'samesite' => 'Strict',
+    ];
+
+    setcookie(admin_session_cookie_name(), $sessionToken, $common + ['httponly' => true]);
+    setcookie(admin_csrf_cookie_name(), admin_csrf_token_for_session($sessionToken), $common + ['httponly' => false]);
+}
+
+function clear_admin_auth_cookies(): void
+{
+    $secure = is_https_request() || (defined('APP_ENV') && APP_ENV === 'production');
+    $options = [
+        'expires' => time() - 3600,
+        'path' => '/',
+        'secure' => $secure,
+        'samesite' => 'Strict',
+    ];
+
+    setcookie(admin_session_cookie_name(), '', $options + ['httponly' => true]);
+    setcookie(admin_csrf_cookie_name(), '', $options + ['httponly' => false]);
+}
+
+function validate_admin_csrf(string $sessionToken): void
+{
+    $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+    if (in_array($method, ['GET', 'HEAD', 'OPTIONS'], true)) {
+        return;
+    }
+
+    $origin = get_request_origin();
+    if ($origin !== '' && !is_cors_origin_allowed($origin)) {
+        json_response(false, 'Request origin is not allowed.', 403);
+    }
+
+    $headerToken = trim((string) ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
+    $cookieToken = trim((string) ($_COOKIE[admin_csrf_cookie_name()] ?? ''));
+    $expectedToken = admin_csrf_token_for_session($sessionToken);
+
+    if (
+        $headerToken === ''
+        || $cookieToken === ''
+        || !hash_equals($cookieToken, $headerToken)
+        || !hash_equals($expectedToken, $headerToken)
+    ) {
+        json_response(false, 'Invalid CSRF token.', 403);
+    }
+}
+
 function require_admin_auth(): array
 {
-    $token = get_bearer_token();
+    $token = get_admin_session_token();
 
     if ($token === null || $token === '') {
         json_response(false, 'Authentication required.', 401);
     }
+
+    validate_admin_csrf($token);
 
     $tokenHash = hash('sha256', $token);
     $pdo = get_db_connection();
@@ -219,8 +281,6 @@ function require_admin_auth(): array
         : 30;
     $idleCutoff = (new DateTimeImmutable('-' . $idleMinutes . ' minutes'))->format('Y-m-d H:i:s');
 
-    // Revoke this token before looking it up when either its absolute lifetime
-    // or its administrator idle lifetime has ended.
     $revokeExpired = $pdo->prepare(
         "UPDATE admin_sessions
          SET revoked_at = NOW()
@@ -255,6 +315,7 @@ function require_admin_auth(): array
     $session = $stmt->fetch();
 
     if (!$session) {
+        clear_admin_auth_cookies();
         json_response(false, 'Invalid or expired session.', 401);
     }
 
@@ -263,6 +324,7 @@ function require_admin_auth(): array
             'UPDATE admin_sessions SET revoked_at = NOW() WHERE id = :id AND revoked_at IS NULL'
         );
         $revokeInactive->execute([':id' => $session['session_id']]);
+        clear_admin_auth_cookies();
         json_response(false, 'Invalid or expired session.', 401);
     }
 

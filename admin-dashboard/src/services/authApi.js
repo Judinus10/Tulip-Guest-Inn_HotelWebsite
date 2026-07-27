@@ -10,42 +10,38 @@ async function readJsonResponse(response) {
   return payload
 }
 
-export async function loginAdmin({ email, password }) {
+export async function loginAdmin({ email, password, rememberMe = false }) {
   const response = await fetch(`${API_BASE_URL}/auth/login.php`, {
     method: 'POST',
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ email, password }),
+    credentials: 'include',
+    body: JSON.stringify({ email, password, remember_me: rememberMe }),
   })
 
   return readJsonResponse(response)
 }
 
-export async function logoutAdmin(token) {
-  if (!token) return
-
-  await fetch(`${API_BASE_URL}/auth/logout.php`, {
+export async function logoutAdmin(csrfToken) {
+  return fetch(`${API_BASE_URL}/auth/logout.php`, {
     method: 'POST',
     headers: {
       Accept: 'application/json',
-      Authorization: `Bearer ${token}`,
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
     },
+    credentials: 'include',
   }).catch(() => null)
 }
 
-export async function verifyAdminSession(token) {
-  if (!token) {
-    return null
-  }
-
+export async function verifyAdminSession() {
   const response = await fetch(`${API_BASE_URL}/auth/me.php`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
-      Authorization: `Bearer ${token}`,
     },
+    credentials: 'include',
   })
 
   const payload = await response.json().catch(() => null)

@@ -14,6 +14,7 @@ rate_limit_or_fail('admin_login', 6, 15);
 $data = read_request_data();
 $email = strtolower(clean_string($data['email'] ?? '', 190));
 $password = (string) ($data['password'] ?? '');
+$rememberMe = filter_var($data['remember_me'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
 if ($email === '' || $password === '') {
     json_response(false, 'Email and password are required.', 422);
@@ -58,9 +59,10 @@ try {
     $updateLogin = $pdo->prepare('UPDATE admin_users SET last_login_at = NOW(), updated_at = NOW() WHERE id = :id');
     $updateLogin->execute([':id' => $user['id']]);
 
+    set_admin_auth_cookies($token, $rememberMe);
+
     json_response(true, 'Login successful.', 200, [
         'data' => [
-            'token' => $token,
             'expires_at' => $expiresAt,
             'user' => [
                 'id' => (int) $user['id'],

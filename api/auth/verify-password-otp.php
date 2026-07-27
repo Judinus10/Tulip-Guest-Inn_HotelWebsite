@@ -129,7 +129,7 @@ try {
     );
     $revokeOtherSessions->execute([
         ':admin_user_id' => (int) $admin['id'],
-        ':current_token_hash' => hash('sha256', (string) get_bearer_token()),
+        ':current_token_hash' => hash('sha256', (string) get_admin_session_token()),
     ]);
 
     $pdo->commit();

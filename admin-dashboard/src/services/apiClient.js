@@ -1,4 +1,4 @@
-import { clearStoredSession, getStoredToken } from '@/utils/auth'
+import { clearLegacyAuthStorage, getCookie } from '@/utils/auth'
 
 const localApiBaseUrl = 'http://localhost/HotelWebsite/api'
 
@@ -10,24 +10,28 @@ export function buildApiUrl(path) {
 }
 
 export async function apiFetch(url, options = {}) {
-  const token = getStoredToken()
   const headers = new Headers(options.headers || {})
+  const method = String(options.method || 'GET').toUpperCase()
 
   if (!headers.has('Accept')) {
     headers.set('Accept', 'application/json')
   }
 
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`)
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+    const csrfToken = getCookie('tulip_admin_csrf')
+    if (csrfToken) {
+      headers.set('X-CSRF-Token', csrfToken)
+    }
   }
 
   const response = await fetch(url, {
     ...options,
     headers,
+    credentials: 'include',
   })
 
   if (response.status === 401) {
-    clearStoredSession()
+    clearLegacyAuthStorage()
     if (!window.location.pathname.includes('/login')) {
       window.location.href = '/login'
     }

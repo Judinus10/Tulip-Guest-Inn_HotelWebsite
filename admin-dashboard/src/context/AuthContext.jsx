@@ -1,41 +1,23 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { clearStoredSession, getStoredToken, getStoredUser, storeSession } from '@/utils/auth'
+import { clearLegacyAuthStorage, getCookie } from '@/utils/auth'
 import { loginAdmin, logoutAdmin, verifyAdminSession } from '@/services/authApi'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
-  const [token, setToken] = useState(null)
   const [initializing, setInitializing] = useState(true)
 
   useEffect(() => {
     let cancelled = false
 
     async function restoreSession() {
-      const storedToken = getStoredToken()
-      const storedUser = getStoredUser()
-
-      if (!storedToken || !storedUser) {
-        clearStoredSession()
-        if (!cancelled) setInitializing(false)
-        return
-      }
-
-      const verifiedUser = await verifyAdminSession(storedToken)
+      clearLegacyAuthStorage()
+      const verifiedUser = await verifyAdminSession()
 
       if (cancelled) return
 
-      if (verifiedUser) {
-        setUser(verifiedUser)
-        setToken(storedToken)
-        storeSession({ user: verifiedUser, token: storedToken, rememberMe: localStorage.getItem('jebal_admin_storage_mode') === 'local' })
-      } else {
-        clearStoredSession()
-        setUser(null)
-        setToken(null)
-      }
-
+      setUser(verifiedUser)
       setInitializing(false)
     }
 
@@ -47,35 +29,28 @@ export function AuthProvider({ children }) {
   }, [])
 
   const login = async ({ email, password, rememberMe }) => {
-    const payload = await loginAdmin({ email, password })
+    const payload = await loginAdmin({ email, password, rememberMe })
     const nextUser = payload.data.user
-    const nextToken = payload.data.token
-
-    storeSession({ user: nextUser, token: nextToken, rememberMe })
     setUser(nextUser)
-    setToken(nextToken)
-
     return nextUser
   }
 
   const logout = async () => {
-    const currentToken = token || getStoredToken()
-    clearStoredSession()
+    const csrfToken = getCookie('tulip_admin_csrf')
+    clearLegacyAuthStorage()
     setUser(null)
-    setToken(null)
-    await logoutAdmin(currentToken)
+    await logoutAdmin(csrfToken)
   }
 
   const value = useMemo(
     () => ({
       user,
-      token,
       initializing,
-      isAuthenticated: Boolean(user && token),
+      isAuthenticated: Boolean(user),
       login,
       logout,
     }),
-    [user, token, initializing]
+    [user, initializing]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
