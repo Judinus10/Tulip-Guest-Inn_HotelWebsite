@@ -13,13 +13,37 @@ if (!$isCli) {
         ? trim((string) jebal_env_value('STAY_REMINDER_CRON_TOKEN', ''))
         : '';
 
-    if ($configuredToken !== '') {
-        $requestToken = trim((string) ($_GET['token'] ?? ''));
-        if (!hash_equals($configuredToken, $requestToken)) {
-            json_response(false, 'Unauthorized cron request.', 401);
-        }
+    if ($configuredToken === '') {
+        error_log('Stay reminder cron denied: STAY_REMINDER_CRON_TOKEN is not configured.');
+        json_response(false, 'Cron endpoint is not configured.', 503);
+    }
+
+    $requestToken = trim((string) (
+        $_SERVER['HTTP_X_CRON_TOKEN']
+        ?? $_GET['token']
+        ?? ''
+    ));
+    if ($requestToken === '' || !hash_equals($configuredToken, $requestToken)) {
+        json_response(false, 'Unauthorized cron request.', 401);
     }
 }
+
+$cronLock = fopen(sys_get_temp_dir() . '/tulip-send-stay-reminders.lock', 'c');
+if ($cronLock === false || !flock($cronLock, LOCK_EX | LOCK_NB)) {
+    if (is_resource($cronLock)) {
+        fclose($cronLock);
+    }
+    if ($isCli) {
+        fwrite(STDOUT, "Stay reminder cron is already running.\n");
+        exit(0);
+    }
+    json_response(false, 'Stay reminder cron is already running.', 409);
+}
+
+register_shutdown_function(static function () use ($cronLock): void {
+    flock($cronLock, LOCK_UN);
+    fclose($cronLock);
+});
 
 function stay_reminder_fetch_bookings(PDO $pdo, string $date, string $field): array
 {

@@ -3,6 +3,9 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/_experience_helpers.php';
 
+experience_require_method('DELETE');
+require_admin_auth();
+
 try {
     $pdo = experience_db();
 

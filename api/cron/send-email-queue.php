@@ -15,15 +15,37 @@ if (!$isCli) {
         $configuredToken = trim((string) jebal_env_value('EMAIL_QUEUE_CRON_TOKEN', ''));
     }
 
-    // Optional protection for production: add EMAIL_QUEUE_CRON_TOKEN=your-secret in api/.env
-    // Then call: /api/cron/send-email-queue.php?token=your-secret
-    if ($configuredToken !== '') {
-        $requestToken = trim((string) ($_GET['token'] ?? ''));
-        if (!hash_equals($configuredToken, $requestToken)) {
-            json_response(false, 'Unauthorized cron request.', 401);
-        }
+    if ($configuredToken === '') {
+        error_log('Email queue cron denied: EMAIL_QUEUE_CRON_TOKEN is not configured.');
+        json_response(false, 'Cron endpoint is not configured.', 503);
+    }
+
+    $requestToken = trim((string) (
+        $_SERVER['HTTP_X_CRON_TOKEN']
+        ?? $_GET['token']
+        ?? ''
+    ));
+    if ($requestToken === '' || !hash_equals($configuredToken, $requestToken)) {
+        json_response(false, 'Unauthorized cron request.', 401);
     }
 }
+
+$cronLock = fopen(sys_get_temp_dir() . '/tulip-send-email-queue.lock', 'c');
+if ($cronLock === false || !flock($cronLock, LOCK_EX | LOCK_NB)) {
+    if (is_resource($cronLock)) {
+        fclose($cronLock);
+    }
+    if ($isCli) {
+        fwrite(STDOUT, "Email queue worker is already running.\n");
+        exit(0);
+    }
+    json_response(false, 'Email queue worker is already running.', 409);
+}
+
+register_shutdown_function(static function () use ($cronLock): void {
+    flock($cronLock, LOCK_UN);
+    fclose($cronLock);
+});
 
 function payment_pending_email_delay_minutes(): int
 {

@@ -214,20 +214,55 @@ function require_admin_auth(): array
 
     $tokenHash = hash('sha256', $token);
     $pdo = get_db_connection();
+    $idleMinutes = defined('ADMIN_SESSION_IDLE_MINUTES')
+        ? max(5, (int) ADMIN_SESSION_IDLE_MINUTES)
+        : 30;
+    $idleCutoff = (new DateTimeImmutable('-' . $idleMinutes . ' minutes'))->format('Y-m-d H:i:s');
+
+    // Revoke this token before looking it up when either its absolute lifetime
+    // or its administrator idle lifetime has ended.
+    $revokeExpired = $pdo->prepare(
+        "UPDATE admin_sessions
+         SET revoked_at = NOW()
+         WHERE token_hash = :token_hash
+           AND revoked_at IS NULL
+           AND (
+               expires_at <= NOW()
+               OR last_used_at IS NULL
+               OR last_used_at <= :idle_cutoff
+           )"
+    );
+    $revokeExpired->execute([
+        ':token_hash' => $tokenHash,
+        ':idle_cutoff' => $idleCutoff,
+    ]);
 
     $stmt = $pdo->prepare(
-        "SELECT s.id AS session_id, s.expires_at, u.id, u.name, u.email, u.role, u.is_active
+        "SELECT s.id AS session_id, s.expires_at, s.last_used_at,
+                u.id, u.name, u.email, u.role, u.is_active
          FROM admin_sessions s
          INNER JOIN admin_users u ON u.id = s.admin_user_id
          WHERE s.token_hash = :token_hash
            AND s.revoked_at IS NULL
            AND s.expires_at > NOW()
+           AND s.last_used_at > :idle_cutoff
          LIMIT 1"
     );
-    $stmt->execute([':token_hash' => $tokenHash]);
+    $stmt->execute([
+        ':token_hash' => $tokenHash,
+        ':idle_cutoff' => $idleCutoff,
+    ]);
     $session = $stmt->fetch();
 
-    if (!$session || (int) $session['is_active'] !== 1) {
+    if (!$session) {
+        json_response(false, 'Invalid or expired session.', 401);
+    }
+
+    if ((int) $session['is_active'] !== 1) {
+        $revokeInactive = $pdo->prepare(
+            'UPDATE admin_sessions SET revoked_at = NOW() WHERE id = :id AND revoked_at IS NULL'
+        );
+        $revokeInactive->execute([':id' => $session['session_id']]);
         json_response(false, 'Invalid or expired session.', 401);
     }
 

@@ -191,6 +191,7 @@ jebal_define(
 jebal_define('INVOICE_STORAGE_DIR', __DIR__ . '/storage/invoices');
 
 jebal_define('ADMIN_SESSION_HOURS', (int) jebal_env_value('ADMIN_SESSION_HOURS', 12));
+jebal_define('ADMIN_SESSION_IDLE_MINUTES', max(5, (int) jebal_env_value('ADMIN_SESSION_IDLE_MINUTES', 30)));
 jebal_define('PUBLIC_RATE_LIMIT_MAX', (int) jebal_env_value('PUBLIC_RATE_LIMIT_MAX', 8));
 jebal_define('PUBLIC_RATE_LIMIT_WINDOW_MINUTES', (int) jebal_env_value('PUBLIC_RATE_LIMIT_WINDOW_MINUTES', 15));
 

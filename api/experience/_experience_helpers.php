@@ -16,6 +16,20 @@ function experience_json(array $data, int $code = 200): void
     exit;
 }
 
+function experience_require_method(string $allowedMethod): void
+{
+    $requestMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+    $allowedMethod = strtoupper($allowedMethod);
+
+    if ($requestMethod !== $allowedMethod) {
+        header('Allow: ' . $allowedMethod);
+        experience_json([
+            'success' => false,
+            'message' => 'Method not allowed.',
+        ], 405);
+    }
+}
+
 function experience_db(): PDO
 {
     if (!function_exists('get_db_connection')) {
@@ -32,8 +46,8 @@ function experience_upload_dir(): string
 {
     $dir = __DIR__ . '/../uploads/experience';
 
-    if (!is_dir($dir)) {
-        mkdir($dir, 0777, true);
+    if (!ensure_directory_exists($dir)) {
+        throw new RuntimeException('Experience upload directory is unavailable.');
     }
 
     return $dir;
