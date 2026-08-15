@@ -168,7 +168,10 @@ try {
         json_response(false, 'Booking dates are no longer valid for payment.', 422);
     }
 
-    $amount = calculate_booking_amount($roomName, $checkInDate, $checkOutDate);
+    $bookingGroupId = (int) ($booking['booking_group_id'] ?? 0);
+    $amount = $bookingGroupId > 0
+        ? (float) $pdo->query('SELECT total_amount FROM booking_groups WHERE id = ' . $bookingGroupId)->fetchColumn()
+        : calculate_booking_amount($roomName, $checkInDate, $checkOutDate);
 
     if ($amount <= 0) {
         $pdo->rollBack();
@@ -218,7 +221,7 @@ try {
         'cancel_url' => $cancelUrl,
         'notify_url' => $notifyUrl,
         'order_id' => $orderId,
-        'items' => 'Tulip Guest Inn booking #' . $bookingId . ' - ' . $roomName,
+        'items' => $bookingGroupId > 0 ? 'Tulip Guest Inn multi-room booking MB-' . str_pad((string) $bookingGroupId, 6, '0', STR_PAD_LEFT) : 'Tulip Guest Inn booking #' . $bookingId . ' - ' . $roomName,
         'currency' => $currency,
         'amount' => $amountFormatted,
         'first_name' => (string) ($booking['full_name'] ?? 'Guest'),
@@ -273,6 +276,10 @@ try {
         ':payment_status' => 'Payment Pending',
         ':id' => $bookingId,
     ]);
+    if ($bookingGroupId > 0) {
+        $pdo->prepare("UPDATE bookings SET payment_status = 'Payment Pending', status = 'Pending', updated_at = NOW() WHERE booking_group_id = :group_id")
+            ->execute([':group_id' => $bookingGroupId]);
+    }
 
     booking_audit_log($pdo, $bookingId, 'booking_payment_hold_refreshed', 'Booking Payment Hold Active', 'Booking remains reserved while awaiting payment.', [
         'order_id' => $orderId,

@@ -158,6 +158,20 @@ try {
         json_response(false, 'Payment record was not found.', 404);
     }
 
+    $bookingGroupId = (int) ($record['booking_group_id'] ?? 0);
+    if ($bookingGroupId > 0) {
+        $groupStmt = $pdo->prepare(
+            "SELECT GROUP_CONCAT(room_name ORDER BY is_group_primary DESC, id ASC SEPARATOR ', ') AS room_names,
+                    SUM(guests) AS total_guests, COUNT(*) AS total_rooms
+             FROM bookings WHERE booking_group_id = :group_id"
+        );
+        $groupStmt->execute([':group_id' => $bookingGroupId]);
+        $group = $groupStmt->fetch() ?: [];
+        $record['room_name'] = (string) ($group['room_names'] ?? $record['room_name']);
+        $record['guests'] = (int) ($group['total_guests'] ?? $record['guests']);
+        $record['rooms'] = (int) ($group['total_rooms'] ?? 1);
+    }
+
     $amountForToken = number_format((float) ($record['paid_amount'] ?? $record['amount'] ?? 0), 2, '.', '');
     $validToken = verify_public_token($token, 'booking-status', [
         'order_id' => $orderId,
@@ -207,6 +221,8 @@ try {
             'check_in_date' => (string) ($record['check_in_date'] ?? ''),
             'check_out_date' => (string) ($record['check_out_date'] ?? ''),
             'guests' => (int) ($record['guests'] ?? 0),
+            'rooms' => (int) ($record['rooms'] ?? 1),
+            'booking_group_id' => $bookingGroupId ?: null,
             'booking_status' => (string) ($record['status'] ?? 'Pending'),
             'payment_status' => $paymentStatus,
             'amount' => (float) ($record['paid_amount'] ?? $record['amount'] ?? 0),

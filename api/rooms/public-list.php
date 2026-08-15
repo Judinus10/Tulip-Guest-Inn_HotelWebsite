@@ -35,6 +35,7 @@ try {
     $checkInDate = clean_string($_GET['check_in_date'] ?? $_GET['check_in'] ?? '', 20);
     $checkOutDate = clean_string($_GET['check_out_date'] ?? $_GET['check_out'] ?? '', 20);
     $guests = (int) ($_GET['guests'] ?? 0);
+    $requestedRooms = max(1, (int) ($_GET['rooms'] ?? 1));
     $roomType = clean_string($_GET['room_type'] ?? $_GET['type'] ?? '', 100);
 
     if (($checkInDate !== '' || $checkOutDate !== '') && (
@@ -47,7 +48,10 @@ try {
 
     $rooms = get_room_payload($pdo, true);
 
-    if ($guests > 0) {
+    // A single-room search requires one room to hold everyone. A multi-room
+    // search must return the individual available rooms so the frontend can
+    // build a real room combination using each backend max_guests value.
+    if ($guests > 0 && $requestedRooms === 1) {
         $rooms = array_values(array_filter($rooms, static fn(array $room): bool => (int) ($room['guests'] ?? 0) >= $guests));
     }
 
@@ -71,6 +75,7 @@ try {
             'check_in_date' => $checkInDate,
             'check_out_date' => $checkOutDate,
             'guests' => $guests,
+            'rooms' => $requestedRooms,
             'room_type' => $roomType,
         ],
     ]);

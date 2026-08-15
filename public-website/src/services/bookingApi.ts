@@ -8,6 +8,8 @@ export type BookingFormPayload = {
   check_in_date: string;
   check_out_date: string;
   guests: number;
+  rooms?: number;
+  booking_group_id?: number | null;
   message?: string;
   is_booking_for_other?: boolean;
   staying_guest_name?: string;
@@ -76,6 +78,30 @@ export async function submitBookingRequest(payload: BookingFormPayload): Promise
   requires_online_checkout?: boolean;
 }> {
   return requestJson('/submit-booking.php', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export type MultiRoomBookingPayload = {
+  full_name: string;
+  email: string;
+  phone: string;
+  check_in_date: string;
+  check_out_date: string;
+  total_guests: number;
+  payment_method: 'Cash' | 'PayHere';
+  message?: string;
+  rooms: Array<{ room_id: string | number; guests: number }>;
+};
+
+export async function submitMultiRoomBooking(payload: MultiRoomBookingPayload): Promise<{
+  booking_id: number;
+  booking_no: string;
+  bill_url?: string | null;
+  requires_online_checkout?: boolean;
+}> {
+  return requestJson('/submit-multi-room-booking.php', {
     method: 'POST',
     body: JSON.stringify(payload),
   });

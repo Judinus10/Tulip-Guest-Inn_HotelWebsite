@@ -16,6 +16,7 @@ const Attractions = lazy(() => import('./pages/Attractions'));
 const About = lazy(() => import('./pages/About'));
 const Contact = lazy(() => import('./pages/Contact'));
 const Booking = lazy(() => import('./pages/Booking'));
+const MultiRoomBooking = lazy(() => import('./pages/MultiRoomBooking'));
 const BookingBill = lazy(() => import('./pages/BookingBill'));
 const PointPedroAccommodation = lazy(() => import('./pages/PointPedroAccommodation'));
 const NotFound = lazy(() => import('./pages/NotFound'));
@@ -57,6 +58,7 @@ function AppLayout() {
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/booking" element={<Booking />} />
+          <Route path="/multi-room-booking" element={<MultiRoomBooking />} />
           <Route path="/booking-bill" element={<BookingBill />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -50,7 +50,7 @@ try {
     $pdo = get_db_connection();
     $pdo->beginTransaction();
 
-    $stmt = $pdo->prepare('SELECT id, status, payment_status FROM bookings WHERE id = :id LIMIT 1 FOR UPDATE');
+    $stmt = $pdo->prepare('SELECT id, booking_group_id, status, payment_status FROM bookings WHERE id = :id LIMIT 1 FOR UPDATE');
     $stmt->execute([':id' => $bookingId]);
     $booking = $stmt->fetch();
     if (!$booking) {
@@ -87,8 +87,14 @@ try {
     }
 
     $newStatus = $statusMap[$requestedKey];
-    $update = $pdo->prepare('UPDATE bookings SET status = :status, updated_at = NOW() WHERE id = :id');
-    $update->execute([':status' => $newStatus, ':id' => $bookingId]);
+    $groupId = (int) ($booking['booking_group_id'] ?? 0);
+    if ($groupId > 0) {
+        $update = $pdo->prepare('UPDATE bookings SET status = :status, updated_at = NOW() WHERE booking_group_id = :group_id');
+        $update->execute([':status' => $newStatus, ':group_id' => $groupId]);
+    } else {
+        $update = $pdo->prepare('UPDATE bookings SET status = :status, updated_at = NOW() WHERE id = :id');
+        $update->execute([':status' => $newStatus, ':id' => $bookingId]);
+    }
     $pdo->commit();
 
     if ($requestedKey === 'confirmed' && $paymentAllowed && $currentStatus !== 'confirmed') {

@@ -18,7 +18,8 @@ try {
     $stmt = $pdo->query(
         "SELECT
             b.id,
-            CONCAT('BK-', LPAD(b.id, 5, '0')) AS booking_no,
+            CASE WHEN b.booking_group_id IS NOT NULL THEN CONCAT('MB-', LPAD(b.booking_group_id, 6, '0')) ELSE CONCAT('BK-', LPAD(b.id, 5, '0')) END AS booking_no,
+            b.booking_group_id,
             CASE WHEN b.is_booking_for_other = 1 AND COALESCE(NULLIF(b.staying_guest_name, ''), '') <> '' THEN b.staying_guest_name ELSE b.full_name END AS guest_name,
             CASE WHEN b.is_booking_for_other = 1 AND COALESCE(NULLIF(b.staying_guest_email, ''), '') <> '' THEN b.staying_guest_email ELSE b.email END AS guest_email,
             CASE WHEN b.is_booking_for_other = 1 AND COALESCE(NULLIF(b.staying_guest_phone, ''), '') <> '' THEN b.staying_guest_phone ELSE b.phone END AS guest_phone,
@@ -31,7 +32,7 @@ try {
             b.staying_guest_phone,
             b.staying_guest_note,
             r.id AS room_id,
-            b.room_name,
+            CASE WHEN b.booking_group_id IS NOT NULL THEN (SELECT GROUP_CONCAT(gb.room_name ORDER BY gb.is_group_primary DESC, gb.id ASC SEPARATOR ', ') FROM bookings gb WHERE gb.booking_group_id = b.booking_group_id) ELSE b.room_name END AS room_name,
             CASE
                 WHEN b.room_name LIKE 'Ground Floor%' THEN 'Ground Floor'
                 WHEN b.room_name LIKE 'First Floor%' THEN 'First Floor'
@@ -48,8 +49,8 @@ try {
             b.check_out_date,
             b.check_in_date AS check_in,
             b.check_out_date AS check_out,
-            b.guests,
-            b.guests AS adults,
+            CASE WHEN b.booking_group_id IS NOT NULL THEN (SELECT SUM(gb.guests) FROM bookings gb WHERE gb.booking_group_id = b.booking_group_id) ELSE b.guests END AS guests,
+            CASE WHEN b.booking_group_id IS NOT NULL THEN (SELECT SUM(gb.guests) FROM bookings gb WHERE gb.booking_group_id = b.booking_group_id) ELSE b.guests END AS adults,
             0 AS children,
             GREATEST(1, DATEDIFF(b.check_out_date, b.check_in_date)) AS total_nights,
             b.message AS special_requests,
@@ -63,7 +64,7 @@ try {
                 ORDER BY p.id DESC
                 LIMIT 1
             ), '') AS payment_method,
-            b.amount AS total_amount,
+            CASE WHEN b.booking_group_id IS NOT NULL THEN (SELECT bg.total_amount FROM booking_groups bg WHERE bg.id = b.booking_group_id) ELSE b.amount END AS total_amount,
             b.currency AS payment_currency,
             b.invoice_number,
             b.invoice_file_path,
@@ -72,6 +73,7 @@ try {
             b.updated_at
          FROM bookings b
          LEFT JOIN rooms r ON r.room_name = b.room_name
+         WHERE b.booking_group_id IS NULL OR b.is_group_primary = 1
          ORDER BY
             CASE WHEN CURDATE() >= b.check_in_date AND CURDATE() < b.check_out_date THEN 0
                  WHEN b.check_in_date >= CURDATE() THEN 1 ELSE 2 END,

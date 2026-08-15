@@ -14,6 +14,7 @@ const routeNames: Record<string, string> = {
   '/about': 'About',
   '/contact': 'Contact',
   '/booking': 'Book a Room',
+  '/multi-room-booking': 'Multiple Room Booking',
 };
 
 type SeoConfig = {
@@ -67,6 +68,12 @@ const pages: Record<string, SeoConfig> = {
     title: 'Book a Room in Point Pedro | Tulip Guest Inn',
     description:
       'Book your stay directly at Tulip Guest Inn for comfortable room accommodation in Point Pedro, Northern Province, Sri Lanka.',
+  },
+  '/multi-room-booking': {
+    title: 'Book Multiple Rooms | Tulip Guest Inn',
+    description:
+      'Choose multiple available rooms and allocate guests for your stay at Tulip Guest Inn in Point Pedro.',
+    index: false,
   },
   '/booking-bill': {
     title: 'Booking Payment Status | Tulip Guest Inn',

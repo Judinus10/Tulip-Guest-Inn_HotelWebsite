@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams, Link, Navigate, useNavigate } from 'react-router-dom';
+import { useParams, Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Users, BedDouble, Maximize, Bath, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import RoomCard from '../components/ui/RoomCard';
@@ -21,14 +21,18 @@ const today = () => new Date().toISOString().split('T')[0];
 export default function RoomDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const queryCheckIn = searchParams.get('checkin') || searchParams.get('checkIn') || '';
+  const queryCheckOut = searchParams.get('checkout') || searchParams.get('checkOut') || '';
+  const queryGuests = searchParams.get('guests') || '1';
   const fallbackRoom = fallbackRooms.find((r) => r.slug === id || r.id === id);
   const [room, setRoom] = useState<Room | undefined>(fallbackRoom);
   const [roomList, setRoomList] = useState<Room[]>(fallbackRooms);
   const [loading, setLoading] = useState(!fallbackRoom);
   const [bookingForm, setBookingForm] = useState<RoomBookingForm>({
-    checkIn: '',
-    checkOut: '',
-    guests: '1',
+    checkIn: queryCheckIn,
+    checkOut: queryCheckOut,
+    guests: queryGuests,
   });
   const [invalidFields, setInvalidFields] = useState<Partial<Record<RoomBookingField, boolean>>>({});
   const fieldRefs = useRef<Record<RoomBookingField, HTMLInputElement | HTMLSelectElement | null>>({
@@ -46,7 +50,13 @@ export default function RoomDetails() {
     setLoading(true);
     setActiveImg(0);
 
-    Promise.allSettled([fetchPublicRoom(id), fetchPublicRooms()]).then(([roomResult, roomsResult]) => {
+    const roomFilters: Record<string, string> = {};
+    if (queryCheckIn && queryCheckOut) {
+      roomFilters.check_in_date = queryCheckIn;
+      roomFilters.check_out_date = queryCheckOut;
+    }
+
+    Promise.allSettled([fetchPublicRoom(id), fetchPublicRooms(roomFilters)]).then(([roomResult, roomsResult]) => {
       if (!mounted) return;
 
       if (roomResult.status === 'fulfilled') {
@@ -67,7 +77,15 @@ export default function RoomDetails() {
     return () => {
       mounted = false;
     };
-  }, [id]);
+  }, [id, queryCheckIn, queryCheckOut]);
+
+  useEffect(() => {
+    setBookingForm({
+      checkIn: queryCheckIn,
+      checkOut: queryCheckOut,
+      guests: room ? String(Math.min(Math.max(1, Number(queryGuests) || 1), room.guests)) : queryGuests,
+    });
+  }, [queryCheckIn, queryCheckOut, queryGuests, room]);
 
   useEffect(() => {
     const scriptId = 'room-structured-data';
@@ -302,7 +320,7 @@ export default function RoomDetails() {
             <div className="lg:col-span-2">
               <AnimatedSection>
                 <Link
-                  to="/rooms"
+                  to={`/rooms${searchParams.toString() ? `?${searchParams.toString()}` : ''}`}
                   className="inline-flex items-center gap-2 text-[10px] tracking-[0.18em] uppercase text-gray-400 hover:text-gold transition-colors duration-200 mb-6"
                 >
                   <ChevronLeft size={12} />

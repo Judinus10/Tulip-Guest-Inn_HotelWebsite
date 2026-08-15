@@ -55,13 +55,16 @@ try {
         json_response(false, 'Booking was not found.', 404);
     }
 
-    $updateBooking = $pdo->prepare('UPDATE bookings SET payment_status = :payment_status, updated_at = NOW() WHERE id = :id');
-    $updateBooking->execute([
-        ':payment_status' => $paymentStatus,
-        ':id' => $id,
-    ]);
+    $groupId = (int) ($booking['booking_group_id'] ?? 0);
+    if ($groupId > 0) {
+        $updateBooking = $pdo->prepare('UPDATE bookings SET payment_status = :payment_status, updated_at = NOW() WHERE booking_group_id = :group_id');
+        $updateBooking->execute([':payment_status' => $paymentStatus, ':group_id' => $groupId]);
+    } else {
+        $updateBooking = $pdo->prepare('UPDATE bookings SET payment_status = :payment_status, updated_at = NOW() WHERE id = :id');
+        $updateBooking->execute([':payment_status' => $paymentStatus, ':id' => $id]);
+    }
 
-    $amount = (float) ($booking['amount'] ?? 0);
+    $amount = $groupId > 0 ? (float) $pdo->query('SELECT total_amount FROM booking_groups WHERE id = ' . $groupId)->fetchColumn() : (float) ($booking['amount'] ?? 0);
     $currency = (string) ($booking['currency'] ?? PAYMENT_CURRENCY);
     $orderId = 'MANUAL-' . date('YmdHis') . '-' . str_pad((string) $id, 5, '0', STR_PAD_LEFT);
 

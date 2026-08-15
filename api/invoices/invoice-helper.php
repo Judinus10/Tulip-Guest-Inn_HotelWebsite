@@ -180,6 +180,19 @@ function build_invoice_data_for_booking(PDO $pdo, int $bookingId, array $payment
     $booking = get_booking_by_id($pdo, $bookingId);
     if (!$booking) return null;
 
+    $bookingGroupId = (int) ($booking['booking_group_id'] ?? 0);
+    if ($bookingGroupId > 0) {
+        $groupStmt = $pdo->prepare("SELECT GROUP_CONCAT(room_name ORDER BY is_group_primary DESC, id ASC SEPARATOR ', ') AS room_names, SUM(guests) AS total_guests, COUNT(*) AS total_rooms FROM bookings WHERE booking_group_id = :group_id");
+        $groupStmt->execute([':group_id' => $bookingGroupId]);
+        $group = $groupStmt->fetch() ?: [];
+        $booking['room_name'] = (string) ($group['room_names'] ?? $booking['room_name']);
+        $booking['guests'] = (int) ($group['total_guests'] ?? $booking['guests']);
+        $booking['rooms'] = (int) ($group['total_rooms'] ?? 1);
+        $groupTotalStmt = $pdo->prepare('SELECT total_amount FROM booking_groups WHERE id = :group_id LIMIT 1');
+        $groupTotalStmt->execute([':group_id' => $bookingGroupId]);
+        $booking['amount'] = (float) ($groupTotalStmt->fetchColumn() ?: $booking['amount']);
+    }
+
     if (!$payment) {
         $paymentStmt = $pdo->prepare('SELECT * FROM payments WHERE booking_id = :booking_id ORDER BY id DESC LIMIT 1');
         $paymentStmt->execute([':booking_id' => $bookingId]);

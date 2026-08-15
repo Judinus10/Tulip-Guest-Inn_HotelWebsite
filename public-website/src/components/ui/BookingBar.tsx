@@ -1,13 +1,12 @@
 import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Users, Home, Search } from 'lucide-react';
+import { Calendar, Users, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface BookingBarForm {
   checkIn: string;
   checkOut: string;
   guests: string;
-  rooms: string;
 }
 
 type BookingBarField = keyof BookingBarForm;
@@ -19,7 +18,6 @@ const buildBookingQuery = (form: BookingBarForm) => {
     checkin: form.checkIn,
     checkout: form.checkOut,
     guests: form.guests,
-    rooms: form.rooms,
   });
 
   return `/rooms?${params.toString()}`;
@@ -31,14 +29,12 @@ export default function BookingBar() {
     checkIn: null,
     checkOut: null,
     guests: null,
-    rooms: null,
   });
 
   const [form, setForm] = useState<BookingBarForm>({
     checkIn: '',
     checkOut: '',
     guests: '2',
-    rooms: '1',
   });
   const [invalidFields, setInvalidFields] = useState<Partial<Record<BookingBarField, boolean>>>({});
 
@@ -51,10 +47,9 @@ export default function BookingBar() {
       checkIn: !form.checkIn,
       checkOut: !form.checkOut,
       guests: !form.guests,
-      rooms: !form.rooms,
     };
 
-    const orderedFields: BookingBarField[] = ['checkIn', 'checkOut', 'guests', 'rooms'];
+    const orderedFields: BookingBarField[] = ['checkIn', 'checkOut', 'guests'];
     const firstInvalid = orderedFields.find((field) => nextInvalid[field]);
 
     setInvalidFields(nextInvalid);
@@ -121,7 +116,7 @@ export default function BookingBar() {
       <form
         onSubmit={handleSubmit}
         noValidate
-        className="glass shadow-luxury-lg border border-border grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-0"
+        className="glass shadow-luxury-lg border border-border grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-0"
       >
         {/* Check In */}
         <div className={fieldClass('checkIn')}>
@@ -170,7 +165,7 @@ export default function BookingBar() {
             onChange={handleChange}
             className={inputClass('guests')}
           >
-            {[1, 2, 3, 4, 5, 6].map((n) => (
+            {Array.from({ length: 20 }, (_, index) => index + 1).map((n) => (
               <option key={n} value={n}>
                 {n} {n === 1 ? 'Guest' : 'Guests'}
               </option>
@@ -178,29 +173,8 @@ export default function BookingBar() {
           </select>
         </div>
 
-        {/* Rooms */}
-        <div className={fieldClass('rooms')}>
-          <label className="flex items-center gap-1.5 text-[9px] tracking-[0.2em] uppercase text-gold font-medium mb-2">
-            <Home size={11} />
-            Rooms
-          </label>
-          <select
-            ref={(node) => { fieldRefs.current.rooms = node; }}
-            name="rooms"
-            value={form.rooms}
-            onChange={handleChange}
-            className={inputClass('rooms')}
-          >
-            {[1, 2, 3, 4].map((n) => (
-              <option key={n} value={n}>
-                {n} {n === 1 ? 'Room' : 'Rooms'}
-              </option>
-            ))}
-          </select>
-        </div>
-
         {/* Search */}
-        <div className="col-span-2 md:col-span-4 lg:col-span-1">
+        <div className="col-span-2 md:col-span-3 lg:col-span-1">
           <button
             type="submit"
             className="w-full h-full bg-gold hover:bg-deep-green text-white flex items-center justify-center gap-2 text-[10px] tracking-[0.2em] uppercase font-medium transition-colors duration-300 py-5 lg:py-0"

@@ -273,6 +273,11 @@ try {
         ':currency' => $payhereCurrency,
         ':id' => $bookingId,
     ]);
+    $groupId = (int) ($booking['booking_group_id'] ?? 0);
+    if ($groupId > 0) {
+        $pdo->prepare('UPDATE bookings SET status = :status, payment_status = :payment_status, currency = :currency, updated_at = NOW() WHERE booking_group_id = :group_id')
+            ->execute([':status' => $finalBookingStatus, ':payment_status' => $finalPaymentStatus, ':currency' => $payhereCurrency, ':group_id' => $groupId]);
+    }
 
     if ($finalPaymentStatus === 'Paid') {
         booking_audit_log($pdo, $bookingId, 'payment_success', 'Payment Success', 'PayHere payment was verified and booking was confirmed.', [

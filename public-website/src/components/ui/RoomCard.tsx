@@ -6,15 +6,21 @@ import type { Room } from '../../data/rooms';
 interface RoomCardProps {
   room: Room;
   index?: number;
+  bookingPath?: string;
 }
 
-export default function RoomCard({ room, index = 0 }: RoomCardProps) {
+export default function RoomCard({ room, index = 0, bookingPath }: RoomCardProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const roomPath = `/rooms/${room.slug}`;
+  const roomPath = `/rooms/${room.slug}${location.search}`;
 
   const buildBookingPath = () => {
+    if (bookingPath) return bookingPath;
+
     const params = new URLSearchParams(location.search);
+    if (Number(params.get('rooms') || '1') > 1) {
+      return `/multi-room-booking?${params.toString()}`;
+    }
     params.set('room', room.slug);
 
     return `/booking?${params.toString()}`;
