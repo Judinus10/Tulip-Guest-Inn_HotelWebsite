@@ -6,7 +6,10 @@ LimitRequestBody 67108864
 </IfModule>
 
 <IfModule mod_headers.c>
-  Header always set Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+  # payhere-redirect.php sends its own nonce-based CSP because its browser form
+  # must POST to the selected PayHere checkout origin.
+  SetEnvIf Request_URI "/payments/payhere-redirect\.php$" payhere_checkout
+  Header always set Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'" env=!payhere_checkout
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "DENY"
   Header always set Referrer-Policy "strict-origin-when-cross-origin"

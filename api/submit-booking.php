@@ -230,18 +230,15 @@ try {
 
     $pdo->commit();
 
-    // Notifications must run only after the booking transaction is committed.
-    // Email logging/schema checks must never implicitly end the booking
-    // transaction or turn a saved Cash booking into a 500 response.
     if ($isCashPayment) {
         $emailBooking = $bookingValues;
         $emailBooking['id'] = $bookingId;
         $emailBooking['booking_no'] = $bookingNumber;
         $emailBooking['payment_method'] = 'Cash';
         try {
-            send_booking_received_emails($pdo, $emailBooking);
+            queue_booking_received_emails($pdo, $emailBooking);
         } catch (Throwable $emailError) {
-            error_log('Pay on Arrival booking email error: ' . $emailError->getMessage());
+            error_log('Pay on Arrival booking email queue error: ' . $emailError->getMessage());
         }
     }
 

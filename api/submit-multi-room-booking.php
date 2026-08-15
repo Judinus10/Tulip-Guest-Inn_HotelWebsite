@@ -85,7 +85,7 @@ try {
         $amountToken=number_format($totalAmount,2,'.',''); $token=create_public_token('booking-status',['order_id'=>$orderId,'booking_id'=>$primaryId,'amount'=>$amountToken],BOOKING_LINK_TTL_SECONDS);
         $base=defined('FRONTEND_URL')&&FRONTEND_URL!==''?FRONTEND_URL:(defined('PUBLIC_APP_URL')?PUBLIC_APP_URL:APP_BASE_URL);
         $billUrl=rtrim((string)$base,'/').'/booking-bill?'.http_build_query(['booking_id'=>$primaryId,'order_id'=>$orderId,'token'=>$token]);
-        try { send_booking_received_emails($pdo,['id'=>$primaryId,'booking_no'=>$bookingNo,'full_name'=>$fullName,'email'=>$email,'phone'=>$phone,'room_name'=>implode(', ',array_column($rooms,'room_name')),'check_in_date'=>$checkInDate,'check_out_date'=>$checkOutDate,'guests'=>$totalGuests,'rooms'=>count($rooms),'status'=>'Pending','payment_status'=>'Payment Pending','payment_method'=>'Cash','amount'=>$totalAmount,'currency'=>$currency]); } catch(Throwable $mailError){ error_log($mailError->getMessage()); }
+        try { queue_booking_received_emails($pdo,['id'=>$primaryId,'booking_no'=>$bookingNo,'full_name'=>$fullName,'email'=>$email,'phone'=>$phone,'room_name'=>implode(', ',array_column($rooms,'room_name')),'check_in_date'=>$checkInDate,'check_out_date'=>$checkOutDate,'guests'=>$totalGuests,'rooms'=>count($rooms),'status'=>'Pending','payment_status'=>'Payment Pending','payment_method'=>'Cash','amount'=>$totalAmount,'currency'=>$currency]); } catch(Throwable $mailError){ error_log('Multi-room booking email queue error: '.$mailError->getMessage()); }
     }
     json_response(true,'Multi-room booking created.',201,['booking_id'=>$primaryId,'booking_no'=>$bookingNo,'booking_group_id'=>$groupId,'bill_url'=>$billUrl,'requires_online_checkout'=>$isOnline]);
 } catch(Throwable $e) {

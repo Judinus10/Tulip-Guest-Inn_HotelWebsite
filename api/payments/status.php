@@ -202,14 +202,13 @@ try {
     $canRetryPayment = !$isCashPayment && in_array($paymentStatus, ['Payment Pending', 'Failed', 'Cancelled'], true)
         && (string) ($record['status'] ?? '') !== 'Confirmed';
 
-    $invoiceDownloadUrl = null;
-    if ($isCashPayment || $paymentStatus === 'Paid') {
-        $baseApiUrl = API_BASE_URL !== '' ? API_BASE_URL : rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/api/payments')), '/');
-        $invoiceDownloadUrl = $baseApiUrl . '/invoices/download.php?' . http_build_query([
-            'id' => $bookingId,
-            'token' => public_invoice_download_token($bookingId),
-        ]);
-    }
+    // A booking bill is available for every valid booking. For online payments
+    // the generated PDF reflects the current payment state (pending/paid/etc.).
+    $baseApiUrl = API_BASE_URL !== '' ? API_BASE_URL : rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/api/payments')), '/');
+    $invoiceDownloadUrl = $baseApiUrl . '/invoices/download.php?' . http_build_query([
+        'id' => $bookingId,
+        'token' => public_invoice_download_token($bookingId),
+    ]);
 
     json_response(true, 'Payment status loaded.', 200, [
         'booking' => [

@@ -1576,49 +1576,76 @@ function queue_staying_guest_booking_email(PDO $pdo, array $booking, string $sta
     );
 }
 
-function send_booking_received_emails(PDO $pdo, array $booking): void
+function queue_booking_received_emails(PDO $pdo, array $booking): int
 {
     $bookingId = (int) ($booking['id'] ?? 0);
-    $payment = [];
-    if ($bookingId > 0) {
-        $paymentStmt = $pdo->prepare('SELECT * FROM payments WHERE booking_id = :booking_id ORDER BY id DESC LIMIT 1');
-        $paymentStmt->execute([':booking_id' => $bookingId]);
-        $payment = $paymentStmt->fetch() ?: [];
+    if ($bookingId < 1) {
+        return 0;
     }
-    $subjectCustomer = 'Booking inquiry received - Tulip Guest Inn #' . $bookingId;
 
+    $payment = [];
+    $paymentStmt = $pdo->prepare('SELECT * FROM payments WHERE booking_id = :booking_id ORDER BY id DESC LIMIT 1');
+    $paymentStmt->execute([':booking_id' => $bookingId]);
+    $payment = $paymentStmt->fetch() ?: [];
+    $queued = 0;
+    $fromEmail = booking_from_email();
+    $fromName = booking_from_name();
+
+    $subjectCustomer = 'Booking inquiry received - Tulip Guest Inn #' . $bookingId;
     $bodyCustomer = booking_email_html('received', $booking, $payment);
 
-    $sentCustomer = send_tracked_email(
+    if (enqueue_email(
         $pdo,
         'booking',
         $bookingId,
         (string) ($booking['email'] ?? ''),
         $subjectCustomer,
         $bodyCustomer,
-        'booking_inquiry_received'
-    );
+        'booking_inquiry_received',
+        null,
+        3,
+        $fromEmail,
+        $fromName
+    )) {
+        $queued++;
+    }
 
     $subjectAdmin = 'New booking received - Tulip Guest Inn #' . $bookingId;
-
     $bodyAdmin = booking_email_html('received', $booking, $payment, true);
 
-    send_tracked_email(
+    $adminEmail = booking_admin_email();
+    if (enqueue_email(
         $pdo,
         'booking',
         $bookingId,
-        ADMIN_EMAIL,
+        $adminEmail,
         $subjectAdmin,
         $bodyAdmin,
         'admin_new_booking',
-        $booking['email'] ?? null
-    );
-
-    send_staying_guest_booking_email($pdo, $booking, 'received', $payment, 'staying_guest_booking_received', 'A room was booked for you');
-
-    if ($bookingId > 0) {
-        update_booking_email_status($pdo, $bookingId, $sentCustomer ? 'Sent' : 'Failed');
+        $booking['email'] ?? null,
+        3,
+        $fromEmail,
+        $fromName
+    )) {
+        $queued++;
     }
+
+    if (queue_staying_guest_booking_email($pdo, $booking, 'received', $payment, 'staying_guest_booking_received', 'A room was booked for you')) {
+        $queued++;
+    }
+
+    if ($queued > 0) {
+        update_booking_email_status($pdo, $bookingId, 'Booking Email Queued');
+    }
+
+    return $queued;
+}
+
+// Backward-compatible wrapper. This no longer opens an SMTP connection during
+// a web request; delivery is performed only by the email queue cron worker.
+function send_booking_received_emails(PDO $pdo, array $booking): void
+{
+    queue_booking_received_emails($pdo, $booking);
 }
 
 function send_booking_confirmed_email(PDO $pdo, array $booking): void
@@ -2270,6 +2297,11 @@ function email_queue_add_column_if_missing(PDO $pdo, string $column, string $def
  */
 function ensure_email_queue_table(PDO $pdo): void
 {
+    static $ensured = false;
+    if ($ensured) {
+        return;
+    }
+
     $pdo->exec(
         "CREATE TABLE IF NOT EXISTS email_queue (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -2324,6 +2356,8 @@ function ensure_email_queue_table(PDO $pdo): void
     if (!email_queue_index_exists($pdo, 'idx_email_queue_related')) {
         $pdo->exec("CREATE INDEX idx_email_queue_related ON email_queue (related_type, related_id)");
     }
+
+    $ensured = true;
 }
 
 function enqueue_email(

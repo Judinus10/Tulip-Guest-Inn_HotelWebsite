@@ -5,6 +5,7 @@ import {
   CalendarDays,
   Check,
   CheckCircle2,
+  Download,
   Loader2,
   Mail,
   Phone,
@@ -317,16 +318,16 @@ export default function BookingBill() {
                 </article>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {booking.can_retry_payment ? (
+              <div className={`grid grid-cols-1 gap-4 ${booking.can_retry_payment ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+                {booking.can_retry_payment && (
                   <button type="button" onClick={handleRetryPayment} disabled={retrying} className="flex h-11 items-center justify-center gap-2 rounded-[5px] border border-[#d8d2c8] bg-white text-[10px] font-bold uppercase tracking-[0.18em] text-[#14251f] transition hover:border-[#c99d53] hover:text-[#c99d53]">
                     <RefreshCcw size={13} /> {retrying ? 'Restarting' : 'Retry Payment'}
                   </button>
-                ) : (
-                  <a href={booking.invoice_download_url || '#'} className={booking.invoice_download_url ? 'flex h-11 items-center justify-center gap-2 rounded-[5px] border border-[#d8d2c8] bg-white text-[10px] font-bold uppercase tracking-[0.18em] text-[#14251f] transition hover:border-[#c99d53] hover:text-[#c99d53]' : 'pointer-events-none flex h-11 items-center justify-center gap-2 rounded-[5px] border border-[#d8d2c8] bg-white text-[10px] font-bold uppercase tracking-[0.18em] text-[#14251f] opacity-50'}>
-                    {isCashPayment ? 'Download Booking Confirmation' : 'Download Receipt'}
-                  </a>
                 )}
+
+                <a href={booking.invoice_download_url || '#'} className={booking.invoice_download_url ? 'flex h-11 items-center justify-center gap-2 rounded-[5px] border border-[#d8d2c8] bg-white text-[10px] font-bold uppercase tracking-[0.18em] text-[#14251f] transition hover:border-[#c99d53] hover:text-[#c99d53]' : 'pointer-events-none flex h-11 items-center justify-center gap-2 rounded-[5px] border border-[#d8d2c8] bg-white text-[10px] font-bold uppercase tracking-[0.18em] text-[#14251f] opacity-50'}>
+                  <Download size={13} /> {isCashPayment ? 'Download Booking Confirmation' : 'Download Bill'}
+                </a>
 
                 <Link to={booking.room_url || '/rooms'} className="flex h-11 items-center justify-center rounded-[5px] bg-[#c99d53] text-[10px] font-bold uppercase tracking-[0.2em] text-white transition hover:bg-[#19352b]">
                   Manage Booking

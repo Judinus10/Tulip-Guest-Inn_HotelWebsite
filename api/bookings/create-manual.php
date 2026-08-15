@@ -213,9 +213,9 @@ try {
     ];
 
     try {
-        send_booking_received_emails($pdo, $emailBooking);
+        queue_booking_received_emails($pdo, $emailBooking);
     } catch (Throwable $emailError) {
-        error_log('Manual booking email error: ' . $emailError->getMessage());
+        error_log('Manual booking email queue error: ' . $emailError->getMessage());
     }
 
     json_response(true, 'Manual booking created successfully.', 201, [
