@@ -1738,8 +1738,11 @@ function queue_payment_pending_emails_once(PDO $pdo, array $booking, array $paym
     }
 
     $paymentStatus = (string) ($booking['payment_status'] ?? $payment['status'] ?? 'Payment Pending');
+    $paymentMethod = strtolower(trim((string) ($payment['method'] ?? $payment['payment_method'] ?? $booking['payment_method'] ?? '')));
 
-    if ($paymentStatus !== 'Payment Pending') {
+    // Pay-on-arrival bookings stay pending for administrator review and must
+    // never receive an online-payment completion reminder.
+    if ($paymentStatus !== 'Payment Pending' || $paymentMethod === 'cash') {
         return 0;
     }
 
@@ -2131,9 +2134,28 @@ function email_queue_job_should_be_skipped(PDO $pdo, array $job): bool
         return true;
     }
 
-    $stmt = $pdo->prepare('SELECT payment_status FROM bookings WHERE id = :id LIMIT 1');
+    $stmt = $pdo->prepare(
+        "SELECT b.payment_status,
+                COALESCE((
+                    SELECT p.method
+                    FROM payments p
+                    WHERE p.booking_id = b.id
+                    ORDER BY p.id DESC
+                    LIMIT 1
+                ), '') AS payment_method
+         FROM bookings b
+         WHERE b.id = :id
+         LIMIT 1"
+    );
     $stmt->execute([':id' => $bookingId]);
-    return (string) $stmt->fetchColumn() !== 'Payment Pending';
+    $booking = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$booking) {
+        return true;
+    }
+
+    return (string) ($booking['payment_status'] ?? '') !== 'Payment Pending'
+        || strtolower(trim((string) ($booking['payment_method'] ?? ''))) === 'cash';
 }
 
 

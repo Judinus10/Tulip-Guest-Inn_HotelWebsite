@@ -79,6 +79,7 @@ function queue_due_payment_pending_emails(PDO $pdo, int $limit = 25): array
          WHERE b.status = 'Pending'
            AND b.payment_status = 'Payment Pending'
            AND p.status = 'Payment Pending'
+           AND LOWER(TRIM(COALESCE(p.method, ''))) <> 'cash'
            AND p.created_at <= :cutoff
            AND NOT EXISTS (
                 SELECT 1
