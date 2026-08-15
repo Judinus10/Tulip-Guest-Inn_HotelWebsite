@@ -39,12 +39,14 @@ if ($allocatedTotal !== $totalGuests) json_response(false, 'Guest allocation mus
 $pdo = null;
 try {
     $pdo = get_db_connection(); expire_pending_bookings($pdo, null, false); ensure_ics_schema($pdo);
-    // These statements are idempotent and allow the replacement package to be
-    // deployed safely even when the SQL migration was already imported.
-    $pdo->exec("CREATE TABLE IF NOT EXISTS booking_groups (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, booking_no VARCHAR(40) NULL, primary_booking_id INT UNSIGNED NULL, total_guests INT UNSIGNED NOT NULL, total_rooms INT UNSIGNED NOT NULL, total_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00, currency VARCHAR(10) NOT NULL DEFAULT 'LKR', created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, PRIMARY KEY (id), UNIQUE KEY uq_booking_groups_booking_no (booking_no), KEY idx_booking_groups_primary_booking (primary_booking_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-    $columns = array_column($pdo->query('SHOW COLUMNS FROM bookings')->fetchAll(), 'Field');
-    if (!in_array('booking_group_id', $columns, true)) $pdo->exec('ALTER TABLE bookings ADD COLUMN booking_group_id BIGINT UNSIGNED NULL AFTER id');
-    if (!in_array('is_group_primary', $columns, true)) $pdo->exec('ALTER TABLE bookings ADD COLUMN is_group_primary TINYINT(1) NOT NULL DEFAULT 0 AFTER booking_group_id');
+    try {
+        // Read-only check: customer requests must never create or alter tables.
+        $pdo->query('SELECT id, booking_no FROM booking_groups LIMIT 0');
+        $pdo->query('SELECT booking_group_id, is_group_primary FROM bookings LIMIT 0');
+    } catch (Throwable $schemaError) {
+        error_log('Multiple-room migration missing: ' . $schemaError->getMessage());
+        json_response(false, 'Multiple-room booking is temporarily unavailable because its database migration has not been installed.', 503);
+    }
 
     $pdo->beginTransaction();
     $ids = array_keys($allocations); $marks = implode(',', array_fill(0, count($ids), '?'));

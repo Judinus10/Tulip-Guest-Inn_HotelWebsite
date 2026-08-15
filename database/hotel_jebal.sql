@@ -641,3 +641,102 @@ ALTER TABLE bookings
 
 ALTER TABLE payments
   MODIFY status ENUM('Payment Pending','Paid','Failed','Cancelled','Refunded','No Pay') NOT NULL DEFAULT 'Payment Pending';
+
+CREATE TABLE IF NOT EXISTS booking_groups (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  booking_no VARCHAR(40) NULL,
+  primary_booking_id INT UNSIGNED NULL,
+  total_guests INT UNSIGNED NOT NULL,
+  total_rooms INT UNSIGNED NOT NULL,
+  total_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  currency VARCHAR(10) NOT NULL DEFAULT 'LKR',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id), UNIQUE KEY uq_booking_groups_booking_no (booking_no),
+  KEY idx_booking_groups_primary_booking (primary_booking_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS booking_group_id BIGINT UNSIGNED NULL AFTER id;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS is_group_primary TINYINT(1) NOT NULL DEFAULT 0 AFTER booking_group_id;
+
+-- Tulip Guest Inn
+-- Migration: multiple-room booking support
+-- Run this file in the Tulip database before deploying the related PHP file.
+-- It is safe to import again because every schema change is conditional.
+
+CREATE TABLE IF NOT EXISTS `booking_groups` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `booking_no` VARCHAR(40) NULL,
+  `primary_booking_id` INT UNSIGNED NULL,
+  `total_guests` INT UNSIGNED NOT NULL,
+  `total_rooms` INT UNSIGNED NOT NULL,
+  `total_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  `currency` VARCHAR(10) NOT NULL DEFAULT 'LKR',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_booking_groups_booking_no` (`booking_no`),
+  KEY `idx_booking_groups_primary_booking` (`primary_booking_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Add bookings.booking_group_id when it does not exist.
+SET @migration_sql = (
+  SELECT IF(
+    EXISTS(
+      SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'bookings'
+        AND COLUMN_NAME = 'booking_group_id'
+    ),
+    'SELECT 1',
+    'ALTER TABLE `bookings` ADD COLUMN `booking_group_id` BIGINT UNSIGNED NULL AFTER `id`'
+  )
+);
+PREPARE migration_statement FROM @migration_sql;
+EXECUTE migration_statement;
+DEALLOCATE PREPARE migration_statement;
+
+-- Add bookings.is_group_primary when it does not exist.
+SET @migration_sql = (
+  SELECT IF(
+    EXISTS(
+      SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'bookings'
+        AND COLUMN_NAME = 'is_group_primary'
+    ),
+    'SELECT 1',
+    'ALTER TABLE `bookings` ADD COLUMN `is_group_primary` TINYINT(1) NOT NULL DEFAULT 0 AFTER `booking_group_id`'
+  )
+);
+PREPARE migration_statement FROM @migration_sql;
+EXECUTE migration_statement;
+DEALLOCATE PREPARE migration_statement;
+
+-- Add the composite index used by grouped admin queries and status updates.
+SET @migration_sql = (
+  SELECT IF(
+    EXISTS(
+      SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'bookings'
+        AND INDEX_NAME = 'idx_bookings_group_primary'
+    ),
+    'SELECT 1',
+    'ALTER TABLE `bookings` ADD INDEX `idx_bookings_group_primary` (`booking_group_id`, `is_group_primary`)'
+  )
+);
+PREPARE migration_statement FROM @migration_sql;
+EXECUTE migration_statement;
+DEALLOCATE PREPARE migration_statement;
+
+SET @migration_sql = NULL;
+
+-- Verification output. Expected values: 1, 1 and 1.
+SELECT
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
+   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'booking_groups') AS `booking_groups_table`,
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bookings' AND COLUMN_NAME = 'booking_group_id') AS `booking_group_id_column`,
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bookings' AND COLUMN_NAME = 'is_group_primary') AS `is_group_primary_column`;
