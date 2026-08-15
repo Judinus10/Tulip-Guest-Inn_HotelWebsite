@@ -14,6 +14,7 @@ export type BookingFormPayload = {
   staying_guest_email?: string;
   staying_guest_phone?: string;
   staying_guest_note?: string;
+  payment_method: 'Cash' | 'PayHere';
 };
 
 export type CheckoutSession = {
@@ -69,6 +70,10 @@ export async function submitBookingRequest(payload: BookingFormPayload): Promise
   booking_no?: string;
   amount?: number;
   currency?: string;
+  payment_method?: 'Cash' | 'PayHere';
+  order_id?: string | null;
+  bill_url?: string | null;
+  requires_online_checkout?: boolean;
 }> {
   return requestJson('/submit-booking.php', {
     method: 'POST',

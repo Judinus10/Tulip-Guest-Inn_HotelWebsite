@@ -15,7 +15,8 @@ function booking_admin_notification_email_html(array $booking, array $payment = 
     $guests = !empty($booking['guests']) ? ((string)$booking['guests'] . ' Guests') : '';
     $rooms = !empty($booking['rooms']) ? ((string)$booking['rooms'] . ' Room') : '1 Room';
     $amount = format_money_amount($payment['amount'] ?? $booking['amount'] ?? 0);
-    $paymentMethod = trim((string) ($payment['payment_method'] ?? $payment['method'] ?? ($payment ? 'Card Payment' : '-')));
+    $paymentMethod = trim((string) ($payment['method'] ?? $payment['payment_method'] ?? $booking['payment_method'] ?? ($payment ? 'PayHere' : '-')));
+    if (strcasecmp($paymentMethod, 'Cash') === 0) { $paymentMethod = 'Cash on Arrival'; }
     $paymentStatus = status_label_for_email($booking['payment_status'] ?? $payment['status'] ?? 'Paid');
     $paymentDate = trim((string) ($payment['payment_date'] ?? $payment['paid_at'] ?? $payment['created_at'] ?? ''));
     if ($paymentDate !== '') { try { $paymentDate = (new DateTime($paymentDate))->format('d M Y, h:i A'); } catch (Throwable) { $paymentDate = booking_email_format_date($paymentDate); } } else { $paymentDate = date('d M Y, h:i A'); }

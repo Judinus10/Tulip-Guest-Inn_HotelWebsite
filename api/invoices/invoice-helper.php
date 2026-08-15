@@ -218,6 +218,7 @@ function build_invoice_data_for_booking(PDO $pdo, int $bookingId, array $payment
         'transaction_id' => $transactionId,
         'payment_status' => (string) ($payment['status'] ?? $booking['payment_status'] ?? 'Paid'),
         'guests' => (int) ($booking['guests'] ?? 1),
+        'rooms' => max(1, (int) ($booking['rooms'] ?? 1)),
         'nights' => $nights,
         'room_image_path' => $roomImage,
         'business_name' => $settings['business_name'],
@@ -268,136 +269,102 @@ function create_invoice_pdf_binary(array $invoice): string
     $transactionId = (string) ($invoice['transaction_id'] ?? '-');
     $paymentDate = pdf_datetime_display((string) ($invoice['payment_date'] ?? ''));
     $paymentStatus = strtolower((string) ($invoice['payment_status'] ?? 'Paid')) === 'paid' ? 'Paid' : (string) ($invoice['payment_status'] ?? 'Paid');
+    $isCash = strcasecmp($paymentMethod, 'Cash') === 0;
+    $isPaid = strcasecmp($paymentStatus, 'Paid') === 0;
+    $documentTitle = $isCash && !$isPaid ? 'BOOKING REQUEST' : 'INVOICE';
+    $documentBadge = $isPaid ? 'PAID' : 'PENDING';
+    $methodLabel = $isCash ? 'Cash on Arrival' : $paymentMethod;
     $businessAddress = (string) ($invoice['business_address'] ?? 'Point Pedro, Northern Sri Lanka');
     $businessPhone = (string) ($invoice['business_phone'] ?? '+94 77 123 4567');
     $businessEmail = (string) ($invoice['business_email'] ?? 'info@tulipguestinn.com');
     $businessWebsite = (string) ($invoice['business_website'] ?? 'www.tulipguestinn.com');
 
+    $rooms = max(1, (int) ($invoice['rooms'] ?? 1));
+    $bookingDate = pdf_datetime_display((string) ($invoice['payment_date'] ?? ''));
+    $checkIn = pdf_date_display((string) ($invoice['check_in_date'] ?? ''), '1:00 PM');
+    $checkOut = pdf_date_display((string) ($invoice['check_out_date'] ?? ''), '12:00 PM');
+    $statusLabel = $isPaid ? 'Paid' : 'Pending';
+    $collectionLabel = $isCash ? 'On Arrival' : ($isPaid ? 'Paid Online' : 'Online');
     $content = "";
 
-    // Header - close to the provided reference, but text-only logo as requested.
-    pdf_add_text($content, 38, 774, 'TULIP', 34, 'F4', $navy);
-    pdf_add_text($content, 39, 748, 'GUEST INN', 17, 'F1', $gold);
-    pdf_add_text($content, 40, 726, 'Luxury Boutique Hotel', 9.5, 'F2', $navy);
-    pdf_add_wrapped_text($content, 40, 711, $businessAddress, 9, 150, 11, 'F1', $navy, 2);
+    // Navy and gold booking-bill header.
+    pdf_add_rect($content, 0, 712, 595, 130, $navy, $navy, 0.5);
+    pdf_add_text($content, 42, 780, 'TULIP', 34, 'F4', $white);
+    pdf_add_text($content, 54, 752, 'GUEST INN', 16, 'F2', $gold);
+    pdf_add_line($content, 340, 740, 340, 808, $gold, 1.0);
+    pdf_add_text($content, 362, 787, 'BOOKING BILL', 18, 'F2', $gold);
+    pdf_add_text($content, 362, 766, 'Thank you for choosing Tulip Guest Inn.', 9.5, 'F1', $white);
+    pdf_add_text($content, 362, 750, 'We look forward to welcoming you!', 9.5, 'F1', $white);
+    pdf_add_rect($content, 0, 708, 595, 4, $gold, $gold, 0.5);
 
-    pdf_add_center_text($content, 300, 764, 'INVOICE', 40, 'F4', $navy);
-    pdf_add_line($content, 255, 746, 345, 746, $gold, 0.8);
-    pdf_add_center_text($content, 300, 718, 'Thank you for choosing Tulip Guest Inn.', 13, 'F3', $gold);
+    // Booking reference and date.
+    pdf_add_text($content, 38, 677, 'Booking ID', 10, 'F2', $navy);
+    pdf_add_rect($content, 38, 640, 126, 29, $gold, null, 0.9);
+    pdf_add_text($content, 50, 649, $bookingCode, 15, 'F2', $gold);
+    pdf_add_text($content, 38, 617, 'Booking Date', 9, 'F2', $navy);
+    pdf_add_text($content, 38, 601, $bookingDate, 9, 'F1', $navy);
+    pdf_add_text($content, 443, 663, $documentBadge, 11, 'F2', $isPaid ? $green : $gold);
+    pdf_add_text($content, 443, 646, $isPaid ? 'Payment completed' : 'Payment pending', 8.5, 'F1', $navy);
 
-    pdf_add_rect($content, 482, 778, 78, 26, $navy, $navy, 0.5);
-    pdf_add_center_text($content, 521, 787, 'PAID', 12, 'F2', $white);
-    pdf_add_text($content, 482, 752, 'Invoice Number', 9, 'F2', $navy);
-    pdf_add_text($content, 482, 737, $invoiceNumber, 9, 'F1', $navy);
-    pdf_add_text($content, 482, 713, 'Invoice Date', 9, 'F2', $navy);
-    pdf_add_text($content, 482, 698, pdf_short_date((string) ($invoice['payment_date'] ?? '')), 9, 'F1', $navy);
-    pdf_add_text($content, 482, 674, 'Payment Date', 9, 'F2', $navy);
-    pdf_add_text($content, 482, 659, $paymentDate, 8.5, 'F1', $navy);
-    pdf_add_line($content, 38, 632, 560, 632, $line, 0.6);
+    // Booking details card.
+    pdf_add_rect($content, 38, 395, 519, 184, $line, null, 0.7);
+    pdf_add_text($content, 52, 553, 'BOOKING DETAILS', 13, 'F2', $navy);
+    // Keep the downloaded bill independent from local/remote room-image paths.
+    $imageFile = '';
+    $hasImage = false;
+    pdf_add_wrapped_text($content, 52, 516, $roomName, 17, 480, 19, 'F2', $navy, 2);
+    pdf_add_text($content, 52, 480, $guests . ' ' . ($guests === 1 ? 'Guest' : 'Guests'), 10, 'F1', $navy);
+    pdf_add_text($content, 222, 480, $rooms . ' ' . ($rooms === 1 ? 'Room' : 'Rooms'), 10, 'F1', $navy);
+    pdf_add_text($content, 390, 480, $nights . ' ' . ($nights === 1 ? 'Night' : 'Nights'), 10, 'F1', $navy);
+    pdf_add_line($content, 52, 460, 542, 460, $gold, 0.7);
+    pdf_add_text($content, 52, 438, 'Check-in', 9, 'F2', $navy);
+    pdf_add_text($content, 52, 419, $checkIn, 10, 'F1', $navy);
+    pdf_add_text($content, 318, 438, 'Check-out', 9, 'F2', $navy);
+    pdf_add_text($content, 318, 419, $checkOut, 10, 'F1', $navy);
 
-    // Bill-to and booking area.
-    pdf_add_text($content, 50, 608, 'BILL TO', 12, 'F4', $navy);
-    pdf_add_line($content, 50, 596, 145, 596, $gold, 0.8);
-    pdf_add_wrapped_text($content, 65, 573, $customerName, 9.5, 112, 11, 'F1', $navy, 3);
-    pdf_add_wrapped_text($content, 65, 538, $customerEmail, 9.5, 112, 11, 'F1', $navy, 2);
-    pdf_add_text($content, 65, 505, $customerPhone, 9.5, 'F1', $navy);
-    pdf_add_text($content, 50, 573, 'o', 11, 'F2', $navy);
-    pdf_add_text($content, 50, 538, 'x', 10, 'F2', $navy);
-    pdf_add_text($content, 50, 505, 'c', 10, 'F2', $navy);
+    // Charges and payment summary cards.
+    pdf_add_rect($content, 38, 226, 252, 151, $line, null, 0.7);
+    pdf_add_text($content, 52, 350, 'CHARGES SUMMARY', 12, 'F2', $navy);
+    pdf_add_text($content, 52, 318, 'Room Charges (' . $nights . ' ' . ($nights === 1 ? 'Night' : 'Nights') . ')', 9, 'F1', $navy);
+    pdf_add_right_text($content, 276, 318, pdf_money($amountPaid, $currency), 9, 'F2', $navy);
+    pdf_add_line($content, 52, 288, 276, 288, $line, 0.5);
+    pdf_add_text($content, 52, 251, 'Total Amount', 10, 'F2', $navy);
+    pdf_add_right_text($content, 276, 248, pdf_money($amountPaid, $currency), 16, 'F2', $gold);
 
-    pdf_add_line($content, 188, 608, 188, 472, $line, 0.6);
-    pdf_add_text($content, 210, 608, 'BOOKING INFORMATION', 12, 'F4', $navy);
-    pdf_add_line($content, 210, 596, 392, 596, $gold, 0.8);
-    $infoRows = [
-        ['Booking ID', $bookingCode],
-        ['Room Name', $roomName],
-        ['Check-in Date', pdf_date_display((string) ($invoice['check_in_date'] ?? ''), '11:00 AM')],
-        ['Check-out Date', pdf_date_display((string) ($invoice['check_out_date'] ?? ''), '10:00 AM')],
-        ['Guests', $guests . ' ' . ($guests === 1 ? 'Guest' : 'Guests')],
-        ['Nights', $nights . ' ' . ($nights === 1 ? 'Night' : 'Nights')],
-    ];
-    $y = 572;
-    foreach ($infoRows as $row) {
-        pdf_add_text($content, 210, $y, $row[0], 9, 'F2', $navy);
-        pdf_add_wrapped_text($content, 296, $y, $row[1], 9, 118, 10.5, 'F1', $navy, 2);
-        $y -= 21;
-    }
+    pdf_add_rect($content, 305, 226, 252, 151, $line, null, 0.7);
+    pdf_add_text($content, 319, 350, 'PAYMENT SUMMARY', 12, 'F2', $navy);
+    pdf_add_text($content, 319, 318, 'Payment Method', 9, 'F1', $navy);
+    pdf_add_right_text($content, 542, 318, $isCash ? 'Pay on Arrival' : $methodLabel, 9, 'F2', $navy);
+    pdf_add_line($content, 319, 300, 542, 300, $line, 0.5);
+    pdf_add_text($content, 319, 278, 'Payment Status', 9, 'F1', $navy);
+    pdf_add_right_text($content, 542, 278, $statusLabel, 10, 'F2', $isPaid ? $green : $gold);
+    pdf_add_line($content, 319, 260, 542, 260, $line, 0.5);
+    pdf_add_text($content, 319, 239, 'Payment will be collected', 9, 'F1', $navy);
+    pdf_add_right_text($content, 542, 239, $collectionLabel, 9, 'F2', $navy);
 
-    $imageFile = invoice_resolve_image_path((string) ($invoice['room_image_path'] ?? ''));
-    $hasImage = $imageFile !== '' && @getimagesize($imageFile);
-    if ($hasImage) {
-        pdf_add_rect($content, 410, 488, 150, 92, [0.78, 0.65, 0.48], null, 0.7);
-        pdf_draw_jpeg($content, 412, 490, 146, 88, 'Im1');
-    } else {
-        pdf_add_rect($content, 410, 488, 150, 92, [0.78, 0.65, 0.48], $softGold, 0.7);
-        pdf_add_center_text($content, 485, 534, 'Room image', 10, 'F2', $gold);
-    }
-    pdf_add_line($content, 38, 456, 560, 456, $line, 0.6);
-
-    // Invoice breakdown.
-    pdf_add_text($content, 50, 432, 'INVOICE BREAKDOWN', 12, 'F4', $navy);
-    pdf_add_rect($content, 38, 397, 522, 25, $navy, $navy, 0.5);
-    pdf_add_text($content, 50, 406, 'DESCRIPTION', 10, 'F2', $white);
-    pdf_add_right_text($content, 545, 406, 'AMOUNT (' . $currency . ')', 10, 'F2', $white);
-    pdf_add_rect($content, 38, 303, 522, 94, $line, null, 0.5);
-    pdf_add_text($content, 50, 375, 'Room Charges (' . $nights . ' ' . ($nights === 1 ? 'Night' : 'Nights') . ')', 10, 'F1', $navy);
-    pdf_add_right_text($content, 545, 375, pdf_money($amountPaid, $currency), 10, 'F1', $navy);
-    pdf_add_line($content, 50, 332, 545, 332, $line, 0.5);
-    pdf_add_text($content, 50, 314, 'TOTAL AMOUNT', 12, 'F4', $gold);
-    pdf_add_right_text($content, 545, 313, pdf_money($amountPaid, $currency), 18, 'F4', $gold);
-
-    // Payment info and total paid card.
-    pdf_add_rect($content, 38, 135, 282, 137, $line, null, 0.6);
-    pdf_add_text($content, 50, 249, 'PAYMENT INFORMATION', 12, 'F4', $navy);
-    $paymentRows = [
-        ['Payment Method', $paymentMethod],
-        ['Transaction ID', $transactionId],
-        ['Payment Gateway', 'PayHere'],
-        ['Payment Date', $paymentDate],
-        ['Payment Status', $paymentStatus],
-    ];
-    $y = 226;
-    foreach ($paymentRows as $row) {
-        pdf_add_text($content, 50, $y, $row[0], 9, 'F2', $gold);
-        if ($row[0] === 'Payment Status' && strtolower($row[1]) === 'paid') {
-            pdf_add_text($content, 178, $y, '●', 10, 'F2', $green);
-            pdf_add_text($content, 193, $y, 'Paid', 9, 'F2', $green);
-        } else {
-            pdf_add_wrapped_text($content, 180, $y, $row[1], 9, 128, 10.5, 'F1', $navy, 2);
-        }
-        $y -= 20;
-    }
-
-    pdf_add_rect($content, 336, 160, 224, 112, [0.93, 0.83, 0.66], $softGold, 0.6);
-    pdf_add_center_text($content, 448, 235, 'TOTAL PAID', 10, 'F2', $navy);
-    pdf_add_center_text($content, 448, 211, pdf_money($amountPaid, $currency), 20, 'F4', $gold);
-    pdf_add_center_text($content, 448, 184, 'Thank You', 18, 'F3', $navy);
-    pdf_add_center_text($content, 448, 168, 'for your stay with us!', 11, 'F1', $navy);
-
-    // Notes and signature.
-    pdf_add_text($content, 50, 118, 'IMPORTANT NOTES', 10.5, 'F4', $navy);
+    // Important notes and thank-you line.
+    pdf_add_rect($content, 38, 105, 519, 102, [0.91, 0.79, 0.59], $softGold, 0.6);
+    pdf_add_text($content, 56, 182, 'IMPORTANT NOTES', 11, 'F2', $gold);
     $notes = [
-        'This is a computer generated invoice.',
-        'No signature is required.',
-        'Standard check-in time is 11:00 AM and check-out time is 10:00 AM.',
-        'For any queries, please contact our support team.',
+        'Check-in is available from 1:00 PM.',
+        'Check-out is by 12:00 PM.',
+        $isCash ? 'Payment will be collected at the property.' : ($isPaid ? 'Online payment has been received.' : 'Complete payment through the secure online gateway.'),
+        'Please contact us in advance if you need to change your booking.',
     ];
-    $y = 101;
+    $y = 160;
     foreach ($notes as $note) {
-        pdf_add_text($content, 54, $y, '- ' . $note, 8, 'F1', $navy);
-        $y -= 11;
+        pdf_add_text($content, 60, $y, '- ' . $note, 8.5, 'F1', $navy);
+        $y -= 16;
     }
-    pdf_add_center_text($content, 455, 100, 'Tulip Guest Inn', 18, 'F3', $navy);
-    pdf_add_line($content, 378, 86, 532, 91, $line, 0.5);
-    pdf_add_center_text($content, 455, 72, 'Authorized Signatory', 8.5, 'F2', $navy);
-    pdf_add_center_text($content, 455, 60, 'Tulip Guest Inn', 8.5, 'F1', $navy);
+    pdf_add_center_text($content, 298, 80, 'Thank you!', 18, 'F3', $gold);
+    pdf_add_center_text($content, 298, 62, 'Please keep this bill for your reference.', 9.5, 'F1', $navy);
 
-    // Footer.
-    pdf_add_rect($content, 0, 0, 595, 46, $navy, $navy, 0.5);
-    pdf_add_text($content, 50, 26, $businessAddress, 8.5, 'F1', $white);
-    pdf_add_text($content, 235, 26, $businessPhone, 8.5, 'F1', $white);
-    pdf_add_text($content, 340, 26, $businessEmail, 8.2, 'F1', $white);
-    pdf_add_text($content, 475, 26, $businessWebsite, 7.5, 'F1', $white);
+    // Compact contact footer.
+    pdf_add_rect($content, 0, 0, 595, 45, $navy, $navy, 0.5);
+    pdf_add_text($content, 36, 26, $businessPhone, 8.5, 'F1', $white);
+    pdf_add_text($content, 165, 26, $businessEmail, 8.2, 'F1', $white);
+    pdf_add_wrapped_text($content, 320, 29, $businessAddress, 8, 150, 10, 'F1', $white, 2);
+    pdf_add_right_text($content, 558, 26, $businessWebsite, 8, 'F1', $white);
 
     $objects = [];
     $resources = '/Font << /F1 4 0 R /F2 5 0 R /F3 6 0 R /F4 7 0 R >>';

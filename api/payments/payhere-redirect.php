@@ -78,6 +78,14 @@ try {
     ? 'https://www.payhere.lk/pay/checkout'
     : 'https://sandbox.payhere.lk/pay/checkout';
 
+    $scriptNonce = base64_encode(random_bytes(18));
+    header(
+        "Content-Security-Policy: default-src 'none'; " .
+        "script-src 'nonce-{$scriptNonce}'; " .
+        "style-src 'unsafe-inline'; " .
+        "form-action https://sandbox.payhere.lk https://www.payhere.lk; " .
+        "base-uri 'none'; frame-ancestors 'none'"
+    );
     header('Content-Type: text/html; charset=utf-8');
 } catch (Throwable $e) {
     error_log('PayHere redirect error: ' . $e->getMessage());
@@ -99,7 +107,7 @@ try {
         <?php endforeach; ?>
         <noscript><button type="submit">Continue to PayHere</button></noscript>
     </form>
-    <script>
+    <script nonce="<?= htmlspecialchars($scriptNonce, ENT_QUOTES, 'UTF-8') ?>">
         document.getElementById('payhere-checkout-form').submit();
     </script>
 </body>

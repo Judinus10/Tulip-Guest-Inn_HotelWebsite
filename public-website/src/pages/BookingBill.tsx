@@ -97,7 +97,7 @@ export default function BookingBill() {
   }, [loadStatus]);
 
   useEffect(() => {
-    if (!booking || booking.payment_status !== 'Payment Pending') return;
+    if (!booking || booking.payment_status !== 'Payment Pending' || booking.payment_method.toLowerCase() === 'cash') return;
     const interval = window.setInterval(loadStatus, 10000);
     return () => window.clearInterval(interval);
   }, [booking, loadStatus]);
@@ -121,6 +121,7 @@ export default function BookingBill() {
   const paidAt = latestPayment?.updated_at || latestPayment?.created_at;
   const roomImage = booking?.room_main_image || 'https://images.unsplash.com/photo-1611892440506-42a832e657fb?w=1200&q=80';
   const isPaid = booking?.payment_status?.toLowerCase() === 'paid';
+  const isCashPayment = booking?.payment_method?.toLowerCase() === 'cash';
   const heroImage = 'https://images.pexels.com/photos/261102/pexels-photo-261102.jpeg?auto=compress&cs=tinysrgb&w=1600';
 
   return (
@@ -166,10 +167,14 @@ export default function BookingBill() {
                   </span>
                   <div>
                     <h2 className="font-sans text-[14px] font-bold text-[#28582f]">
-                      {isPaid ? 'Your booking is confirmed!' : 'Payment confirmation pending'}
+                      {isCashPayment ? 'Booking Request Received' : isPaid ? 'Your booking is confirmed!' : 'Payment confirmation pending'}
                     </h2>
                     <p className="mt-1 text-[11px] text-[#51645a]">
-                      {isPaid ? 'Thank you for choosing Tulip Guest Inn. We look forward to welcoming you.' : 'This page refreshes automatically while PayHere confirms your payment.'}
+                      {isCashPayment
+                        ? 'Your booking is pending review. Payment will be collected at the property.'
+                        : isPaid
+                          ? 'Thank you for choosing Tulip Guest Inn. We look forward to welcoming you.'
+                          : 'This page refreshes automatically while PayHere confirms your payment.'}
                     </p>
                   </div>
                 </div>
@@ -223,7 +228,7 @@ export default function BookingBill() {
                       <ul className="space-y-1.5 pl-4">
                         <li className="list-disc">Check-in is available from 1:00 PM.</li>
                         <li className="list-disc">Check-out is by 12:00 PM.</li>
-                        <li className="list-disc">Please keep your payment receipt for verification at reception.</li>
+                        <li className="list-disc">{isCashPayment ? 'Payment will be collected at the property.' : 'Please keep your payment receipt for verification at reception.'}</li>
                         <li className="list-disc">Contact support for booking changes before arrival.</li>
                       </ul>
                     </div>
@@ -236,23 +241,29 @@ export default function BookingBill() {
                     <div>
                       <CheckCircle2 size={34} className={isPaid ? 'mx-auto mb-2 text-[#2f8b47]' : 'mx-auto mb-2 text-[#b78335]'} />
                       <p className={isPaid ? 'font-sans text-[14px] font-bold text-[#2f8b47]' : 'font-sans text-[14px] font-bold text-[#b78335]'}>{statusLabel(booking.payment_status)}</p>
-                      <p className="mt-1 text-[11px] text-[#4f5d57]">{paidAt ? `Paid on ${formatDateTime(paidAt)}` : 'Latest status from PayHere'}</p>
+                      <p className="mt-1 text-[11px] text-[#4f5d57]">
+                        {isCashPayment ? 'Payment will be collected on arrival' : paidAt ? `Paid on ${formatDateTime(paidAt)}` : 'Latest status from PayHere'}
+                      </p>
                     </div>
                   </div>
                   <div className="rounded-[6px] border border-[#ead6b3] bg-[#fff7e9] p-5 text-[12px]">
                     <div className="space-y-4">
                       <div>
                         <p className="font-bold text-[#14251f]">Payment Method</p>
-                        <p className="mt-1 text-[#35463f]">{booking.payment_method || 'PayHere'}</p>
+                        <p className="mt-1 text-[#35463f]">{isCashPayment ? 'Pay on Arrival' : booking.payment_method || 'PayHere'}</p>
                       </div>
-                      <div>
-                        <p className="font-bold text-[#14251f]">Transaction ID</p>
-                        <p className="mt-1 break-all text-[#35463f]">{booking.payment_id || booking.order_id}</p>
-                      </div>
-                      <div>
-                        <p className="font-bold text-[#14251f]">Payment Gateway</p>
-                        <p className="mt-1 text-[#35463f]">PayHere</p>
-                      </div>
+                      {!isCashPayment && (
+                        <>
+                          <div>
+                            <p className="font-bold text-[#14251f]">Transaction ID</p>
+                            <p className="mt-1 break-all text-[#35463f]">{booking.payment_id || booking.order_id}</p>
+                          </div>
+                          <div>
+                            <p className="font-bold text-[#14251f]">Payment Gateway</p>
+                            <p className="mt-1 text-[#35463f]">PayHere</p>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </article>
@@ -260,14 +271,21 @@ export default function BookingBill() {
 
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                 <article className="rounded-[8px] border border-[#e2ddd5] bg-white p-5 shadow-[0_10px_35px_rgba(20,30,25,0.04)] lg:col-span-2">
-                  <h3 className="mb-5 font-serif text-[21px] font-semibold text-[#14251f]">Payment Timeline</h3>
+                  <h3 className="mb-5 font-serif text-[21px] font-semibold text-[#14251f]">{isCashPayment ? 'Booking Timeline' : 'Payment Timeline'}</h3>
                   <div className="space-y-0">
-                    {[
-                      ['Booking Placed', 'Your room has been successfully reserved.', latestPayment?.created_at],
-                      ['Payment Initiated', 'You were redirected to the secure payment gateway.', latestPayment?.created_at],
-                      [statusLabel(booking.payment_status), isPaid ? 'Your payment has been processed successfully.' : 'Waiting for gateway confirmation.', paidAt],
-                      [booking.booking_status || 'Booking Status', 'Your booking is confirmed. We look forward to your stay!', paidAt],
-                    ].map(([title, body, time], index) => (
+                    {(isCashPayment
+                      ? [
+                          ['Booking Placed', 'Your booking request was received successfully.', latestPayment?.created_at],
+                          ['Pending Review', 'The property will review and confirm your booking request.', latestPayment?.created_at],
+                          ['Pay on Arrival', 'Payment will be collected when you arrive at the property.', undefined],
+                          [booking.booking_status || 'Pending', 'Contact the property if you need to change your booking.', undefined],
+                        ]
+                      : [
+                          ['Booking Placed', 'Your room has been successfully reserved.', latestPayment?.created_at],
+                          ['Payment Initiated', 'You were redirected to the secure payment gateway.', latestPayment?.created_at],
+                          [statusLabel(booking.payment_status), isPaid ? 'Your payment has been processed successfully.' : 'Waiting for gateway confirmation.', paidAt],
+                          [booking.booking_status || 'Booking Status', 'Your booking is confirmed. We look forward to your stay!', paidAt],
+                        ]).map(([title, body, time], index) => (
                       <div key={`${title}-${index}`} className="grid grid-cols-[26px_120px_1fr] gap-3 text-[11px] sm:grid-cols-[26px_135px_1fr]">
                         <div className="flex flex-col items-center">
                           <span className={index === 2 && isPaid ? 'flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[#4e9a55] text-white' : 'flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[#183548] text-white'}>
@@ -306,7 +324,7 @@ export default function BookingBill() {
                   </button>
                 ) : (
                   <a href={booking.invoice_download_url || '#'} className={booking.invoice_download_url ? 'flex h-11 items-center justify-center gap-2 rounded-[5px] border border-[#d8d2c8] bg-white text-[10px] font-bold uppercase tracking-[0.18em] text-[#14251f] transition hover:border-[#c99d53] hover:text-[#c99d53]' : 'pointer-events-none flex h-11 items-center justify-center gap-2 rounded-[5px] border border-[#d8d2c8] bg-white text-[10px] font-bold uppercase tracking-[0.18em] text-[#14251f] opacity-50'}>
-                    Download Receipt
+                    {isCashPayment ? 'Download Booking Confirmation' : 'Download Receipt'}
                   </a>
                 )}
 

@@ -209,11 +209,14 @@ function email_icon_file_map(): array
         'time' => $base . '/time.png',
         'open' => $base . '/open.png',
         'location' => $base . '/location.png',
-        'bell' => $base . '/bell.png',
-        'clipboard' => $base . '/clipboard.png',
-        'card' => $base . '/card.png',
+        // These aliases intentionally reuse the closest email-safe PNG asset.
+        // The old paths referenced files that were never shipped and produced
+        // the visible fallback letters (CD / CL) in Outlook.
+        'bell' => $base . '/info.png',
+        'clipboard' => $base . '/check.png',
+        'card' => $base . '/wallet.png',
         'room' => $base . '/bed.png',
-        'chart' => $base . '/chart.png',
+        'chart' => $base . '/info.png',
     ];
 }
 
@@ -595,11 +598,12 @@ function email_social_links_html(): string
         $digits = preg_replace('/\D+/', '', email_contact_value('whatsapp_reservation_number', email_contact_phone()));
         $whatsappRaw = $digits !== '' ? 'https://wa.me/' . $digits : '';
     }
-    $items = [['F', $facebook], ['IG', $instagram], ['WA', $whatsappRaw]];
+    $items = [['F', $facebook, ''], ['IG', $instagram, ''], ['', $whatsappRaw, 'message']];
     $html = '';
-    foreach ($items as [$label, $url]) {
+    foreach ($items as [$label, $url, $icon]) {
         if ($url === '') { continue; }
-        $html .= '<a href="' . email_safe($url) . '" style="display:inline-block;min-width:34px;height:30px;border:1px solid rgba(255,255,255,.42);border-radius:999px;text-align:center;line-height:30px;color:#ffffff;text-decoration:none;font-size:11px;font-weight:700;margin:0 4px;font-family:Arial,Helvetica,sans-serif;">' . email_safe($label) . '</a>';
+        $content = $icon !== '' ? booking_email_icon($icon, 16) : email_safe($label);
+        $html .= '<a href="' . email_safe($url) . '" style="display:inline-block;min-width:34px;height:30px;border:1px solid rgba(255,255,255,.42);border-radius:999px;text-align:center;line-height:30px;color:#ffffff;text-decoration:none;font-size:11px;font-weight:700;margin:0 4px;font-family:Arial,Helvetica,sans-serif;">' . $content . '</a>';
     }
     return $html;
 }
@@ -643,7 +647,7 @@ function email_kv_rows(array $rows): string
     foreach ($rows as $row) {
         $label = (string)($row[0] ?? ''); $value = trim((string)($row[1] ?? '')); $icon = (string)($row[2] ?? 'info');
         if ($value === '') { continue; }
-        $html .= '<tr><td style="width:28px;padding:8px 10px 8px 0;vertical-align:top;">' . booking_email_icon($icon, 14) . '</td><td class="kv-label" style="width:155px;padding:8px 12px 8px 0;vertical-align:top;color:#071529;font-size:13px;font-weight:700;">' . email_safe($label) . '</td><td style="padding:8px 0;vertical-align:top;color:#102033;font-size:13px;line-height:1.45;word-break:break-word;">' . nl2br(email_safe($value)) . '</td></tr>';
+        $html .= '<tr><td style="width:24px;padding:5px 7px 5px 0;vertical-align:top;">' . booking_email_icon($icon, 14) . '</td><td class="kv-label" style="width:112px;padding:5px 8px 5px 0;vertical-align:top;color:#071529;font-size:12px;font-weight:700;white-space:nowrap;">' . email_safe($label) . '</td><td style="padding:5px 0;vertical-align:top;color:#102033;font-size:12px;line-height:1.35;word-break:normal;overflow-wrap:anywhere;">' . nl2br(email_safe($value)) . '</td></tr>';
     }
     return $html;
 }
@@ -1575,9 +1579,15 @@ function queue_staying_guest_booking_email(PDO $pdo, array $booking, string $sta
 function send_booking_received_emails(PDO $pdo, array $booking): void
 {
     $bookingId = (int) ($booking['id'] ?? 0);
+    $payment = [];
+    if ($bookingId > 0) {
+        $paymentStmt = $pdo->prepare('SELECT * FROM payments WHERE booking_id = :booking_id ORDER BY id DESC LIMIT 1');
+        $paymentStmt->execute([':booking_id' => $bookingId]);
+        $payment = $paymentStmt->fetch() ?: [];
+    }
     $subjectCustomer = 'Booking inquiry received - Tulip Guest Inn #' . $bookingId;
 
-    $bodyCustomer = booking_email_html('received', $booking);
+    $bodyCustomer = booking_email_html('received', $booking, $payment);
 
     $sentCustomer = send_tracked_email(
         $pdo,
@@ -1591,7 +1601,7 @@ function send_booking_received_emails(PDO $pdo, array $booking): void
 
     $subjectAdmin = 'New booking received - Tulip Guest Inn #' . $bookingId;
 
-    $bodyAdmin = booking_email_html('received', $booking, [], true);
+    $bodyAdmin = booking_email_html('received', $booking, $payment, true);
 
     send_tracked_email(
         $pdo,
@@ -1604,7 +1614,7 @@ function send_booking_received_emails(PDO $pdo, array $booking): void
         $booking['email'] ?? null
     );
 
-    send_staying_guest_booking_email($pdo, $booking, 'received', [], 'staying_guest_booking_received', 'A room was booked for you');
+    send_staying_guest_booking_email($pdo, $booking, 'received', $payment, 'staying_guest_booking_received', 'A room was booked for you');
 
     if ($bookingId > 0) {
         update_booking_email_status($pdo, $bookingId, $sentCustomer ? 'Sent' : 'Failed');

@@ -341,6 +341,11 @@ function MobileBookingCard({ booking, shouldFlashBooking, setRef, onView, onUpda
         <div className="flex flex-wrap gap-2">
           <Badge variant={bookingStatusVariant[booking.booking_status] || 'warning'}>{isBookingCom && booking.booking_status !== 'cancelled' ? 'Booked' : humanizeBookingStatus(booking.booking_status)}</Badge>
           <Badge variant={paymentStatusVariant[booking.payment_status] || 'warning'}>{isBookingCom ? 'Booking.com' : humanizePaymentStatus(booking.payment_status)}</Badge>
+          {!isBookingCom && booking.payment_method ? (
+            <Badge variant={String(booking.payment_method).toLowerCase() === 'cash' ? 'warning' : 'info'}>
+              {String(booking.payment_method).toLowerCase() === 'cash' ? 'Pay on Arrival' : booking.payment_method}
+            </Badge>
+          ) : null}
         </div>
       </div>
     </div>

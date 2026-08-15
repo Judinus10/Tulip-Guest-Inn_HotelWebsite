@@ -7,8 +7,8 @@ function booking_email_html(string $state, array $booking, array $payment = [], 
         return booking_admin_notification_email_html($booking, $payment, $extraButton, $extraRows, $customHeading, $customMessage);
     }
 
-    if (in_array(strtolower(trim($state)), ['confirmed', 'paid'], true)) {
-        return booking_customer_confirmation_email_html($booking, $payment, $extraButton, $extraRows, $customHeading, $customMessage);
+    if (in_array(strtolower(trim($state)), ['received', 'pending', 'confirmed', 'paid'], true)) {
+        return booking_customer_confirmation_email_html($booking, $payment, $extraButton, $extraRows, $customHeading, $customMessage, $state);
     }
 
     $cfg = booking_email_status_config($state);
@@ -39,7 +39,7 @@ function booking_email_html(string $state, array $booking, array $payment = [], 
 
     $guestName = $admin ? ($booking['full_name'] ?? $booking['guest_name'] ?? 'Guest') : ($booking['full_name'] ?? 'Guest');
     $amount = format_money_amount((float) ($payment['amount'] ?? $booking['amount'] ?? 0));
-    $paymentMethod = $payment['payment_method'] ?? $payment['method'] ?? ($payment ? 'PayHere' : '-');
+    $paymentMethod = $payment['method'] ?? $payment['payment_method'] ?? $booking['payment_method'] ?? ($payment ? 'PayHere' : '-');
     $transaction = $payment['transaction_id'] ?? $payment['payment_id'] ?? $payment['order_id'] ?? '';
     $dates = trim((string) ($booking['check_in_date'] ?? '') . ' - ' . (string) ($booking['check_out_date'] ?? ''));
 

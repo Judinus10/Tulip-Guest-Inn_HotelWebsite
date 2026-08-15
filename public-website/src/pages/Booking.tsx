@@ -34,6 +34,7 @@ interface BookingForm {
   stayingGuestEmail: string;
   stayingGuestPhone: string;
   stayingGuestNote: string;
+  paymentMethod: 'Cash' | 'PayHere';
 }
 
 export default function Booking() {
@@ -60,6 +61,7 @@ export default function Booking() {
     stayingGuestEmail: '',
     stayingGuestPhone: '',
     stayingGuestNote: '',
+    paymentMethod: 'Cash',
   });
   const [bookingRooms, setBookingRooms] = useState<Room[]>(fallbackRooms);
   const [submitError, setSubmitError] = useState('');
@@ -155,6 +157,7 @@ export default function Booking() {
         staying_guest_email: form.isBookingForOther ? form.stayingGuestEmail : '',
         staying_guest_phone: form.isBookingForOther ? form.stayingGuestPhone : '',
         staying_guest_note: form.isBookingForOther ? form.stayingGuestNote : '',
+        payment_method: form.paymentMethod,
         message: [
           form.specialRequests,
           form.nationality ? `Nationality: ${form.nationality}` : '',
@@ -169,12 +172,20 @@ export default function Booking() {
         throw new Error('Booking was saved but the payment checkout could not start. Missing booking ID.');
       }
 
-      const checkout = await createCheckoutSession(bookingId);
-      if (!checkout.checkout_url) {
-        throw new Error('Payment checkout could not start. Missing PayHere checkout URL.');
+      if (form.paymentMethod === 'PayHere') {
+        const checkout = await createCheckoutSession(bookingId);
+        if (!checkout.checkout_url) {
+          throw new Error('Payment checkout could not start. Missing PayHere checkout URL.');
+        }
+        window.location.href = checkout.checkout_url;
+        return;
       }
 
-      window.location.href = checkout.checkout_url;
+      const billUrl = booking.bill_url;
+      if (!billUrl) {
+        throw new Error('Booking was saved, but the booking bill link was not returned. Please contact reception.');
+      }
+      window.location.href = billUrl;
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : 'Unable to submit booking request.');
     } finally {
@@ -305,6 +316,41 @@ export default function Booking() {
                         </select>
                       </div>
                     </div>
+                  </div>
+                </AnimatedSection>
+
+                <AnimatedSection delay={0.15}>
+                  <div className="bg-white border border-border p-8">
+                    <h3 className="font-serif text-2xl font-light text-dark mb-5">Payment Method</h3>
+                    <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm text-dark">
+                      <label className="flex cursor-pointer items-center gap-3">
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          value="Cash"
+                          checked={form.paymentMethod === 'Cash'}
+                          onChange={handleChange}
+                          className="h-4 w-4 accent-gold"
+                        />
+                        <span>Pay on Arrival</span>
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-3">
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          value="PayHere"
+                          checked={form.paymentMethod === 'PayHere'}
+                          onChange={handleChange}
+                          className="h-4 w-4 accent-gold"
+                        />
+                        <span>Pay Online</span>
+                      </label>
+                    </div>
+                    <p className="mt-3 text-[10px] leading-relaxed text-gray-400">
+                      {form.paymentMethod === 'Cash'
+                        ? 'Your booking request will be reviewed by the property. Payment is collected when you arrive.'
+                        : 'You will continue to the secure PayHere payment page after submitting.'}
+                    </p>
                   </div>
                 </AnimatedSection>
 
@@ -461,7 +507,9 @@ export default function Booking() {
                 )}
 
                 <button type="submit" className="btn-primary w-full justify-center py-4 text-xs" disabled={isSubmitting}>
-                  {isSubmitting ? 'Preparing Payment...' : 'Continue to Payment'}
+                  {isSubmitting
+                    ? form.paymentMethod === 'Cash' ? 'Submitting Booking...' : 'Preparing Payment...'
+                    : form.paymentMethod === 'Cash' ? 'Submit Booking' : 'Continue to Payment'}
                 </button>
               </form>
 
@@ -512,7 +560,9 @@ export default function Booking() {
                       </div>
                       {total > 0 && (
                         <p className="text-[10px] text-gray-400 mt-1 text-right">
-                          Final amount is verified by the backend before PayHere checkout
+                          {form.paymentMethod === 'Cash'
+                            ? 'Final amount is verified by the property and collected on arrival'
+                            : 'Final amount is verified by the backend before PayHere checkout'}
                         </p>
                       )}
                     </div>

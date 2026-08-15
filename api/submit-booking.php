@@ -29,6 +29,13 @@ $checkInDate = clean_string($data['check_in_date'] ?? '', 20);
 $checkOutDate = clean_string($data['check_out_date'] ?? '', 20);
 $guests = (int) ($data['guests'] ?? 0);
 $message = clean_string($data['message'] ?? '', 3000);
+$paymentMethod = strtolower(clean_string($data['payment_method'] ?? 'Cash', 30));
+$isOnlinePayment = in_array($paymentMethod, ['payhere', 'online', 'pay online'], true);
+$isCashPayment = in_array($paymentMethod, ['cash', 'pay on arrival'], true);
+
+if (!$isCashPayment && !$isOnlinePayment) {
+    json_response(false, 'Please select a valid payment method.', 422);
+}
 
 if ($fullName === '' || $email === '' || $phone === '' || $roomName === '' || $checkInDate === '' || $checkOutDate === '' || $guests < 1) {
     json_response(false, 'Please fill in all required fields.', 422);
@@ -92,15 +99,20 @@ try {
     $pdo = get_db_connection();
     expire_pending_bookings($pdo, null, true);
 
+    ensure_ics_schema($pdo);
+    $pdo->beginTransaction();
+
     $roomStmt = $pdo->prepare("SELECT id, max_guests, status FROM rooms WHERE room_name = :room_name LIMIT 1");
     $roomStmt->execute([':room_name' => $roomName]);
     $room = $roomStmt->fetch();
 
     if (!$room || ($room['status'] ?? '') !== 'Available') {
+        $pdo->rollBack();
         json_response(false, 'Please select a valid available room.', 422);
     }
 
     if ($guests > (int) ($room['max_guests'] ?? 0)) {
+        $pdo->rollBack();
         json_response(false, 'Selected room cannot hold this number of guests.', 422);
     }
 
@@ -121,6 +133,7 @@ try {
     ]);
 
     if ($conflict->fetch() || ics_room_conflict($pdo, (int) $room['id'], $checkInDate, $checkOutDate)) {
+        $pdo->rollBack();
         json_response(false, 'Sorry, this room is not available for the selected dates.', 409, ['available' => false]);
     }
 
@@ -173,29 +186,89 @@ try {
 
     $bookingId = (int) $pdo->lastInsertId();
 
+    $bookingNumber = 'BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT);
+    $cashOrderId = '';
+    $cashBillUrl = '';
+
+    if ($isCashPayment) {
+        $cashOrderId = 'CASH-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT);
+        $paymentStmt = $pdo->prepare(
+            "INSERT INTO payments
+                (booking_id, order_id, amount, currency, status, method, gateway_response, created_at, updated_at)
+             VALUES
+                (:booking_id, :order_id, :amount, :currency, 'Payment Pending', 'Cash', NULL, NOW(), NOW())"
+        );
+        $paymentStmt->execute([
+            ':booking_id' => $bookingId,
+            ':order_id' => $cashOrderId,
+            ':amount' => $amount,
+            ':currency' => PAYMENT_CURRENCY,
+        ]);
+
+        $amountForToken = number_format($amount, 2, '.', '');
+        $cashBillToken = create_public_token('booking-status', [
+            'order_id' => $cashOrderId,
+            'booking_id' => $bookingId,
+            'amount' => $amountForToken,
+        ], BOOKING_LINK_TTL_SECONDS);
+        $publicBaseUrl = defined('FRONTEND_URL') && FRONTEND_URL !== ''
+            ? FRONTEND_URL
+            : (defined('PUBLIC_APP_URL') && PUBLIC_APP_URL !== '' ? PUBLIC_APP_URL : APP_BASE_URL);
+        $cashBillUrl = rtrim((string) $publicBaseUrl, '/') . '/booking-bill?' . http_build_query([
+            'booking_id' => $bookingId,
+            'order_id' => $cashOrderId,
+            'token' => $cashBillToken,
+        ]);
+    }
+
     booking_audit_log($pdo, $bookingId, 'booking_created', 'Booking Created', 'Customer submitted booking details and a pending booking was created.', [
         'room_name' => $roomName,
         'amount' => $amount,
         'currency' => PAYMENT_CURRENCY,
+        'payment_method' => $isOnlinePayment ? 'PayHere' : 'Cash',
     ]);
 
-    // Do not send user/admin confirmation emails here.
-    // Payment is not verified yet. Success/failed emails are sent only from payments/payhere-notify.php.
+    $pdo->commit();
 
-    json_response(true, 'Booking details saved. Continue to payment.', 201, [
+    // Notifications must run only after the booking transaction is committed.
+    // Email logging/schema checks must never implicitly end the booking
+    // transaction or turn a saved Cash booking into a 500 response.
+    if ($isCashPayment) {
+        $emailBooking = $bookingValues;
+        $emailBooking['id'] = $bookingId;
+        $emailBooking['booking_no'] = $bookingNumber;
+        $emailBooking['payment_method'] = 'Cash';
+        try {
+            send_booking_received_emails($pdo, $emailBooking);
+        } catch (Throwable $emailError) {
+            error_log('Pay on Arrival booking email error: ' . $emailError->getMessage());
+        }
+    }
+
+    json_response(true, $isCashPayment ? 'Booking request received successfully.' : 'Booking details saved. Continue to payment.', 201, [
         'inquiry_id' => $bookingId,
         'booking_id' => $bookingId,
-        'booking_no' => 'BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT),
+        'booking_no' => $bookingNumber,
         'amount' => $amount,
         'currency' => PAYMENT_CURRENCY,
+        'payment_method' => $isOnlinePayment ? 'PayHere' : 'Cash',
+        'order_id' => $cashOrderId !== '' ? $cashOrderId : null,
+        'bill_url' => $cashBillUrl !== '' ? $cashBillUrl : null,
+        'requires_online_checkout' => $isOnlinePayment,
         'data' => [
             'booking_id' => $bookingId,
-            'booking_no' => 'BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT),
+            'booking_no' => $bookingNumber,
             'amount' => $amount,
             'currency' => PAYMENT_CURRENCY,
+            'payment_method' => $isOnlinePayment ? 'PayHere' : 'Cash',
+            'order_id' => $cashOrderId !== '' ? $cashOrderId : null,
+            'bill_url' => $cashBillUrl !== '' ? $cashBillUrl : null,
         ],
     ]);
 } catch (Throwable $e) {
+    if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     error_log('Booking submit error: ' . $e->getMessage());
     json_response(false, 'Unable to save booking details.', 500);
 }

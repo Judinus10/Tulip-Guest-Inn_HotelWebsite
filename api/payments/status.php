@@ -181,13 +181,15 @@ try {
 
     $paymentHistory = load_payment_history($pdo, $bookingId);
 
-    $expiresAt = booking_expires_at($record);
-    $secondsRemaining = $paymentStatus === 'Payment Pending' ? booking_seconds_remaining($record) : 0;
-    $canRetryPayment = in_array($paymentStatus, ['Payment Pending', 'Failed', 'Cancelled'], true)
+    $paymentMethod = strtolower((string) ($record['payment_method'] ?? ''));
+    $isCashPayment = $paymentMethod === 'cash';
+    $expiresAt = $isCashPayment ? null : booking_expires_at($record);
+    $secondsRemaining = !$isCashPayment && $paymentStatus === 'Payment Pending' ? booking_seconds_remaining($record) : 0;
+    $canRetryPayment = !$isCashPayment && in_array($paymentStatus, ['Payment Pending', 'Failed', 'Cancelled'], true)
         && (string) ($record['status'] ?? '') !== 'Confirmed';
 
     $invoiceDownloadUrl = null;
-    if ($paymentStatus === 'Paid') {
+    if ($isCashPayment || $paymentStatus === 'Paid') {
         $baseApiUrl = API_BASE_URL !== '' ? API_BASE_URL : rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/api/payments')), '/');
         $invoiceDownloadUrl = $baseApiUrl . '/invoices/download.php?' . http_build_query([
             'id' => $bookingId,

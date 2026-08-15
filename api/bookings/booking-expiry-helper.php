@@ -59,7 +59,8 @@ function booking_seconds_remaining(array $booking): int
 function booking_is_unpaid_pending(array $booking): bool
 {
     return (string) ($booking['status'] ?? '') === 'Pending'
-        && (string) ($booking['payment_status'] ?? '') === 'Payment Pending';
+        && (string) ($booking['payment_status'] ?? '') === 'Payment Pending'
+        && strcasecmp((string) ($booking['payment_method'] ?? ''), 'Cash') !== 0;
 }
 
 function booking_hold_is_expired(array $booking): bool
@@ -85,6 +86,11 @@ function expire_pending_bookings(PDO $pdo, ?int $bookingId = null, bool $sendEma
          WHERE status = 'Pending'
            AND payment_status = 'Payment Pending'
            AND created_at < :cutoff
+           AND NOT EXISTS (
+               SELECT 1 FROM payments p
+               WHERE p.booking_id = bookings.id
+                 AND LOWER(COALESCE(p.method, '')) = 'cash'
+           )
            {$whereId}"
     );
     $select->execute($params);
@@ -141,6 +147,17 @@ function active_booking_conflict_sql(): string
     return "AND (
                 status = 'Confirmed'
                 OR
-                (status = 'Pending' AND COALESCE(payment_status, '') = 'Payment Pending' AND created_at >= :hold_cutoff)
+                (
+                    status = 'Pending'
+                    AND COALESCE(payment_status, '') = 'Payment Pending'
+                    AND (
+                        created_at >= :hold_cutoff
+                        OR EXISTS (
+                            SELECT 1 FROM payments p
+                            WHERE p.booking_id = bookings.id
+                              AND LOWER(COALESCE(p.method, '')) = 'cash'
+                        )
+                    )
+                )
             )";
 }

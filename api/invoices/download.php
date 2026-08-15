@@ -65,11 +65,6 @@ try {
         json_response(false, 'Invoice not found.', 404);
     }
 
-    if ($hasGuestToken && (string) ($booking['payment_status'] ?? '') !== 'Paid') {
-        header('Content-Type: application/json; charset=utf-8');
-        json_response(false, 'Invoice is available only after successful payment.', 403);
-    }
-
     $paymentStmt = $pdo->prepare(
         'SELECT *
          FROM payments
@@ -80,13 +75,21 @@ try {
     $paymentStmt->execute([':booking_id' => $bookingId]);
     $payment = $paymentStmt->fetch() ?: [];
 
+    $isPaid = strcasecmp((string) ($booking['payment_status'] ?? ''), 'Paid') === 0;
+    $isCash = strcasecmp((string) ($payment['method'] ?? ''), 'Cash') === 0;
+    if ($hasGuestToken && !$isPaid && !$isCash) {
+        header('Content-Type: application/json; charset=utf-8');
+        json_response(false, 'Receipt is available only after successful payment.', 403);
+    }
+
     $invoice = build_invoice_data_for_booking($pdo, $bookingId, $payment);
     if (!$invoice) {
         header('Content-Type: application/json; charset=utf-8');
         json_response(false, 'Invoice not found.', 404);
     }
 
-    $invoiceNumber = preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($invoice['invoice_number'] ?: generate_invoice_number($bookingId))) ?: 'invoice';
+    $documentNumber = $isCash ? 'BK-' . str_pad((string) $bookingId, 6, '0', STR_PAD_LEFT) : (string) ($invoice['invoice_number'] ?: generate_invoice_number($bookingId));
+    $invoiceNumber = preg_replace('/[^A-Za-z0-9_-]/', '', $documentNumber) ?: ($isCash ? 'booking-confirmation' : 'invoice');
     $pdf = create_invoice_pdf_binary($invoice);
 
     header('Content-Type: application/pdf');

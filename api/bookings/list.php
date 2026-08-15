@@ -56,6 +56,13 @@ try {
             b.message AS special_request,
             LOWER(b.status) AS booking_status,
             b.payment_status,
+            COALESCE((
+                SELECT p.method
+                FROM payments p
+                WHERE p.booking_id = b.id
+                ORDER BY p.id DESC
+                LIMIT 1
+            ), '') AS payment_method,
             b.amount AS total_amount,
             b.currency AS payment_currency,
             b.invoice_number,
