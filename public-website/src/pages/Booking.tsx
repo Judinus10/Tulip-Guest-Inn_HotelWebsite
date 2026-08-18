@@ -6,6 +6,7 @@ import AnimatedSection from '../components/ui/AnimatedSection';
 import { rooms as fallbackRooms } from '../data/rooms';
 import type { Room } from '../data/rooms';
 import { createCheckoutSession, fetchPublicRooms, submitBookingRequest } from '../services/publicApi';
+import bannerBooking from '../assets/images/banners/banner-booking.jpg';
 
 function buildRoomTypeOptions(roomList: Room[]) {
   return [
@@ -198,7 +199,7 @@ export default function Booking() {
       <PageHero
         title="Book Your Stay"
         subtitle="Reserve your room directly for the best rate and personalised service."
-        image="https://images.pexels.com/photos/271624/pexels-photo-271624.jpeg?auto=compress&cs=tinysrgb&w=1600"
+        image={bannerBooking}
         breadcrumb="Reservation"
       />
 

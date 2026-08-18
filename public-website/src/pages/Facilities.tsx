@@ -9,6 +9,7 @@ import { facilities } from '../data/facilities';
 import bannerFacilities from '../assets/images/banners/banner-facilities.jpg';
 import facilitiesFeatureGarden from '../assets/images/facilities/facilities-feature-garden.jpg';
 import facilitiesFeatureComfort from '../assets/images/facilities/facilities-feature-comfort.jpg';
+import facilitiesFeatureKitchen from '../assets/images/facilities/facilities-feature-kitchen.jpg';
 
 const alternatingFacilities = [
   {
@@ -30,7 +31,7 @@ const alternatingFacilities = [
     title: 'Shared Kitchen',
     description:
       'A shared kitchen is available for guests who prefer to prepare their own meals, giving you extra flexibility and a comfortable, practical option during your stay.',
-    image: facilitiesFeatureComfort,
+    image: facilitiesFeatureKitchen,
   },
 ];
 

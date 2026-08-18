@@ -32,11 +32,6 @@ const values = [
     title: 'Local Connection',
     description: 'You experience the real Point Pedro, not the tourist version. We guide you to family-run eateries and hidden gems most visitors never find, so you taste and see the north as we know it.',
   },
-  {
-    icon: Heart,
-    title: 'Personal Attention',
-    description: 'You are never one of a crowd. With just ten rooms, you get our full attention and a stay shaped around what you need.',
-  },
 ];
 
 const whyChooseUs = [

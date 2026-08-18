@@ -76,12 +76,16 @@ export default function TestimonialSlider() {
             </p>
 
             <div className="flex items-center justify-center gap-4">
-              <img
-                src={testimonial.avatar}
-                alt={testimonial.name}
-                className="w-12 h-12 rounded-full object-cover border-2 border-gold/30"
-                loading="lazy"
-              />
+              <div
+                className="w-12 h-12 rounded-full bg-deep-green text-white border-2 border-gold/30 flex items-center justify-center text-sm font-medium"
+                aria-hidden="true"
+              >
+                {testimonial.name
+                  .split(' ')
+                  .map((part) => part[0])
+                  .join('')
+                  .slice(0, 2)}
+              </div>
               <div className="text-left">
                 <p className="font-medium text-dark text-sm">{testimonial.name}</p>
                 <p className="text-xs text-gray-400 tracking-wide">{testimonial.country}</p>

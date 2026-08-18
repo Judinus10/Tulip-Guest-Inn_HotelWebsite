@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { createCheckoutSession, fetchBookingPaymentStatus } from '../services/publicApi';
 import type { BookingPaymentStatus } from '../services/bookingApi';
+import bannerBooking from '../assets/images/banners/banner-booking.jpg';
+import accommodationFallback from '../assets/images/home/home-luxury-experience.jpg';
 
 function statusLabel(status: string) {
   const normalized = status.toLowerCase();
@@ -120,10 +122,10 @@ export default function BookingBill() {
   const nights = useMemo(() => getNights(booking?.check_in_date, booking?.check_out_date), [booking]);
   const latestPayment = booking?.payment_history?.[booking.payment_history.length - 1];
   const paidAt = latestPayment?.updated_at || latestPayment?.created_at;
-  const roomImage = booking?.room_main_image || 'https://images.unsplash.com/photo-1611892440506-42a832e657fb?w=1200&q=80';
+  const roomImage = booking?.room_main_image || accommodationFallback;
   const isPaid = booking?.payment_status?.toLowerCase() === 'paid';
   const isCashPayment = booking?.payment_method?.toLowerCase() === 'cash';
-  const heroImage = 'https://images.pexels.com/photos/261102/pexels-photo-261102.jpeg?auto=compress&cs=tinysrgb&w=1600';
+  const heroImage = bannerBooking;
 
   return (
     <main className="bg-[#faf8f4] text-[#14251f]">

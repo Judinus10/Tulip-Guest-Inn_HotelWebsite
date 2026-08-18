@@ -3,6 +3,7 @@ import { Phone, Mail, MapPin, Clock, Send, Instagram, Facebook } from 'lucide-re
 import PageHero from '../components/ui/PageHero';
 import AnimatedSection from '../components/ui/AnimatedSection';
 import { getPublicContactSettings, submitContactMessage, type ContactSettings } from '../services/publicApi';
+import bannerContact from '../assets/images/banners/banner-contact.jpg';
 
 const contactCards = [
   {
@@ -197,7 +198,7 @@ export default function Contact() {
       <PageHero
         title="Contact Tulip Guest Inn"
         subtitle="Contact our guest house in Point Pedro for room bookings, directions and enquiries."
-        image="https://images.pexels.com/photos/237371/pexels-photo-237371.jpeg?auto=compress&cs=tinysrgb&w=1600"
+        image={bannerContact}
         breadcrumb="Point Pedro, Sri Lanka"
       />
 
