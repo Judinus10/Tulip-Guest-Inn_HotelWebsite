@@ -9,13 +9,15 @@ import {
   MapPin,
   MessageCircle,
   Phone,
+  Plus,
   RotateCcw,
   Save,
+  Trash2,
 } from 'lucide-react'
 import { PageHeader, SectionCard } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Input, Label, Textarea } from '@/components/ui/input'
-import { fetchContactSettings, saveContactSettings } from '@/services/settingsApi'
+import { fetchContactSettings, fetchPropertyContent, saveContactSettings, savePropertyContent } from '@/services/settingsApi'
 
 const defaultSettings = {
   business_name: 'Tulip Guest Inn',
@@ -91,14 +93,17 @@ function FieldWithIcon({ icon: Icon, children, align = 'center' }) {
 export default function WebsiteSettings() {
   const [settings, setSettings] = useState(defaultSettings)
   const [savedSettings, setSavedSettings] = useState(defaultSettings)
+  const [propertyContent, setPropertyContent] = useState({ nearby_places: [] })
+  const [savedPropertyContent, setSavedPropertyContent] = useState({ nearby_places: [] })
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [toast, setToast] = useState({ message: '', type: 'success' })
 
   const hasChanges = useMemo(
-    () => JSON.stringify(settings) !== JSON.stringify(savedSettings),
-    [settings, savedSettings]
+    () => JSON.stringify(settings) !== JSON.stringify(savedSettings)
+      || JSON.stringify(propertyContent) !== JSON.stringify(savedPropertyContent),
+    [settings, savedSettings, propertyContent, savedPropertyContent]
   )
 
   useEffect(() => {
@@ -108,10 +113,14 @@ export default function WebsiteSettings() {
       setIsLoading(true)
       setLoadError('')
       try {
-        const data = normalizeSettings(await fetchContactSettings())
+        const [contactData, contentData] = await Promise.all([fetchContactSettings(), fetchPropertyContent()])
+        const data = normalizeSettings(contactData)
         if (!active) return
         setSettings(data)
         setSavedSettings(data)
+        const nearby = { nearby_places: Array.isArray(contentData.nearby_places) ? contentData.nearby_places : [] }
+        setPropertyContent(nearby)
+        setSavedPropertyContent(nearby)
       } catch (error) {
         if (!active) return
         setLoadError(error.message || 'Could not load contact settings.')
@@ -136,14 +145,33 @@ export default function WebsiteSettings() {
     setSettings((current) => ({ ...current, [field]: value }))
   }
 
+  const updateNearbyPlace = (index, field, value) => setPropertyContent((current) => ({
+    nearby_places: current.nearby_places.map((place, itemIndex) => itemIndex === index ? { ...place, [field]: value } : place),
+  }))
+
+  const addNearbyPlace = () => setPropertyContent((current) => ({
+    nearby_places: [...current.nearby_places, { name: '', distance: '', distance_unit: 'km' }],
+  }))
+
+  const removeNearbyPlace = (index) => setPropertyContent((current) => ({
+    nearby_places: current.nearby_places.filter((_, itemIndex) => itemIndex !== index),
+  }))
+
   const handleSubmit = async (event) => {
     event.preventDefault()
     setIsSaving(true)
 
     try {
-      const saved = normalizeSettings(await saveContactSettings(settings))
+      const [contactData, contentData] = await Promise.all([
+        saveContactSettings(settings),
+        savePropertyContent(propertyContent),
+      ])
+      const saved = normalizeSettings(contactData)
       setSettings(saved)
       setSavedSettings(saved)
+      const nearby = { nearby_places: Array.isArray(contentData.nearby_places) ? contentData.nearby_places : [] }
+      setPropertyContent(nearby)
+      setSavedPropertyContent(nearby)
       showToast('Contact settings saved to database.')
     } catch (error) {
       showToast(error.message || 'Could not save contact settings.', 'error')
@@ -154,6 +182,7 @@ export default function WebsiteSettings() {
 
   const handleReset = () => {
     setSettings(savedSettings)
+    setPropertyContent(savedPropertyContent)
     showToast('Changes reset.')
   }
 
@@ -328,6 +357,33 @@ export default function WebsiteSettings() {
                     placeholder="https://instagram.com/jebalguesthouse"
                   />
                 </FieldWithIcon>
+              </div>
+
+              <div className="border-t border-border pt-5">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-semibold text-text-primary">Nearby Places</h3>
+                    <p className="mt-1 text-xs text-text-secondary">Displayed on every public room-details page.</p>
+                  </div>
+                  <Button type="button" variant="outline" onClick={addNearbyPlace}>
+                    <Plus className="h-4 w-4" /> Add Place
+                  </Button>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {propertyContent.nearby_places.length === 0 && <p className="rounded-xl bg-slate-50 p-4 text-sm text-text-secondary">No nearby places added.</p>}
+                  {propertyContent.nearby_places.map((place, index) => (
+                    <div key={place.id || `nearby-${index}`} className="grid gap-3 rounded-xl border border-border p-3 sm:grid-cols-[1fr_120px_90px_auto]">
+                      <Input value={place.name} onChange={(event) => updateNearbyPlace(index, 'name', event.target.value)} placeholder="Nearby beach" />
+                      <Input type="number" min="0" step="0.01" value={place.distance} onChange={(event) => updateNearbyPlace(index, 'distance', event.target.value)} placeholder="Distance" />
+                      <select value={place.distance_unit || 'km'} onChange={(event) => updateNearbyPlace(index, 'distance_unit', event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm text-text-primary">
+                        <option value="km">km</option><option value="m">m</option>
+                      </select>
+                      <Button type="button" variant="outline" onClick={() => removeNearbyPlace(index)} aria-label={`Delete ${place.name || 'nearby place'}`}>
+                        <Trash2 className="h-4 w-4 text-red-600" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               </div>
             </FormSection>
           </div>

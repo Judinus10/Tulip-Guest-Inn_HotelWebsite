@@ -18,7 +18,13 @@ try {
     $room = $stmt->fetch();
     if (!$room) json_response(false, 'Room not found.', 404);
     $images = fetch_room_images($pdo, [(int) $room['id']]);
-    $payload = normalize_room($room, $images[(int) $room['id']] ?? []);
+    $assignments = fetch_room_amenity_assignments($pdo, [(int) $room['id']]);
+    $payload = normalize_room(
+        $room,
+        $images[(int) $room['id']] ?? [],
+        $assignments[(int) $room['id']] ?? [],
+        list_amenities($pdo)
+    );
     json_response(true, 'Room loaded.', 200, ['data' => $payload, 'room' => $payload]);
 } catch (Throwable $e) {
     json_response(false, 'Unable to load room.', 500, ['error' => APP_ENV === 'local' ? $e->getMessage() : null]);

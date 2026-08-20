@@ -740,3 +740,67 @@ SELECT
    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bookings' AND COLUMN_NAME = 'booking_group_id') AS `booking_group_id_column`,
   (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bookings' AND COLUMN_NAME = 'is_group_primary') AS `is_group_primary_column`;
+
+
+-- Tulip Guest Inn: database-backed room amenity catalogue
+-- Run once after taking a database backup.
+
+CREATE TABLE IF NOT EXISTS property_amenities (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    name VARCHAR(120) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_property_amenity_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS room_amenities (
+    room_id INT UNSIGNED NOT NULL,
+    amenity_id INT UNSIGNED NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (room_id, amenity_id),
+    KEY idx_room_amenities_amenity (amenity_id),
+    CONSTRAINT fk_room_amenities_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
+    CONSTRAINT fk_room_amenities_amenity FOREIGN KEY (amenity_id) REFERENCES property_amenities(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Move every valid name from the existing rooms.amenities JSON into the
+-- catalogue and keep its room assignment. This is safe to run again.
+DELIMITER $$
+DROP PROCEDURE IF EXISTS migrate_room_amenities$$
+CREATE PROCEDURE migrate_room_amenities()
+BEGIN
+    DECLARE current_room_id INT UNSIGNED DEFAULT 0;
+    DECLARE next_room_id INT UNSIGNED DEFAULT NULL;
+    DECLARE room_json LONGTEXT;
+    DECLARE item_index INT DEFAULT 0;
+    DECLARE item_count INT DEFAULT 0;
+    DECLARE item_name VARCHAR(120);
+    DECLARE item_id INT UNSIGNED;
+
+    room_loop: LOOP
+        SET next_room_id = NULL;
+        SELECT MIN(id) INTO next_room_id FROM rooms WHERE id > current_room_id;
+        IF next_room_id IS NULL THEN LEAVE room_loop; END IF;
+
+        SET current_room_id = next_room_id;
+        SELECT amenities INTO room_json FROM rooms WHERE id = current_room_id;
+
+        IF room_json IS NOT NULL AND JSON_VALID(room_json) THEN
+            SET item_index = 0;
+            SET item_count = JSON_LENGTH(room_json);
+            WHILE item_index < item_count DO
+                SET item_name = TRIM(JSON_UNQUOTE(JSON_EXTRACT(room_json, CONCAT('$[', item_index, ']'))));
+                IF item_name IS NOT NULL AND item_name <> '' THEN
+                    INSERT IGNORE INTO property_amenities (name) VALUES (item_name);
+                    SELECT id INTO item_id FROM property_amenities WHERE name = item_name LIMIT 1;
+                    INSERT IGNORE INTO room_amenities (room_id, amenity_id) VALUES (current_room_id, item_id);
+                END IF;
+                SET item_index = item_index + 1;
+            END WHILE;
+        END IF;
+    END LOOP;
+END$$
+CALL migrate_room_amenities()$$
+DROP PROCEDURE migrate_room_amenities$$
+DELIMITER ;

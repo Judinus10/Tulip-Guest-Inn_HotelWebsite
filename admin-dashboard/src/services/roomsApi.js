@@ -45,3 +45,39 @@ export async function deleteRoomImage(id) {
   })
   return readJsonResponse(response)
 }
+
+export async function listAmenities() {
+  const response = await apiFetch(buildApiUrl('/amenities/list.php'))
+  const payload = await readJsonResponse(response)
+  return Array.isArray(payload.data) ? payload.data : []
+}
+
+export async function createAmenity(name) {
+  const response = await apiFetch(buildApiUrl('/amenities/create.php'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+  const payload = await readJsonResponse(response)
+  return Array.isArray(payload.data) ? payload.data : []
+}
+
+export async function updateAmenity(id, name) {
+  const response = await apiFetch(buildApiUrl('/amenities/update.php'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, name }),
+  })
+  const payload = await readJsonResponse(response)
+  return Array.isArray(payload.data) ? payload.data : []
+}
+
+export async function deleteAmenity(id) {
+  const response = await apiFetch(buildApiUrl('/amenities/delete.php'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  })
+  const payload = await readJsonResponse(response)
+  return Array.isArray(payload.data) ? payload.data : []
+}

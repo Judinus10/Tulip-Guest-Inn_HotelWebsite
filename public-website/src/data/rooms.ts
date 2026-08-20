@@ -14,6 +14,8 @@ export interface Room {
   image: string;
   images: string[];
   amenities: string[];
+  amenityCatalog?: Array<{ id: number; amenity_name: string; selected: boolean }>;
+  showUnavailableAmenities?: boolean;
   featured: boolean;
 }
 

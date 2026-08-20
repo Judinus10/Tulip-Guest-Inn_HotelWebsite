@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../amenities/_amenity_helpers.php';
 
 function rooms_upload_url(string $relativePath): string
 {
@@ -106,9 +107,42 @@ function fetch_room_images(PDO $pdo, array $roomIds): array
     return $grouped;
 }
 
-function normalize_room(array $room, array $images = []): array
+function fetch_room_amenity_assignments(PDO $pdo, array $roomIds): array
 {
-    $amenities = decode_amenities($room['amenities'] ?? '[]');
+    ensure_amenity_tables($pdo);
+    if ($roomIds === []) return [];
+    $placeholders = implode(',', array_fill(0, count($roomIds), '?'));
+    $stmt = $pdo->prepare(
+        "SELECT ra.room_id, a.id, a.name AS amenity_name
+         FROM room_amenities ra
+         JOIN property_amenities a ON a.id = ra.amenity_id
+         WHERE ra.room_id IN ($placeholders)
+         ORDER BY a.name ASC"
+    );
+    $stmt->execute($roomIds);
+    $grouped = [];
+    foreach ($stmt->fetchAll() as $amenity) {
+        $grouped[(int) $amenity['room_id']][] = [
+            'id' => (int) $amenity['id'],
+            'amenity_name' => (string) $amenity['amenity_name'],
+        ];
+    }
+    return $grouped;
+}
+
+function normalize_room(array $room, array $images = [], array $amenityRecords = [], array $amenityCatalog = []): array
+{
+    $legacyAmenities = decode_amenities($room['amenities'] ?? '[]');
+    $amenities = $amenityCatalog !== []
+        ? array_map(static fn(array $amenity): string => (string) $amenity['amenity_name'], $amenityRecords)
+        : $legacyAmenities;
+    $amenityIds = array_map(static fn(array $amenity): int => (int) $amenity['id'], $amenityRecords);
+    $selectedLookup = array_fill_keys($amenityIds, true);
+    $catalog = array_map(static fn(array $amenity): array => [
+        'id' => (int) $amenity['id'],
+        'amenity_name' => (string) $amenity['amenity_name'],
+        'selected' => isset($selectedLookup[(int) $amenity['id']]),
+    ], $amenityCatalog);
     $imageUrls = array_map(static fn(array $image): string => $image['image_url'] ?? rooms_upload_url($image['image_path']), $images);
     $fallbackImage = 'https://images.unsplash.com/photo-1611892440506-42a832e657fb?w=1200&q=80';
     if ($imageUrls === []) $imageUrls = [$fallbackImage];
@@ -145,7 +179,11 @@ function normalize_room(array $room, array $images = []): array
         'price_per_night' => $price,
         'currency' => $currency,
         'amenities' => $amenities,
+        'amenity_ids' => $amenityIds,
+        'amenity_records' => $amenityRecords,
+        'amenities_catalog' => $catalog,
         'amenities_summary' => implode(', ', $amenities),
+        'show_unavailable_amenities' => !empty($room['show_unavailable_amenities']),
         'status' => (string) ($room['status'] ?? 'Available'),
         'sort_order' => (int) ($room['sort_order'] ?? 0),
         'images' => $imageUrls,
@@ -161,12 +199,24 @@ function get_room_payload(PDO $pdo, bool $publicOnly = false): array
 {
     ensure_rooms_schema($pdo);
     ensure_room_images_table($pdo);
+    ensure_amenity_tables($pdo);
     $sql = 'SELECT * FROM rooms';
     if ($publicOnly) $sql .= " WHERE status = 'Available'";
     $sql .= ' ORDER BY sort_order ASC, id ASC';
     $rooms = $pdo->query($sql)->fetchAll();
-    $images = fetch_room_images($pdo, array_map(static fn($room) => (int) $room['id'], $rooms));
-    return array_map(static fn($room): array => normalize_room($room, $images[(int) $room['id']] ?? []), $rooms);
+    $roomIds = array_map(static fn($room) => (int) $room['id'], $rooms);
+    $images = fetch_room_images($pdo, $roomIds);
+    $amenities = fetch_room_amenity_assignments($pdo, $roomIds);
+    $catalog = list_amenities($pdo);
+    return array_map(
+        static fn($room): array => normalize_room(
+            $room,
+            $images[(int) $room['id']] ?? [],
+            $amenities[(int) $room['id']] ?? [],
+            $catalog
+        ),
+        $rooms
+    );
 }
 
 function save_room_images(PDO $pdo, int $roomId, array $files): void

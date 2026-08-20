@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Users, BedDouble, Maximize, Bath, Check, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, BedDouble, Maximize, Bath, Check, X, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 import RoomCard from '../components/ui/RoomCard';
 import AnimatedSection from '../components/ui/AnimatedSection';
 import { rooms as fallbackRooms } from '../data/rooms';
 import type { Room } from '../data/rooms';
 import { fetchPublicRoom, fetchPublicRooms } from '../services/publicApi';
+import { fetchPropertyContent } from '../services/propertyContentApi';
+import type { NearbyPlace } from '../services/propertyContentApi';
 
 interface RoomBookingForm {
   checkIn: string;
@@ -28,6 +30,7 @@ export default function RoomDetails() {
   const fallbackRoom = fallbackRooms.find((r) => r.slug === id || r.id === id);
   const [room, setRoom] = useState<Room | undefined>(fallbackRoom);
   const [roomList, setRoomList] = useState<Room[]>(fallbackRooms);
+  const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([]);
   const [loading, setLoading] = useState(!fallbackRoom);
   const [bookingForm, setBookingForm] = useState<RoomBookingForm>({
     checkIn: queryCheckIn,
@@ -42,6 +45,14 @@ export default function RoomDetails() {
   });
 
   const [activeImg, setActiveImg] = useState(0);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchPropertyContent().then((content) => {
+      if (mounted) setNearbyPlaces(content.nearby_places);
+    });
+    return () => { mounted = false; };
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -355,13 +366,35 @@ export default function RoomDetails() {
                 {/* Amenities */}
                 <h3 className="font-serif text-xl text-dark font-light mb-5">Room Amenities</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {room.amenities.map((amenity) => (
-                    <div key={amenity} className="flex items-center gap-2.5">
-                      <Check size={13} className="text-gold shrink-0" />
-                      <span className="text-sm text-gray-600">{amenity}</span>
+                  {(room.amenityCatalog?.length
+                    ? room.amenityCatalog.filter((amenity) => amenity.selected || room.showUnavailableAmenities)
+                    : room.amenities.map((amenity, index) => ({ id: index, amenity_name: amenity, selected: true }))
+                  ).map((amenity) => (
+                    <div key={`${amenity.id}-${amenity.amenity_name}`} className="flex items-center gap-2.5">
+                      {amenity.selected
+                        ? <Check size={13} className="text-gold shrink-0" />
+                        : <X size={13} className="text-red-500 shrink-0" />}
+                      <span className={`text-sm ${amenity.selected ? 'text-gray-600' : 'text-gray-400'}`}>{amenity.amenity_name}</span>
                     </div>
                   ))}
                 </div>
+
+                {nearbyPlaces.length > 0 && (
+                  <div className="mt-8 border-t border-border pt-8">
+                    <h3 className="font-serif text-xl text-dark font-light mb-5">Nearby Places</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+                      {nearbyPlaces.map((place) => (
+                        <div key={place.id} className="flex items-center justify-between gap-4 border-b border-border pb-3">
+                          <span className="flex items-center gap-2.5 text-sm text-gray-600">
+                            <MapPin size={14} className="text-gold shrink-0" />
+                            {place.name}
+                          </span>
+                          <span className="text-sm text-gray-600">{place.distance} {place.distance_unit}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </AnimatedSection>
             </div>
 

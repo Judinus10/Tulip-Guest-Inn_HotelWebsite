@@ -52,6 +52,16 @@ export function normalizeRoom(room: BackendRoom, index = 0): Room {
   const images = imageList.length > 0 ? imageList : [mainImage];
   const guests = asNumber(room.guests, asNumber(room.max_guests, asNumber(room.capacity, 2)));
   const size = asNumber(room.size, guests > 3 ? 45 : 24);
+  const amenityCatalog = Array.isArray(room.amenities_catalog)
+    ? room.amenities_catalog
+        .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+        .map((item) => ({
+          id: asNumber(item.id),
+          amenity_name: asString(item.amenity_name, asString(item.name)),
+          selected: Boolean(item.selected),
+        }))
+        .filter((item) => item.amenity_name !== '')
+    : [];
 
   return {
     id: String(room.id ?? index + 1),
@@ -69,6 +79,8 @@ export function normalizeRoom(room: BackendRoom, index = 0): Room {
     image: mainImage,
     images,
     amenities: asStringArray(room.amenities),
+    amenityCatalog,
+    showUnavailableAmenities: Boolean(room.show_unavailable_amenities),
     featured: Boolean(room.featured ?? index < 3),
   };
 }
