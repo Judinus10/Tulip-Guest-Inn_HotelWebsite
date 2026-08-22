@@ -273,9 +273,15 @@ export default function Footer() {
             />
           </a>
 
-          <p className="text-xs text-gray-600">
-            {footerLocation}
-          </p>
+          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-x-4 gap-y-2 text-xs text-gray-500">
+            <Link to="/privacy-policy" className="hover:text-white transition-colors duration-200">
+              Privacy Policy
+            </Link>
+            <Link to="/terms-and-conditions" className="hover:text-white transition-colors duration-200">
+              Terms &amp; Conditions
+            </Link>
+            <span className="text-gray-600">{footerLocation}</span>
+          </div>
         </div>
       </div>
     </footer>

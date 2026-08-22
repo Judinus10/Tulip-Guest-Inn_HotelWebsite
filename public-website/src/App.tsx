@@ -19,6 +19,8 @@ const Booking = lazy(() => import('./pages/Booking'));
 const MultiRoomBooking = lazy(() => import('./pages/MultiRoomBooking'));
 const BookingBill = lazy(() => import('./pages/BookingBill'));
 const PointPedroAccommodation = lazy(() => import('./pages/PointPedroAccommodation'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 function PageWrapper({ children }: { children: React.ReactNode }) {
@@ -60,6 +62,8 @@ function AppLayout() {
           <Route path="/booking" element={<Booking />} />
           <Route path="/multi-room-booking" element={<MultiRoomBooking />} />
           <Route path="/booking-bill" element={<BookingBill />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
         </Suspense>

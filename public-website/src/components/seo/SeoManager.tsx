@@ -15,6 +15,8 @@ const routeNames: Record<string, string> = {
   '/contact': 'Contact',
   '/booking': 'Book a Room',
   '/multi-room-booking': 'Multiple Room Booking',
+  '/privacy-policy': 'Privacy Policy',
+  '/terms-and-conditions': 'Terms and Conditions',
 };
 
 type SeoConfig = {
@@ -79,6 +81,14 @@ const pages: Record<string, SeoConfig> = {
     title: 'Booking Payment Status | Tulip Guest Inn',
     description: 'View the status of your Tulip Guest Inn booking payment.',
     index: false,
+  },
+  '/privacy-policy': {
+    title: 'Privacy Policy | Tulip Guest Inn',
+    description: 'Read how Tulip Guest Inn collects, uses and protects personal information provided through this website.',
+  },
+  '/terms-and-conditions': {
+    title: 'Terms and Conditions | Tulip Guest Inn',
+    description: 'Read the booking and website terms and conditions for Tulip Guest Inn in Point Pedro, Sri Lanka.',
   },
 };
 
