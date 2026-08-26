@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuth } from '@/context/AuthContext'
+import { useToastState } from '@/context/ToastContext'
 import logo from '@/assets/logo.jpeg'
 import companyLogo from '@/assets/company_logo.png'
 
@@ -21,7 +22,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [toast, setToast] = useState('')
+  const [toast, setToast] = useToastState('')
 
   const redirectTo = location.state?.from?.pathname || '/dashboard'
 

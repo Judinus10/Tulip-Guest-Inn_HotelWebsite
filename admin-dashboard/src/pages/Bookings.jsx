@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
+import { useToastState } from '@/context/ToastContext'
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -1035,7 +1036,7 @@ export default function Bookings() {
   const [paymentBooking, setPaymentBooking] = useState(null)
   const [deleteTargetBooking, setDeleteTargetBooking] = useState(null)
   const [isAddBookingOpen, setIsAddBookingOpen] = useState(false)
-  const [toast, setToast] = useState(null)
+  const [toast, setToast] = useToastState(null)
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type })

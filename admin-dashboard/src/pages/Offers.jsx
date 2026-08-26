@@ -21,6 +21,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input, Label } from '@/components/ui/input'
 import { discountTypes, offerStatuses, packageCategories } from '@/data/offerData'
 import { createOffer, deleteOfferById, fetchOffers, updateOffer } from '@/services/offersApi'
+import { useToastState } from '@/context/ToastContext'
 
 const emptyForm = {
   title: '',
@@ -566,7 +567,7 @@ export default function Offers() {
   const [editingOffer, setEditingOffer] = useState(null)
   const [viewOffer, setViewOffer] = useState(null)
   const [deleteOffer, setDeleteOffer] = useState(null)
-  const [toast, setToast] = useState('')
+  const [toast, setToast] = useToastState('')
   const [currentPage, setCurrentPage] = useState(1)
 
   const showToast = (message) => {

@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { apiFetch } from '@/services/apiClient'
 import { exportCsv, exportExcel, exportPdf } from '@/utils/exportData'
+import { useToastState } from '@/context/ToastContext'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
 
@@ -121,7 +122,7 @@ export default function Messages() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All Statuses')
   const [typeFilter, setTypeFilter] = useState('All Types')
-  const [toast, setToast] = useState('')
+  const [toast, setToast] = useToastState('')
   const [openActionId, setOpenActionId] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)

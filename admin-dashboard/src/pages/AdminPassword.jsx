@@ -4,6 +4,7 @@ import { PageHeader, SectionCard } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
+import { useToastState } from '@/context/ToastContext'
 
 function Toast({ message, type = 'success', onClose }) {
   if (!message) return null
@@ -107,7 +108,7 @@ export default function AdminPassword() {
   })
 
   const [error, setError] = useState('')
-  const [toast, setToast] = useState({ message: '', type: 'success' })
+  const [toast, setToast] = useToastState({ message: '', type: 'success' })
   const [loading, setLoading] = useState(false)
   const [otpModalOpen, setOtpModalOpen] = useState(false)
   const [otp, setOtp] = useState('')

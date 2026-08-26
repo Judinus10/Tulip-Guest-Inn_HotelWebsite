@@ -17,6 +17,7 @@ import {
 import { PageHeader, SectionCard } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Input, Label, Textarea } from '@/components/ui/input'
+import { useToastState } from '@/context/ToastContext'
 import { fetchContactSettings, fetchPropertyContent, saveContactSettings, savePropertyContent } from '@/services/settingsApi'
 
 const defaultSettings = {
@@ -98,7 +99,7 @@ export default function WebsiteSettings() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [loadError, setLoadError] = useState('')
-  const [toast, setToast] = useState({ message: '', type: 'success' })
+  const [toast, setToast] = useToastState({ message: '', type: 'success' })
 
   const hasChanges = useMemo(
     () => JSON.stringify(settings) !== JSON.stringify(savedSettings)

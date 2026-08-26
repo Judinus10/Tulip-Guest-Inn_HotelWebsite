@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input, Label } from '@/components/ui/input'
+import { useToastState } from '@/context/ToastContext'
 import {
   createGalleryFolder,
   deleteGalleryFolder,
@@ -65,7 +66,7 @@ export default function Gallery() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [toast, setToast] = useState('')
+  const [toast, setToast] = useToastState('')
   const [folderModal, setFolderModal] = useState(null)
   const [imageModal, setImageModal] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)

@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { useToastState } from '@/context/ToastContext'
 
 import { fetchNotificationActivities, getNotificationNavigation, markNotificationActivityRead } from '@/services/notificationsApi'
 
@@ -112,7 +113,7 @@ export default function Notifications() {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('All Types')
   const [statusFilter, setStatusFilter] = useState('All Statuses')
-  const [toast, setToast] = useState('')
+  const [toast, setToast] = useToastState('')
   const [openActionId, setOpenActionId] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)

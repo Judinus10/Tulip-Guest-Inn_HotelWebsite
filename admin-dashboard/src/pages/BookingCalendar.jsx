@@ -5,6 +5,7 @@ import { PageHeader, SectionCard } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { fetchBookings, updateBookingStatus } from '@/services/bookingsApi'
+import { notifyError } from '@/utils/notifications'
 
 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -442,7 +443,7 @@ export default function BookingCalendar() {
     } catch (err) {
       const message = err.message || 'Unable to update booking status.'
       setError(message)
-      window.alert(message)
+      notifyError(err)
     } finally {
       setUpdatingStatus(false)
     }

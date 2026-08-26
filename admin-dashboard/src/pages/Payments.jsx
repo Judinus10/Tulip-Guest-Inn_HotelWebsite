@@ -21,6 +21,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input, Label } from '@/components/ui/input'
 import { fetchPayments, updateCombinedStatusByBooking } from '@/services/paymentsApi'
 import { exportCsv, exportExcel, exportPdf } from '@/utils/exportData'
+import { useToastState } from '@/context/ToastContext'
 
 const PAGE_SIZE = 6
 
@@ -509,7 +510,7 @@ export default function Payments() {
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedPayment, setSelectedPayment] = useState(null)
   const [editingPayment, setEditingPayment] = useState(null)
-  const [toast, setToast] = useState(null)
+  const [toast, setToast] = useToastState(null)
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type })
