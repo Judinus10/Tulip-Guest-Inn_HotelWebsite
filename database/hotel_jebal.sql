@@ -804,3 +804,183 @@ END$$
 CALL migrate_room_amenities()$$
 DROP PROCEDURE migrate_room_amenities$$
 DELIMITER ;
+
+-- Tulip Guest Inn: database foundation for Jebal feature parity
+-- Generated 2026-08-27
+-- Target: MySQL 8.0+ or MariaDB 10.5+
+--
+-- This migration intentionally contains no passwords, OAuth tokens, client
+-- secrets, Jebal email addresses, or other hotel-specific private data.
+
+SET NAMES utf8mb4;
+
+-- Database-managed sender accounts. Secrets must be encrypted by the PHP API
+-- before they are inserted into encrypted_password.
+CREATE TABLE IF NOT EXISTS mail_accounts (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    account_name VARCHAR(120) NOT NULL,
+    provider VARCHAR(30) NOT NULL DEFAULT 'office365',
+    email_address VARCHAR(190) NOT NULL,
+    smtp_username VARCHAR(190) NOT NULL,
+    encrypted_password TEXT NOT NULL,
+    from_name VARCHAR(190) NOT NULL,
+    smtp_host VARCHAR(190) NOT NULL DEFAULT 'smtp.office365.com',
+    smtp_port SMALLINT UNSIGNED NOT NULL DEFAULT 587,
+    smtp_encryption VARCHAR(20) NOT NULL DEFAULT 'tls',
+    is_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    connection_status VARCHAR(20) NOT NULL DEFAULT 'untested',
+    last_tested_at DATETIME NULL,
+    last_test_message VARCHAR(500) NULL,
+    created_by INT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_mail_accounts_email (email_address),
+    KEY idx_mail_accounts_enabled (is_enabled),
+    CONSTRAINT fk_mail_accounts_created_by
+        FOREIGN KEY (created_by) REFERENCES admin_users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS mail_account_functions (
+    mail_account_id INT UNSIGNED NOT NULL,
+    function_key VARCHAR(60) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (mail_account_id, function_key),
+    KEY idx_mail_account_functions_key (function_key),
+    CONSTRAINT fk_mail_account_functions_account
+        FOREIGN KEY (mail_account_id) REFERENCES mail_accounts(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS mail_routing_rules (
+    function_key VARCHAR(60) NOT NULL,
+    sender_account_id INT UNSIGNED NULL,
+    hotel_recipient_email VARCHAR(190) NULL,
+    reply_to_email VARCHAR(190) NULL,
+    send_customer_copy TINYINT(1) NOT NULL DEFAULT 1,
+    send_hotel_copy TINYINT(1) NOT NULL DEFAULT 1,
+    is_enabled TINYINT(1) NOT NULL DEFAULT 1,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (function_key),
+    KEY idx_mail_routing_sender (sender_account_id),
+    CONSTRAINT fk_mail_routing_sender
+        FOREIGN KEY (sender_account_id) REFERENCES mail_accounts(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS mail_settings_audit_logs (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    admin_user_id INT UNSIGNED NULL,
+    action VARCHAR(80) NOT NULL,
+    entity_type VARCHAR(40) NOT NULL,
+    entity_id VARCHAR(80) NULL,
+    change_summary VARCHAR(500) NOT NULL,
+    ip_address VARCHAR(45) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_mail_audit_created (created_at),
+    CONSTRAINT fk_mail_audit_admin
+        FOREIGN KEY (admin_user_id) REFERENCES admin_users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Provider-wide settings used by Jebal's provider-switching layer. All secret
+-- fields remain empty until saved securely through the future Tulip API.
+CREATE TABLE IF NOT EXISTS mail_provider_settings (
+    provider VARCHAR(40) NOT NULL PRIMARY KEY,
+    sender_email VARCHAR(190) NULL,
+    sender_name VARCHAR(190) NOT NULL DEFAULT 'Tulip Guest Inn',
+    smtp_host VARCHAR(190) NULL,
+    smtp_port SMALLINT UNSIGNED NULL,
+    smtp_encryption VARCHAR(20) NULL,
+    smtp_username VARCHAR(190) NULL,
+    encrypted_password TEXT NULL,
+    tenant_id VARCHAR(255) NULL,
+    oauth_client_id VARCHAR(255) NULL,
+    encrypted_client_secret TEXT NULL,
+    encrypted_refresh_token TEXT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 0,
+    connection_status VARCHAR(20) NOT NULL DEFAULT 'untested',
+    last_tested_at DATETIME NULL,
+    last_test_message VARCHAR(500) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_mail_provider_active (is_active, connection_status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Routing keys are seeded without recipient addresses. The administrator will
+-- select sender accounts and enter Tulip-owned recipients after the API/admin
+-- stages are installed.
+INSERT INTO mail_routing_rules
+    (function_key, hotel_recipient_email, send_customer_copy, send_hotel_copy, is_enabled)
+VALUES
+    ('booking', NULL, 1, 1, 1),
+    ('payment', NULL, 1, 1, 1),
+    ('contact', NULL, 1, 1, 1),
+    ('contact_auto_reply', NULL, 1, 0, 1),
+    ('stay_reminder', NULL, 1, 0, 1),
+    ('admin_alert', NULL, 0, 1, 1),
+    ('test_email', NULL, 0, 1, 1)
+ON DUPLICATE KEY UPDATE function_key = VALUES(function_key);
+
+-- Links displayed by Jebal's external business-link manager.
+CREATE TABLE IF NOT EXISTS external_portal_links (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    portal_key VARCHAR(80) NOT NULL,
+    title VARCHAR(120) NOT NULL,
+    description VARCHAR(500) NULL,
+    portal_url VARCHAR(1000) NOT NULL,
+    category VARCHAR(30) NOT NULL DEFAULT 'other',
+    is_enabled TINYINT(1) NOT NULL DEFAULT 1,
+    is_system TINYINT(1) NOT NULL DEFAULT 0,
+    created_by INT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_external_portal_key (portal_key),
+    KEY idx_external_portal_enabled (is_enabled, title)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO external_portal_links
+    (portal_key, title, description, portal_url, category, is_enabled, is_system)
+VALUES
+    ('google-business-profile', 'Google Business Profile', 'Manage the hotel profile, opening hours, photos and reviews shown on Google.', 'https://business.google.com/', 'business', 1, 1),
+    ('booking-com-extranet', 'Booking.com Extranet', 'Manage Booking.com property information, availability and reservations.', 'https://admin.booking.com/', 'booking', 1, 1),
+    ('microsoft-365-admin', 'Microsoft 365 Admin', 'Manage Office 365 users, licences, domains and organisation settings.', 'https://admin.microsoft.com/', 'email', 1, 1),
+    ('outlook-webmail', 'Outlook Webmail', 'Open the Office 365 mailbox in Outlook on the web.', 'https://outlook.office.com/mail/', 'email', 1, 1),
+    ('google-analytics', 'Google Analytics', 'Review website traffic and visitor reports.', 'https://analytics.google.com/', 'analytics', 1, 1),
+    ('google-search-console', 'Google Search Console', 'Review Google search visibility, indexing and website issues.', 'https://search.google.com/search-console/', 'analytics', 1, 1),
+    ('cpanel', 'cPanel', 'Open the Tulip Guest Inn hosting control panel.', 'https://tulipguestinn.com:2083/', 'hosting', 1, 1)
+ON DUPLICATE KEY UPDATE
+    title = VALUES(title),
+    description = VALUES(description);
+
+-- Bring older Tulip email_queue installations up to the Jebal worker schema.
+-- These statements are intentionally idempotent on the supported DB versions.
+ALTER TABLE email_queue
+    ADD COLUMN IF NOT EXISTS reply_to_email VARCHAR(190) NULL AFTER recipient_email;
+ALTER TABLE email_queue
+    ADD COLUMN IF NOT EXISTS body_html MEDIUMTEXT NULL AFTER subject;
+ALTER TABLE email_queue
+    ADD COLUMN IF NOT EXISTS max_attempts TINYINT UNSIGNED NOT NULL DEFAULT 3 AFTER attempts;
+ALTER TABLE email_queue
+    ADD COLUMN IF NOT EXISTS locked_at DATETIME NULL AFTER available_at;
+ALTER TABLE email_queue
+    ADD COLUMN IF NOT EXISTS sent_at DATETIME NULL AFTER locked_at;
+
+-- Mail Integration is a super-admin function in Jebal. Promote only the first
+-- active administrator on installations that do not yet have a super admin.
+UPDATE admin_users
+SET role = 'super_admin'
+WHERE id = (
+    SELECT first_admin_id
+    FROM (
+        SELECT MIN(id) AS first_admin_id
+        FROM admin_users
+        WHERE is_active = 1
+          AND NOT EXISTS (
+              SELECT 1 FROM admin_users existing_admin
+              WHERE existing_admin.role = 'super_admin'
+                AND existing_admin.is_active = 1
+          )
+    ) AS active_admin
+)
+AND role <> 'super_admin';
+
