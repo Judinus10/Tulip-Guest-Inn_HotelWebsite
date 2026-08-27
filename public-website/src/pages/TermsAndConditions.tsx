@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom';
+import PageHero from '../components/ui/PageHero';
+import bannerBooking from '../assets/images/banners/banner-booking.jpg';
 
 const sections = [
   {
@@ -37,12 +39,15 @@ const sections = [
 
 export default function TermsAndConditions() {
   return (
-    <main className="bg-background pt-24 md:pt-28">
+    <main className="bg-background">
+      <PageHero
+        title="Terms & Conditions"
+        subtitle="The booking, payment and stay conditions that apply when using Tulip Guest Inn services."
+        image={bannerBooking}
+        breadcrumb="Legal"
+      />
       <section className="section-padding">
         <div className="container-custom max-w-4xl">
-          <p className="text-[10px] tracking-[0.35em] uppercase text-gold font-medium mb-4">Legal</p>
-          <h1 className="font-serif text-4xl md:text-5xl font-light text-dark mb-4">Terms &amp; Conditions</h1>
-          <div className="w-10 h-[1px] bg-gold mb-5" />
           <p className="text-sm text-gray-500 mb-10">Last updated: 20 August 2026</p>
 
           <div className="bg-white border border-border p-7 md:p-10 space-y-9">

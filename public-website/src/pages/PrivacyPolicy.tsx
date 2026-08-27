@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom';
+import PageHero from '../components/ui/PageHero';
+import bannerAbout from '../assets/images/banners/banner-about.jpg';
 
 const sections = [
   {
@@ -44,12 +46,15 @@ const sections = [
 
 export default function PrivacyPolicy() {
   return (
-    <main className="bg-background pt-24 md:pt-28">
+    <main className="bg-background">
+      <PageHero
+        title="Privacy Policy"
+        subtitle="How Tulip Guest Inn collects, uses and protects information provided through this website."
+        image={bannerAbout}
+        breadcrumb="Legal"
+      />
       <section className="section-padding">
         <div className="container-custom max-w-4xl">
-          <p className="text-[10px] tracking-[0.35em] uppercase text-gold font-medium mb-4">Legal</p>
-          <h1 className="font-serif text-4xl md:text-5xl font-light text-dark mb-4">Privacy Policy</h1>
-          <div className="w-10 h-[1px] bg-gold mb-5" />
           <p className="text-sm text-gray-500 mb-10">Last updated: 20 August 2026</p>
 
           <div className="bg-white border border-border p-7 md:p-10 space-y-9">

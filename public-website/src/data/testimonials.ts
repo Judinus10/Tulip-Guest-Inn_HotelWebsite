@@ -11,15 +11,15 @@ export const testimonials: Testimonial[] = [
     id: '1',
     name: 'James Hartley',
     country: 'United Kingdom',
-    rating: 5,
+    rating: 4.5,
     quote:
-      'An absolutely beautiful stay. The rooms were immaculate, the pool area is stunning and the staff made us feel genuinely welcomed. The garden is lush and peaceful — perfect for morning walks.',
+      'An absolutely beautiful stay. The rooms were immaculate and the staff made us feel genuinely welcomed. The garden is lush and peaceful — perfect for quiet mornings.',
   },
   {
     id: '2',
     name: 'Priya Nair',
     country: 'India',
-    rating: 5,
+    rating: 4.5,
     quote:
       'Tulip Guest Inn exceeded every expectation. The attention to detail is remarkable — from the crisp linens to the personalised service. A true boutique experience in the heart of Point Pedro.',
   },
@@ -29,13 +29,13 @@ export const testimonials: Testimonial[] = [
     country: 'Australia',
     rating: 5,
     quote:
-      'We brought the whole family and everyone loved it. The family room is spacious and comfortable, and the pool kept the kids happy all day. The surrounding area is fascinating to explore.',
+      'We brought the whole family and everyone loved it. The family room is spacious and comfortable, and the surrounding area is fascinating to explore.',
   },
   {
     id: '4',
     name: 'Sophie Laurent',
     country: 'France',
-    rating: 5,
+    rating: 4.5,
     quote:
       'Magnifique! The ambience is calm and elegant, the garden is enchanting and the staff are warm and attentive. I will absolutely return on my next visit to Sri Lanka.',
   },

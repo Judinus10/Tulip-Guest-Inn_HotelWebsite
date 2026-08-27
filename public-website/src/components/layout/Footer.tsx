@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Phone, Mail, MapPin, Instagram, Facebook } from 'lucide-react';
+import { Phone, Mail, Instagram, Facebook } from 'lucide-react';
 import { getPublicContactSettings, fetchPublicRooms, type ContactSettings } from '../../services/publicApi';
 import footerBackground from '../../assets/images/shared/footer-background.jpg';
 
@@ -44,13 +44,6 @@ function mailHref(email: string): string {
   return email ? `mailto:${email}` : '#';
 }
 
-function addressLines(address: string): string[] {
-  return address
-    .split(/\r?\n|,/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
-
 export default function Footer() {
   const [contactSettings, setContactSettings] = useState<ContactSettings>(fallbackContactSettings);
   const [footerRoomLinks, setFooterRoomLinks] = useState(fallbackRoomLinks);
@@ -91,9 +84,7 @@ export default function Footer() {
   const businessName = contactSettings.business_name || fallbackContactSettings.business_name;
   const displayPhone = contactSettings.reception_contact_number || contactSettings.phone || fallbackContactSettings.phone;
   const displayEmail = contactSettings.email || fallbackContactSettings.email;
-  const displayAddress = contactSettings.address || fallbackContactSettings.address;
   const openingHours = contactSettings.business_hours || fallbackContactSettings.business_hours;
-  const footerLocation = addressLines(displayAddress).slice(-3).join(', ') || 'Point Pedro, Northern Province, Sri Lanka';
 
   return (
     <footer className="bg-dark text-white">
@@ -127,7 +118,7 @@ export default function Footer() {
               />
             </Link>
             <p className="text-gray-400 text-sm leading-relaxed mb-6">
-              A family-run guest house offering clean, comfortable rooms at 189 V.M. Road, Point Pedro, Northern Province, Sri Lanka.
+              A family-run guest house offering clean, comfortable accommodation and thoughtful service in Point Pedro.
             </p>
             <div className="flex items-center gap-3">
               <a
@@ -213,17 +204,6 @@ export default function Footer() {
               Contact Us
             </h3>
             <ul className="space-y-4">
-              <li className="flex items-start gap-3">
-                <MapPin size={15} className="text-gold mt-0.5 shrink-0" />
-                <span className="text-sm text-gray-400 leading-relaxed">
-                  {addressLines(displayAddress).map((line, index) => (
-                    <span key={line}>
-                      {line}
-                      {index < addressLines(displayAddress).length - 1 && <br />}
-                    </span>
-                  ))}
-                </span>
-              </li>
               <li className="flex items-center gap-3">
                 <Phone size={15} className="text-gold shrink-0" />
                 <a
@@ -254,14 +234,14 @@ export default function Footer() {
 
       {/* Bottom Bar */}
       <div className="border-t border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 relative flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 grid grid-cols-1 items-center gap-4 text-center sm:grid-cols-3 sm:text-left">
           <p className="text-xs text-gray-500">
             &copy; {new Date().getFullYear()} Tulip Guest Inn. All Rights Reserved.
           </p>
 
           <a
             href="#"
-            className="sm:absolute sm:left-1/2 sm:-translate-x-1/2 flex items-center gap-3 text-[11px] text-gray-500 hover:text-gray-300 transition-colors duration-200"
+            className="flex items-center justify-center gap-3 text-[11px] text-gray-500 hover:text-gray-300 transition-colors duration-200"
             aria-label="Designed and developed by CompyX"
           >
             <span className="tracking-[0.08em]  whitespace-nowrap">Designed & Developed by</span>
@@ -273,14 +253,13 @@ export default function Footer() {
             />
           </a>
 
-          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-x-4 gap-y-2 text-xs text-gray-500">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-500 sm:justify-end">
             <Link to="/privacy-policy" className="hover:text-white transition-colors duration-200">
               Privacy Policy
             </Link>
             <Link to="/terms-and-conditions" className="hover:text-white transition-colors duration-200">
               Terms &amp; Conditions
             </Link>
-            <span className="text-gray-600">{footerLocation}</span>
           </div>
         </div>
       </div>

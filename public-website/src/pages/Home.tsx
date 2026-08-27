@@ -85,7 +85,7 @@ function normalizeGalleryCategory(
 
 function pickRandomGalleryPreview(
   images: HomeGalleryImage[],
-  limit = 8,
+  limit = 10,
 ): HomeGalleryImage[] {
   if (images.length <= limit) return images;
 
@@ -121,9 +121,18 @@ export default function Home() {
   const [homeOffers, setHomeOffers] = useState(offers);
 
   const previewImages = useMemo(
-    () => pickRandomGalleryPreview(homeGalleryImages, 8),
+    () => pickRandomGalleryPreview(homeGalleryImages, 10),
     [homeGalleryImages],
   );
+  const previewGroups = useMemo(() => {
+    const groups: HomeGalleryImage[][] = [];
+    previewImages.forEach((image, index) => {
+      const groupIndex = Math.floor(index / 5);
+      if (!groups[groupIndex]) groups[groupIndex] = [];
+      groups[groupIndex].push(image);
+    });
+    return groups;
+  }, [previewImages]);
   const featuredRooms = homeRooms.filter((r) => r.featured).slice(0, 3);
   const activeHeroImages = heroImages;
 
@@ -488,29 +497,31 @@ export default function Home() {
       <section className="section-padding bg-background">
         <div className="container-custom">
           <SectionTitle eyebrow="Photo Gallery" title="A Glimpse of Tulip" />
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {previewImages.map((img, i) => (
-              <motion.div
-                key={`${img.id}-${img.src}-${i}`}
-                initial={{ opacity: 0, scale: 0.95 }}
+          <div className="space-y-3">
+            {previewGroups.map((group, groupIndex) => {
+              const big = group[0];
+              const small = group.slice(1);
+              const bigOnLeft = groupIndex % 2 === 1;
+              return <motion.div
+                key={group.map((image) => image.id).join("-")}
+                initial={{ opacity: 0, scale: 0.97 }}
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true, margin: "-40px" }}
-                transition={{ duration: 0.5, delay: i * 0.06 }}
-                className={`relative overflow-hidden cursor-pointer group ${
-                  i === 0 || i === 5 ? "col-span-2 row-span-2" : ""
-                }`}
-                style={{ aspectRatio: i === 0 || i === 5 ? "16/9" : "4/3" }}
-                onClick={() => setLightbox(img.src)}
+                transition={{ duration: 0.5 }}
+                className="grid grid-cols-1 gap-3 md:grid-cols-2"
               >
-                <img
-                  src={img.src}
-                  alt={img.alt}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                  loading="lazy"
-                />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-400" />
-              </motion.div>
-            ))}
+                {big && <button type="button" onClick={() => setLightbox(big.src)} className={`group relative aspect-square overflow-hidden ${bigOnLeft ? "md:order-1" : "md:order-2"}`}>
+                  <img src={big.src} alt={big.alt} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy" />
+                  <span className="absolute inset-0 bg-black/0 transition-colors duration-300 group-hover:bg-black/30" />
+                </button>}
+                <div className={`grid aspect-square grid-cols-2 grid-rows-2 gap-3 ${bigOnLeft ? "md:order-2" : "md:order-1"}`}>
+                  {small.map((img) => <button type="button" key={img.id} onClick={() => setLightbox(img.src)} className="group relative min-h-0 overflow-hidden">
+                    <img src={img.src} alt={img.alt} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" loading="lazy" />
+                    <span className="absolute inset-0 bg-black/0 transition-colors duration-300 group-hover:bg-black/30" />
+                  </button>)}
+                </div>
+              </motion.div>;
+            })}
           </div>
           <div className="text-center mt-10">
             <Link to="/gallery" className="btn-outline">

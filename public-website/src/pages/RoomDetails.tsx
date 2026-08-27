@@ -9,6 +9,7 @@ import type { Room } from '../data/rooms';
 import { fetchPublicRoom, fetchPublicRooms } from '../services/publicApi';
 import { fetchPropertyContent } from '../services/propertyContentApi';
 import type { NearbyPlace } from '../services/propertyContentApi';
+import { formatMoney } from '../services/formatters';
 
 interface RoomBookingForm {
   checkIn: string;
@@ -414,7 +415,7 @@ export default function RoomDetails() {
               <div className="bg-white border border-border shadow-luxury p-8 sticky top-28">
                 <p className="text-[9px] tracking-[0.25em] uppercase text-gold font-medium mb-2">Rate From</p>
                 <p className="font-serif text-4xl font-light text-dark mb-1">
-                  {room.currency ? `${room.currency} ` : '$'}{room.price}
+                  {formatMoney(room.currency, room.price)}
                   <span className="text-gray-400 text-base font-sans"> / night</span>
                 </p>
                 <div className="w-8 h-[1px] bg-gold my-5" />

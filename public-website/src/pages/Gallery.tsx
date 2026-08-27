@@ -82,6 +82,15 @@ export default function Gallery() {
   }, [folders]);
 
   const filtered = active === 'all' ? images : images.filter((img) => img.category === active);
+  const galleryGroups = useMemo(() => {
+    const groups: Array<Array<{ image: GalleryItem; index: number }>> = [];
+    filtered.forEach((image, index) => {
+      const groupIndex = Math.floor(index / 5);
+      if (!groups[groupIndex]) groups[groupIndex] = [];
+      groups[groupIndex].push({ image, index });
+    });
+    return groups;
+  }, [filtered]);
 
   const openLightbox = (index: number) => setLightbox(index);
   const closeLightbox = () => setLightbox(null);
@@ -109,7 +118,7 @@ export default function Gallery() {
     <main>
       <PageHero
         title="Gallery"
-        subtitle="A visual journey through Tulip Guest Inn — our rooms, shared spaces and surroundings."
+        subtitle="A visual journey through Tulip Guest Inn — our rooms, gardens, pool and surroundings."
         image={bannerGallery}
         breadcrumb="Photo Gallery"
       />
@@ -134,7 +143,7 @@ export default function Gallery() {
               </button>
             ))}
 
-            <span className="ml-auto text-xs text-gray-400 pr-4 hidden sm:block">
+            <span data-no-translate className="ml-auto text-xs text-gray-400 pr-4 hidden sm:block">
               {filtered.length} {filtered.length === 1 ? 'image' : 'images'}
             </span>
           </div>
@@ -168,36 +177,33 @@ export default function Gallery() {
           )}
 
           {!loading && !error && filtered.length > 0 && (
-            <motion.div layout className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            <motion.div layout className="space-y-3">
               <AnimatePresence mode="popLayout">
-                {filtered.map((img, i) => (
-                  <motion.div
-                    key={img.id}
+                {galleryGroups.map((group, groupIndex) => {
+                  const big = group[0];
+                  const small = group.slice(1);
+                  const bigOnLeft = groupIndex % 2 === 1;
+                  return <motion.div
+                    key={group.map((item) => item.image.id).join('-')}
                     layout
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.9 }}
                     transition={{ duration: 0.4 }}
-                    className={`relative overflow-hidden cursor-pointer group ${
-                      img.width === 'wide' ? 'col-span-2' : ''
-                    }`}
-                    style={{ aspectRatio: img.width === 'wide' ? '16/9' : '4/3' }}
-                    onClick={() => openLightbox(i)}
+                    className="grid grid-cols-1 gap-3 md:grid-cols-2"
                   >
-                    <img
-                      src={img.src}
-                      alt={img.alt}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                      loading="lazy"
-                    />
-
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-400 flex items-center justify-center">
-                      <span className="text-white text-[9px] tracking-[0.25em] uppercase opacity-0 group-hover:opacity-100 transition-opacity duration-400 font-medium">
-                        View
-                      </span>
+                    {big && <button type="button" onClick={() => openLightbox(big.index)} className={`group relative aspect-square overflow-hidden ${bigOnLeft ? 'md:order-1' : 'md:order-2'}`}>
+                      <img src={big.image.src} alt={big.image.alt} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy" />
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-[9px] font-medium uppercase tracking-[0.25em] text-white opacity-0 transition-all duration-300 group-hover:bg-black/35 group-hover:opacity-100">View</span>
+                    </button>}
+                    <div className={`grid aspect-square grid-cols-2 grid-rows-2 gap-3 ${bigOnLeft ? 'md:order-2' : 'md:order-1'}`}>
+                      {small.map(({ image, index }) => <button type="button" key={image.id} onClick={() => openLightbox(index)} className="group relative min-h-0 overflow-hidden">
+                        <img src={image.src} alt={image.alt} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" loading="lazy" />
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-[9px] font-medium uppercase tracking-[0.25em] text-white opacity-0 transition-all duration-300 group-hover:bg-black/35 group-hover:opacity-100">View</span>
+                      </button>)}
                     </div>
-                  </motion.div>
-                ))}
+                  </motion.div>;
+                })}
               </AnimatePresence>
             </motion.div>
           )}

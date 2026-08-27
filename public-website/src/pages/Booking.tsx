@@ -8,13 +8,14 @@ import type { Room } from '../data/rooms';
 import { createCheckoutSession, fetchPublicRooms, submitBookingRequest } from '../services/publicApi';
 import bannerBooking from '../assets/images/banners/banner-booking.jpg';
 import { useToast } from '../components/ui/ToastProvider';
+import { formatMoney } from '../services/formatters';
 
 function buildRoomTypeOptions(roomList: Room[]) {
   return [
     { value: '', label: 'Select Room Type' },
     ...roomList.map((r) => ({
       value: r.slug,
-      label: `${r.name} — From ${r.currency ? `${r.currency} ` : '$'}${r.price}/night`,
+      label: `${r.name} — From ${formatMoney(r.currency, r.price)}/night`,
     })),
   ];
 }

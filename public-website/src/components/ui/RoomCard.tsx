@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Users, BedDouble, Maximize } from 'lucide-react';
 import type { Room } from '../../data/rooms';
+import { formatMoney } from '../../services/formatters';
 
 interface RoomCardProps {
   room: Room;
@@ -63,7 +64,7 @@ export default function RoomCard({ room, index = 0, bookingPath }: RoomCardProps
         </div>
         <div className="absolute top-4 right-4">
           <span className="bg-white/95 text-dark text-xs font-medium px-3 py-1.5">
-            From {room.currency ? `${room.currency} ` : '$'}{room.price}<span className="text-gray-400 text-[10px]">/night</span>
+            From {formatMoney(room.currency, room.price)}<span className="text-gray-400 text-[10px]">/night</span>
           </span>
         </div>
       </div>
