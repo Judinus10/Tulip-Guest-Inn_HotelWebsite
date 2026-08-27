@@ -7,13 +7,18 @@ const PUBLIC_BOOKING_URL = buildApiUrl('/submit-booking.php')
 export const paymentStatusOptions = ['pending', 'paid', 'cancelled', 'refunded', 'no_pay']
 export const paymentMethodOptions = ['PayHere', 'Cash', 'Bank Transfer']
 
-function normalizeBookingStatus(status) {
+function normalizeBookingStatus(status, isExternal = false) {
   const value = String(status || 'pending')
     .trim()
     .toLowerCase()
     .replace(/^booking\s+/, '')
     .replace(/^payment\s+/, '')
     .replace(/\s+/g, '_')
+
+  if (isExternal) {
+    if (value === 'cancelled' || value === 'canceled') return 'cancelled'
+    return 'external'
+  }
 
   if (value === 'confirmed') return 'confirmed'
   if (value === 'checked_in' || value === 'check_in' || value === 'checkedin') return 'checked_in'
@@ -39,7 +44,9 @@ export function toApiPaymentStatus(status) {
   return 'Payment Pending'
 }
 
-export function normalizePaymentStatus(status) {
+export function normalizePaymentStatus(status, isExternal = false) {
+  if (isExternal) return 'external'
+
   const value = String(status || 'Payment Pending')
     .trim()
     .toLowerCase()
@@ -71,24 +78,20 @@ function getRoomByName(roomName) {
 }
 
 export function normalizeBooking(booking) {
+  const isExternal = String(booking.source || '').trim().toLowerCase() === 'booking.com'
   const roomName = booking.room_name || booking.roomName || booking.room || ''
   const room = getRoomByName(roomName)
   const checkIn = booking.check_in || booking.check_in_date || booking.checkIn || booking.arrival_date || booking.arrival || ''
   const checkOut = booking.check_out || booking.check_out_date || booking.checkOut || booking.departure_date || booking.departure || ''
   const guests = Number(booking.guests || booking.guest_count || booking.no_of_guests || booking.adults || 1)
   const totalNights = Number(booking.total_nights || booking.nights || calculateNights(checkIn, checkOut))
-  const bookingNumber = booking.booking_no || booking.bookingNo || booking.booking_number || `BK-${String(booking.id || booking.booking_id || 0).padStart(5, '0')}`
-  const source = String(booking.source || '').trim().toLowerCase()
-  const externalFlag = booking.is_external === true || Number(booking.is_external) === 1
-  const isExternal = externalFlag || source === 'booking.com' || /^(?:BDC|BC)-/i.test(String(bookingNumber))
-  const amount = isExternal
-    ? 0
-    : Number(booking.total_amount || booking.amount || booking.payment_amount || (Number(room?.price_per_night || 0) * totalNights) || 0)
+  const amount = Number(booking.total_amount || booking.amount || booking.payment_amount || (Number(room?.price_per_night || 0) * totalNights) || 0)
 
   return {
     id: Number(booking.id || booking.booking_id || 0),
-    booking_no: bookingNumber,
-    guest_name: isExternal ? 'Booking.com reservation' : (booking.guest_name || booking.staying_guest_name || booking.full_name || booking.customer_name || booking.name || 'Guest'),
+    booking_group_id: Number(booking.booking_group_id || 0),
+    booking_no: booking.booking_no || booking.bookingNo || booking.booking_number || `BK-${String(booking.id || booking.booking_id || 0).padStart(5, '0')}`,
+    guest_name: booking.guest_name || booking.staying_guest_name || booking.full_name || booking.customer_name || booking.name || 'Guest',
     guest_email: booking.guest_email || booking.staying_guest_email || booking.email || booking.customer_email || '',
     guest_phone: booking.guest_phone || booking.staying_guest_phone || booking.phone || booking.mobile || booking.customer_phone || '',
     booker_name: booking.booker_name || booking.full_name || booking.customer_name || booking.name || booking.guest_name || 'Guest',
@@ -112,8 +115,8 @@ export function normalizeBooking(booking) {
     adults: Number(booking.adults || guests || 1),
     children: Number(booking.children || 0),
     total_nights: totalNights,
-    booking_status: normalizeBookingStatus(booking.booking_status || booking.status || booking.bookingState),
-    payment_status: normalizePaymentStatus(booking.payment_status || booking.paymentStatus),
+    booking_status: normalizeBookingStatus(booking.booking_status || booking.status || booking.bookingState, isExternal),
+    payment_status: normalizePaymentStatus(booking.payment_status || booking.paymentStatus, isExternal),
     payment_method: booking.payment_method || booking.method || booking.paymentMethod || '',
     total_amount: amount,
     payment_currency: booking.payment_currency || booking.currency || 'LKR',
@@ -124,9 +127,10 @@ export function normalizeBooking(booking) {
     email_status: booking.email_status || 'Pending',
     created_at: booking.created_at || booking.createdAt || booking.booking_date || booking.date || '',
     updated_at: booking.updated_at || booking.updatedAt || booking.modified_at || '',
-    source: isExternal ? 'booking.com' : (booking.source || 'website'),
+    source: booking.source || 'website',
+    sync_status: booking.sync_status || '',
+    last_synced_at: booking.last_synced_at || '',
     is_external: isExternal,
-    external_uid: booking.external_uid || '',
   }
 }
 
@@ -201,6 +205,10 @@ export async function updateBookingStatus(bookingId, status) {
   return {
     id: Number(data.id || bookingId),
     booking_status: normalizeBookingStatus(data.booking_status || data.status || status),
+    payment_status: normalizePaymentStatus(data.payment_status),
+    payment_method: data.payment_method || '',
+    refund_required: Boolean(data.refund_required),
+    message: payload.message || '',
   }
 }
 
@@ -254,6 +262,41 @@ export async function updateBookingAndPaymentStatus(bookingId, updates) {
     booking_status: normalizeBookingStatus(data.booking_status || updates.booking_status),
     payment_status: normalizePaymentStatus(data.payment_status || updates.payment_status),
     payment_method: data.payment_method || updates.payment_method || 'Manual',
+  }
+}
+
+export async function updateBookingDetails(bookingId, updates) {
+  const response = await apiFetch(`${BOOKINGS_API_BASE_URL}/update-details.php`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      id: bookingId,
+      full_name: updates.full_name,
+      email: updates.email,
+      phone: updates.phone,
+      room_name: updates.room_name,
+      check_in_date: updates.check_in_date,
+      check_out_date: updates.check_out_date,
+      guests: Number(updates.guests || 1),
+      message: updates.message || '',
+      is_booking_for_other: Boolean(updates.is_booking_for_other),
+      staying_guest_name: updates.staying_guest_name || '',
+      staying_guest_email: updates.staying_guest_email || '',
+      staying_guest_phone: updates.staying_guest_phone || '',
+      staying_guest_note: updates.staying_guest_note || '',
+      send_email: updates.send_email !== false,
+    }),
+  })
+
+  const payload = await readJsonResponse(response)
+  return {
+    booking: normalizeBooking(payload.data || payload),
+    adjustment: payload.adjustment || null,
+    email_queued: Boolean(payload.email_queued),
+    message: payload.message || 'Booking details updated successfully.',
   }
 }
 

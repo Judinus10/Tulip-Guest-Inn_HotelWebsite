@@ -11,6 +11,7 @@ import {
   Bell,
   Sparkles,
   KeyRound,
+  Mail,
 } from 'lucide-react'
 
 export const SIDEBAR_WIDTH_EXPANDED = 288
@@ -49,6 +50,7 @@ export const navigation = [
     label: 'Website Management',
     items: [
       { name: 'Website Settings', href: '/website-settings', icon: Globe },
+      { name: 'Mail Integrations', href: '/mail-settings', icon: Mail },
       { name: 'Admin Password', href: '/admin-password', icon: KeyRound },
     ],
   },
@@ -66,6 +68,7 @@ export const pageTitles = {
   '/messages': 'Messages',
   '/website-settings': 'Website Settings',
   '/admin-password': 'Admin Password',
+  '/mail-settings': 'Mail & Business Integrations',
   '/notifications': 'Notifications',
 }
 
@@ -81,5 +84,6 @@ export const pageDescriptions = {
   '/messages': 'Manage guest inquiries and contact requests.',
   '/website-settings': 'Manage public website contact information and social links.',
   '/admin-password': 'Change the dashboard administrator password.',
+  '/mail-settings': 'Manage mail providers, sender accounts, routing and business links.',
   '/notifications': 'View booking, payment, and system notifications.',
 }

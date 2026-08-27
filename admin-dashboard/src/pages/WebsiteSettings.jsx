@@ -17,7 +17,6 @@ import {
 import { PageHeader, SectionCard } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Input, Label, Textarea } from '@/components/ui/input'
-import { useToastState } from '@/context/ToastContext'
 import { fetchContactSettings, fetchPropertyContent, saveContactSettings, savePropertyContent } from '@/services/settingsApi'
 
 const defaultSettings = {
@@ -26,7 +25,7 @@ const defaultSettings = {
   phone: '+94 77 123 4567',
   reception_contact_number: '+94 21 222 4567',
   whatsapp_reservation_number: '+94 77 123 4567',
-  email: 'reservations@jebalguesthouse.com',
+  email: 'reservations@tulipguestinn.com',
   business_hours: 'Daily · 7:00 AM – 10:00 PM',
   facebook_link: '',
   instagram_link: '',
@@ -99,7 +98,7 @@ export default function WebsiteSettings() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [loadError, setLoadError] = useState('')
-  const [toast, setToast] = useToastState({ message: '', type: 'success' })
+  const [toast, setToast] = useState({ message: '', type: 'success' })
 
   const hasChanges = useMemo(
     () => JSON.stringify(settings) !== JSON.stringify(savedSettings)
@@ -294,7 +293,7 @@ export default function WebsiteSettings() {
                       value={settings.email}
                       onChange={(event) => updateSetting('email', event.target.value)}
                       className="pl-9"
-                      placeholder="reservations@jebalguesthouse.com"
+                      placeholder="reservations@tulipguestinn.com"
                       required
                     />
                   </FieldWithIcon>
@@ -341,7 +340,7 @@ export default function WebsiteSettings() {
                     value={settings.facebook_link}
                     onChange={(event) => updateSetting('facebook_link', event.target.value)}
                     className="pl-9"
-                    placeholder="https://facebook.com/jebalguesthouse"
+                    placeholder="https://facebook.com/tulipguestinn"
                   />
                 </FieldWithIcon>
               </div>
@@ -355,7 +354,7 @@ export default function WebsiteSettings() {
                     value={settings.instagram_link}
                     onChange={(event) => updateSetting('instagram_link', event.target.value)}
                     className="pl-9"
-                    placeholder="https://instagram.com/jebalguesthouse"
+                    placeholder="https://instagram.com/tulipguestinn"
                   />
                 </FieldWithIcon>
               </div>

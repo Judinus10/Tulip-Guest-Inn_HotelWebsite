@@ -22,7 +22,6 @@ import {
   Wind,
   X,
 } from 'lucide-react'
-import { useToastState } from '@/context/ToastContext'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -870,7 +869,7 @@ export default function Rooms() {
   const [selectedRoom, setSelectedRoom] = useState(null)
   const [viewRoom, setViewRoom] = useState(null)
   const [deleteRoom, setDeleteRoom] = useState(null)
-  const [toast, setToast] = useToastState(null)
+  const [toast, setToast] = useState(null)
   const [openActionsId, setOpenActionsId] = useState(null)
   const [manageAmenitiesOpen, setManageAmenitiesOpen] = useState(false)
 
