@@ -5,6 +5,7 @@ import PageHero from '../components/ui/PageHero';
 import { fetchPublicRooms, submitMultiRoomBooking, createCheckoutSession } from '../services/publicApi';
 import type { Room } from '../data/rooms';
 import bannerRooms from '../assets/images/banners/banner-rooms.jpg';
+import { useToast } from '../components/ui/ToastProvider';
 
 type AssignedRoom = Room & { allocatedGuests: number };
 
@@ -21,6 +22,7 @@ function assignRooms(available: Room[], roomCount: number, guests: number): Assi
 }
 
 export default function MultiRoomBooking() {
+  const toast = useToast();
   const [params, setParams] = useSearchParams();
   const filters = useMemo(()=>({checkIn:params.get('checkin')||'',checkOut:params.get('checkout')||'',guests:Number(params.get('guests')||0),rooms:Number(params.get('rooms')||0)}),[params]);
   const [available,setAvailable]=useState<Room[]>([]); const [assigned,setAssigned]=useState<AssignedRoom[]>([]);
@@ -52,11 +54,11 @@ export default function MultiRoomBooking() {
 
   const changeRoom=(slot:number,id:string)=>{const replacement=available.find(r=>r.id===id);if(!replacement)return;setAssigned(current=>current.map((r,i)=>i===slot?{...replacement,allocatedGuests:Math.min(replacement.guests,r.allocatedGuests)}:r));};
   const adjust=(slot:number,diff:number)=>setAssigned(current=>current.map((r,i)=>i===slot?{...r,allocatedGuests:Math.max(1,Math.min(r.guests,r.allocatedGuests+diff))}:r));
-  const submit=async(e:React.FormEvent)=>{e.preventDefault();setError('');if(allocated!==filters.guests)return setError(`Allocate exactly ${filters.guests} guests across the rooms.`);setSubmitting(true);try{
+  const submit=async(e:React.FormEvent)=>{e.preventDefault();setError('');if(allocated!==filters.guests){const message=`Allocate exactly ${filters.guests} guests across the rooms.`;setError(message);toast.warning(message);return;}setSubmitting(true);try{
     const result=await submitMultiRoomBooking({...form,check_in_date:filters.checkIn,check_out_date:filters.checkOut,total_guests:filters.guests,rooms:assigned.map(r=>({room_id:r.id,guests:r.allocatedGuests}))});
     if(form.payment_method==='PayHere'){const checkout=await createCheckoutSession(result.booking_id);window.location.href=checkout.checkout_url;return;}
     if(!result.bill_url)throw new Error('Booking saved but bill link was not returned.');window.location.href=result.bill_url;
-  }catch(e){setError(e instanceof Error?e.message:'Unable to book rooms.');setSubmitting(false);}};
+  }catch(e){const message=e instanceof Error?e.message:'Unable to book rooms.';setError(message);toast.error(message);setSubmitting(false);}};
 
   return <main><PageHero title="Multiple Room Booking" subtitle="Choose actual available rooms and allocate your guests." image={bannerRooms} breadcrumb="Reservation"/>
     <section className="section-padding bg-background"><div className="container-custom max-w-6xl">

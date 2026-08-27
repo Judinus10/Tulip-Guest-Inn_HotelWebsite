@@ -6,6 +6,7 @@ import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import ScrollToTop, { ScrollRestorer } from './components/layout/ScrollToTop';
 import SeoManager from './components/seo/SeoManager';
+import AutoTranslate from './i18n/AutoTranslate';
 
 const Home = lazy(() => import('./pages/Home'));
 const Rooms = lazy(() => import('./pages/Rooms'));
@@ -46,6 +47,7 @@ function AppLayout() {
     <>
       <ScrollRestorer />
       <SeoManager />
+      <AutoTranslate />
       <Navbar />
       <PageWrapper key={location.pathname}>
         <Suspense fallback={<div className="min-h-screen bg-white" aria-label="Loading page" />}>

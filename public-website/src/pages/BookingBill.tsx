@@ -18,6 +18,7 @@ import { createCheckoutSession, fetchBookingPaymentStatus } from '../services/pu
 import type { BookingPaymentStatus } from '../services/bookingApi';
 import bannerBooking from '../assets/images/banners/banner-booking.jpg';
 import accommodationFallback from '../assets/images/home/home-luxury-experience.jpg';
+import { useToast } from '../components/ui/ToastProvider';
 
 function statusLabel(status: string) {
   const normalized = status.toLowerCase();
@@ -67,6 +68,7 @@ function bookingNumber(id?: number) {
 }
 
 export default function BookingBill() {
+  const toast = useToast();
   const [searchParams] = useSearchParams();
   const bookingId = searchParams.get('booking_id') || '';
   const orderId = searchParams.get('order_id') || '';
@@ -79,7 +81,9 @@ export default function BookingBill() {
 
   const loadStatus = useCallback(async () => {
     if (!bookingId || !orderId || !token) {
-      setError('Missing booking payment details. Please contact reception.');
+      const message = 'Missing booking payment details. Please contact reception.';
+      setError(message);
+      toast.error(message);
       setLoading(false);
       return;
     }
@@ -89,7 +93,9 @@ export default function BookingBill() {
       setBooking(status);
       setError('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load payment status.');
+      const message = err instanceof Error ? err.message : 'Unable to load payment status.';
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -114,7 +120,9 @@ export default function BookingBill() {
       const checkout = await createCheckoutSession(booking.id);
       window.location.href = checkout.checkout_url;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to restart payment checkout.');
+      const message = err instanceof Error ? err.message : 'Unable to restart payment checkout.';
+      setError(message);
+      toast.error(message);
       setRetrying(false);
     }
   };

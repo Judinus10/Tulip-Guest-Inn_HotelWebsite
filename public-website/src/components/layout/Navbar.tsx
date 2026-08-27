@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import LanguageSwitcher from './LanguageSwitcher';
 
 const navLinks = [
   { label: 'Home', path: '/' },
@@ -84,7 +85,8 @@ export default function Navbar() {
             </nav>
 
             {/* Book Now Button */}
-            <div className="hidden lg:block">
+            <div className="hidden lg:flex items-center gap-5">
+              <LanguageSwitcher light={!scrolled} />
               <Link
                 to="/booking"
                 className="btn-primary text-[10px] py-2.5 px-6"
@@ -158,6 +160,10 @@ export default function Navbar() {
                   </motion.div>
                 ))}
               </nav>
+
+              <div className="border-t border-border px-6 py-4">
+                <LanguageSwitcher />
+              </div>
 
               <div className="p-6">
                 <Link to="/booking" className="btn-primary w-full justify-center text-[10px] py-3">

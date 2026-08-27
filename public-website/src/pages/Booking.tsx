@@ -7,6 +7,7 @@ import { rooms as fallbackRooms } from '../data/rooms';
 import type { Room } from '../data/rooms';
 import { createCheckoutSession, fetchPublicRooms, submitBookingRequest } from '../services/publicApi';
 import bannerBooking from '../assets/images/banners/banner-booking.jpg';
+import { useToast } from '../components/ui/ToastProvider';
 
 function buildRoomTypeOptions(roomList: Room[]) {
   return [
@@ -39,6 +40,7 @@ interface BookingForm {
 }
 
 export default function Booking() {
+  const toast = useToast();
   const [searchParams] = useSearchParams();
 
   const readBookingParams = (): Pick<BookingForm, 'checkIn' | 'checkOut' | 'guests' | 'rooms' | 'roomType'> => ({
@@ -139,6 +141,7 @@ export default function Booking() {
 
     if (!selectedRoom) {
       setSubmitError('Please select a valid room type.');
+      toast.warning('Please select a valid room type.');
       return;
     }
 
@@ -188,7 +191,9 @@ export default function Booking() {
       }
       window.location.href = billUrl;
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Unable to submit booking request.');
+      const message = error instanceof Error ? error.message : 'Unable to submit booking request.';
+      setSubmitError(message);
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }

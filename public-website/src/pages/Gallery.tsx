@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import PageHero from '../components/ui/PageHero';
 import { getPublicGallery, type PublicGalleryFolder } from '../services/publicApi';
 import bannerGallery from '../assets/images/banners/banner-gallery.jpg';
+import { useToast } from '../components/ui/ToastProvider';
 
 type GalleryItem = {
   id: string;
@@ -14,6 +15,8 @@ type GalleryItem = {
 };
 
 export default function Gallery() {
+  const toast = useToast();
+  const touchStartX = useRef<number | null>(null);
   const [active, setActive] = useState('all');
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [folders, setFolders] = useState<PublicGalleryFolder[]>([]);
@@ -49,7 +52,9 @@ export default function Gallery() {
         }
       } catch (err) {
         if (mounted) {
-          setError(err instanceof Error ? err.message : 'Failed to load gallery.');
+          const message = err instanceof Error ? err.message : 'Failed to load gallery.';
+          setError(message);
+          toast.error(message);
           setImages([]);
           setFolders([]);
         }
@@ -63,7 +68,7 @@ export default function Gallery() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [toast]);
 
   const categories = useMemo(() => {
     const dbFolders = folders
@@ -89,11 +94,22 @@ export default function Gallery() {
     setLightbox((i) => (i !== null && filtered.length ? (i + 1) % filtered.length : null));
   };
 
+  useEffect(() => {
+    if (lightbox === null) return;
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'ArrowLeft') prevImage();
+      if (event.key === 'ArrowRight') nextImage();
+      if (event.key === 'Escape') closeLightbox();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [lightbox, filtered.length]);
+
   return (
     <main>
       <PageHero
         title="Gallery"
-        subtitle="A visual journey through Tulip Guest Inn — our rooms, gardens, pool and surroundings."
+        subtitle="A visual journey through Tulip Guest Inn — our rooms, shared spaces and surroundings."
         image={bannerGallery}
         breadcrumb="Photo Gallery"
       />
@@ -196,6 +212,14 @@ export default function Gallery() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center"
             onClick={closeLightbox}
+            onTouchStart={(event) => { touchStartX.current = event.touches[0]?.clientX ?? null; }}
+            onTouchEnd={(event) => {
+              if (touchStartX.current === null) return;
+              const distance = (event.changedTouches[0]?.clientX ?? touchStartX.current) - touchStartX.current;
+              touchStartX.current = null;
+              if (Math.abs(distance) < 45) return;
+              if (distance > 0) prevImage(); else nextImage();
+            }}
           >
             <button
               onClick={closeLightbox}

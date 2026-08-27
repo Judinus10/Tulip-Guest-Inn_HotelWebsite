@@ -4,6 +4,7 @@ import PageHero from '../components/ui/PageHero';
 import AnimatedSection from '../components/ui/AnimatedSection';
 import { getPublicContactSettings, submitContactMessage, type ContactSettings } from '../services/publicApi';
 import bannerContact from '../assets/images/banners/banner-contact.jpg';
+import { useToast } from '../components/ui/ToastProvider';
 
 const contactCards = [
   {
@@ -102,6 +103,7 @@ function getMapEmbedUrl(address: string, mapUrl: string) {
 }
 
 export default function Contact() {
+  const toast = useToast();
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -185,9 +187,10 @@ export default function Contact() {
     try {
       await submitContactMessage(form);
       setSubmitted(true);
+      toast.success('Your message has been sent. Our team will respond shortly.');
       setForm({ name: '', email: '', phone: '', subject: '', message: '' });
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Could not send your message. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Could not send your message. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

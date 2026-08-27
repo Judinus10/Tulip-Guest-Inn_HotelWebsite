@@ -45,6 +45,7 @@ export default function RoomDetails() {
   });
 
   const [activeImg, setActiveImg] = useState(0);
+  const touchStartX = useRef<number | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -257,7 +258,17 @@ export default function RoomDetails() {
       `}</style>
 
       {/* Gallery Slider */}
-      <section className="relative h-[70vh] min-h-[480px] overflow-hidden bg-dark">
+      <section
+        className="relative h-[70vh] min-h-[480px] overflow-hidden bg-dark"
+        onTouchStart={(event) => { touchStartX.current = event.touches[0]?.clientX ?? null; }}
+        onTouchEnd={(event) => {
+          if (touchStartX.current === null) return;
+          const distance = (event.changedTouches[0]?.clientX ?? touchStartX.current) - touchStartX.current;
+          touchStartX.current = null;
+          if (Math.abs(distance) < 45) return;
+          if (distance > 0) prevImg(); else nextImg();
+        }}
+      >
         {room.images.map((src, i) => (
           <motion.div
             key={src}

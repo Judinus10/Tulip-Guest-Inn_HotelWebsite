@@ -8,6 +8,7 @@ import { rooms as fallbackRooms } from '../data/rooms';
 import type { Room } from '../data/rooms';
 import { fetchPublicRooms } from '../services/publicApi';
 import bannerRooms from '../assets/images/banners/banner-rooms.jpg';
+import { useToast } from '../components/ui/ToastProvider';
 
 type Category = 'all' | Room['category'];
 const categories: { value: Category; label: string }[] = [
@@ -34,6 +35,7 @@ function minimumRoomCombination(rooms: Room[], guests: number): Room[] {
 }
 
 export default function Rooms() {
+  const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const urlFilters = useMemo(() => readFilters(searchParams), [searchParams]);
   const [form, setForm] = useState(urlFilters);
@@ -65,7 +67,7 @@ export default function Rooms() {
     // Load every available physical room for the dates. Filtering the API by
     // total guests here would incorrectly demand one room for the whole group.
     fetchPublicRooms(params).then((data) => { if (mounted) setRoomList(data); })
-      .catch((e) => { if (mounted) { setRoomList(hasDates ? [] : fallbackRooms); setError(e instanceof Error ? e.message : 'Unable to load rooms.'); } })
+      .catch((e) => { if (mounted) { const message=e instanceof Error?e.message:'Unable to load rooms.'; setRoomList(hasDates ? [] : fallbackRooms); setError(message); toast.error(message); } })
       .finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
   }, [urlFilters.checkIn, urlFilters.checkOut]);
