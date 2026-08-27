@@ -66,18 +66,27 @@ try {
 
     if (!in_array($status, $transitions[$oldStatus] ?? [], true)) {
         $pdo->rollBack();
-        json_response(false, 'This action is not allowed for the current booking status.', 409);
+        json_response(false, 'This action is not allowed for the current booking status.', 200, [
+            'severity' => 'warning',
+            'error_code' => 'INVALID_STATUS_TRANSITION',
+        ]);
     }
 
     $isCashPayment = strcasecmp($paymentMethod, 'Cash') === 0;
     if ($status === 'confirmed' && $paymentKey !== 'paid' && !$isCashPayment) {
         $pdo->rollBack();
-        json_response(false, 'Payment must be Paid before confirming the booking.', 409);
+        json_response(false, 'Payment must be Paid before confirming the booking.', 200, [
+            'severity' => 'warning',
+            'error_code' => 'PAYMENT_REQUIRED',
+        ]);
     }
 
     if ($status === 'no_show' && date('Y-m-d') < (string) ($booking['check_in_date'] ?? '')) {
         $pdo->rollBack();
-        json_response(false, 'No Show is available only on or after the check-in date.', 409);
+        json_response(false, 'No Show is available only on or after the check-in date.', 200, [
+            'severity' => 'warning',
+            'error_code' => 'NO_SHOW_TOO_EARLY',
+        ]);
     }
 
     if ($status === 'confirmed') {
@@ -90,7 +99,10 @@ try {
         ]);
         if ($conflict->fetch()) {
             $pdo->rollBack();
-            json_response(false, 'Cannot confirm because this room has an overlapping active booking.', 409);
+            json_response(false, 'Cannot confirm because this room has an overlapping active booking.', 200, [
+                'severity' => 'warning',
+                'error_code' => 'ROOM_BOOKING_CONFLICT',
+            ]);
         }
     }
 

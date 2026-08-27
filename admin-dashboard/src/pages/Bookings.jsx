@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import {
+  AlertTriangle,
   CalendarDays,
   CheckCircle2,
   CreditCard,
@@ -296,8 +297,12 @@ function Modal({ title, description, children, onClose, size = 'max-w-3xl' }) {
 function Toast({ toast, onClose }) {
   if (!toast) return null
 
-  const Icon = toast.type === 'error' ? XCircle : CheckCircle2
-  const tone = toast.type === 'error' ? 'border-red-200 bg-red-50 text-red-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+  const Icon = toast.type === 'error' ? XCircle : toast.type === 'warning' ? AlertTriangle : CheckCircle2
+  const tone = toast.type === 'error'
+    ? 'border-red-200 bg-red-50 text-red-800'
+    : toast.type === 'warning'
+      ? 'border-amber-200 bg-amber-50 text-amber-800'
+      : 'border-emerald-200 bg-emerald-50 text-emerald-800'
 
   return (
     <div className={`fixed right-5 top-5 z-[60] flex items-center gap-3 rounded-xl border px-4 py-3 shadow-lg ${tone}`}>
@@ -1447,7 +1452,7 @@ export default function Bookings() {
       } catch {
         // Keep the original request error when verification is unavailable.
       }
-      showToast(error.message || 'Unable to update statuses.', 'error')
+      showToast(error.message || 'Unable to update statuses.', error.severity === 'warning' ? 'warning' : 'error')
     }
   }
 

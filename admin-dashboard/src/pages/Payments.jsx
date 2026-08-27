@@ -21,7 +21,6 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input, Label } from '@/components/ui/input'
 import { fetchPayments, updateCombinedStatusByBooking } from '@/services/paymentsApi'
 import { exportCsv, exportExcel, exportPdf } from '@/utils/exportData'
-import { useToastState } from '@/context/ToastContext'
 
 const PAGE_SIZE = 6
 
@@ -137,7 +136,11 @@ function PaymentStatusBadge({ status }) {
 function Toast({ message, type, onClose }) {
   if (!message) return null
 
-  const tone = type === 'error' ? 'border-red-200 bg-red-50 text-red-800' : 'border-blue-100 bg-white text-blue-900'
+  const tone = type === 'error'
+    ? 'border-red-200 bg-red-50 text-red-800'
+    : type === 'warning'
+      ? 'border-amber-200 bg-amber-50 text-amber-800'
+      : 'border-blue-100 bg-white text-blue-900'
 
   return (
     <div className={`fixed right-4 top-4 z-50 flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium shadow-lg shadow-slate-200 ${tone}`}>
@@ -510,7 +513,7 @@ export default function Payments() {
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedPayment, setSelectedPayment] = useState(null)
   const [editingPayment, setEditingPayment] = useState(null)
-  const [toast, setToast] = useToastState(null)
+  const [toast, setToast] = useState(null)
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type })
@@ -644,7 +647,7 @@ export default function Payments() {
       setEditingPayment(null)
       showToast('Statuses updated successfully. Email handled by the server.')
     } catch (err) {
-      showToast(err.message || 'Unable to update statuses.', 'error')
+      showToast(err.message || 'Unable to update statuses.', err.severity === 'warning' ? 'warning' : 'error')
     } finally {
       setSavingPayment(false)
     }

@@ -90,7 +90,10 @@ try {
 
     $submittedPaymentMethod = admin_payment_method_for_db_unified($data['payment_method'] ?? 'Manual');
     if ($submittedPaymentMethod === 'PayHere' && in_array($requestedPaymentStatusNormalized, ['paid', 'payment_paid'], true)) {
-        json_response(false, 'Paid status is locked. PayHere payments can only be marked Paid by the verified PayHere notify webhook.', 403);
+        json_response(false, 'Paid status is locked. PayHere payments can only be marked Paid by the verified PayHere notify webhook.', 200, [
+            'severity' => 'warning',
+            'error_code' => 'PAYHERE_PAID_LOCKED',
+        ]);
     }
 
     $paymentStatus = admin_payment_status_for_db_unified($requestedPaymentStatusRaw);
@@ -116,7 +119,10 @@ try {
     $cashConfirmationAllowed = $bookingStatus === 'Confirmed' && $paymentMethod === 'Cash';
     if (in_array($bookingStatus, ['Confirmed', 'Checked In'], true) && $paymentStatus !== 'Paid' && $paymentStatus !== 'No Pay' && !$cashConfirmationAllowed) {
         $pdo->rollBack();
-        json_response(false, 'Payment must be Paid or No Pay before confirming or checking in.', 409);
+        json_response(false, 'Payment must be Paid or No Pay before confirming or checking in.', 200, [
+            'severity' => 'warning',
+            'error_code' => 'PAYMENT_REQUIRED',
+        ]);
     }
 
     $allowedTransitions = [
@@ -129,7 +135,10 @@ try {
     ];
     if (!in_array($bookingStatus, $allowedTransitions[$oldBookingStatus] ?? [$oldBookingStatus], true)) {
         $pdo->rollBack();
-        json_response(false, 'This booking status change is not allowed from its current status.', 409);
+        json_response(false, 'This booking status change is not allowed from its current status.', 200, [
+            'severity' => 'warning',
+            'error_code' => 'INVALID_STATUS_TRANSITION',
+        ]);
     }
 
     if ($bookingStatus === 'Confirmed' && strcasecmp($oldBookingStatus, $bookingStatus) !== 0) {
@@ -152,7 +161,10 @@ try {
 
         if ($conflict->fetch()) {
             $pdo->rollBack();
-            json_response(false, 'Cannot confirm this booking because the room is already confirmed for overlapping dates.', 409);
+            json_response(false, 'Cannot confirm this booking because the room is already confirmed for overlapping dates.', 200, [
+                'severity' => 'warning',
+                'error_code' => 'ROOM_BOOKING_CONFLICT',
+            ]);
         }
     }
 

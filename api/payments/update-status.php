@@ -68,7 +68,10 @@ try {
     $requestedStatusNormalized = strtolower(str_replace([' ', '-'], '_', trim($requestedStatusRaw)));
 
     if (in_array($requestedStatusNormalized, ['paid', 'payment_paid'], true)) {
-        json_response(false, 'Paid status is locked. PayHere payments can only be marked Paid by the verified PayHere notify webhook.', 403);
+        json_response(false, 'Paid status is locked. PayHere payments can only be marked Paid by the verified PayHere notify webhook.', 200, [
+            'severity' => 'warning',
+            'error_code' => 'PAYHERE_PAID_LOCKED',
+        ]);
     }
 
     $paymentStatus = admin_payment_status_for_db($requestedStatusRaw);

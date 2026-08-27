@@ -1,16 +1,4 @@
 import { clearLegacyAuthStorage, getCookie } from '@/utils/auth'
-import { getUserFriendlyError } from '@/utils/notifications'
-
-export class ApiError extends Error {
-  constructor(message, { status = 0, code = '', fieldErrors = null, cause = null } = {}) {
-    super(message)
-    this.name = 'ApiError'
-    this.status = status
-    this.code = code
-    this.fieldErrors = fieldErrors
-    this.cause = cause
-  }
-}
 
 const localApiBaseUrl = 'http://localhost/HotelWebsite/api'
 
@@ -36,12 +24,11 @@ export async function apiFetch(url, options = {}) {
     }
   }
 
-  let response
-  try {
-    response = await fetch(url, { ...options, headers, credentials: 'include' })
-  } catch (cause) {
-    throw new ApiError(getUserFriendlyError(cause, 'Unable to connect to the server. Please try again.'), { cause })
-  }
+  const response = await fetch(url, {
+    ...options,
+    headers,
+    credentials: 'include',
+  })
 
   if (response.status === 401) {
     clearLegacyAuthStorage()
@@ -54,19 +41,14 @@ export async function apiFetch(url, options = {}) {
 }
 
 export async function readJsonResponse(response) {
-  const contentType = response.headers.get('content-type') || ''
-  const payload = contentType.includes('application/json')
-    ? await response.json().catch(() => null)
-    : null
+  const payload = await response.json().catch(() => null)
 
   if (!response.ok || !payload?.success) {
-    const source = new ApiError(payload?.message || 'Request failed.', {
-      status: response.status,
-      code: payload?.code || '',
-      fieldErrors: payload?.errors || null,
-    })
-    source.message = getUserFriendlyError(source)
-    throw source
+    const error = new Error(payload?.message || 'Request failed. Please try again.')
+    error.status = response.status
+    error.severity = payload?.severity || (response.status >= 500 ? 'error' : 'warning')
+    error.code = payload?.error_code || ''
+    throw error
   }
 
   return payload
