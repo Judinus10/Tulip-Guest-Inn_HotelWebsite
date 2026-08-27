@@ -6,6 +6,10 @@
 
 declare(strict_types=1);
 
+// Some hosts print first-run mail-queue warnings/notices into the response.
+// Buffer all incidental output so the admin always receives valid JSON.
+ob_start();
+
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../mail/email-helper.php';
 require_once __DIR__ . '/multi-room-helper.php';
@@ -268,6 +272,9 @@ try {
         }
     }
 
+    if (ob_get_length() !== false && ob_get_length() > 0) {
+        ob_clean();
+    }
     json_response(true, 'Statuses updated successfully.', 200, [
         'data' => [
             'id' => $bookingId,
@@ -284,5 +291,8 @@ try {
     }
 
     error_log('Unified admin status update error: ' . $e->getMessage());
+    if (ob_get_length() !== false && ob_get_length() > 0) {
+        ob_clean();
+    }
     json_response(false, 'Unable to update statuses.', 500);
 }

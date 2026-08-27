@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Phone, Mail, Instagram, Facebook } from 'lucide-react';
+import { Phone, Mail, MapPin, Instagram, Facebook } from 'lucide-react';
 import { getPublicContactSettings, fetchPublicRooms, type ContactSettings } from '../../services/publicApi';
 import footerBackground from '../../assets/images/shared/footer-background.jpg';
 
@@ -30,6 +30,8 @@ const fallbackContactSettings: ContactSettings = {
   whatsapp_reservation_number: '',
   email: 'info@tulipguestinn.com',
   business_hours: 'Reception: 24 Hours, 7 Days',
+  business_hours_mode: '24_7',
+  business_hours_schedule: '{}',
   facebook_link: '#',
   instagram_link: '#',
   map_embed_url: '',
@@ -84,6 +86,7 @@ export default function Footer() {
   const businessName = contactSettings.business_name || fallbackContactSettings.business_name;
   const displayPhone = contactSettings.reception_contact_number || contactSettings.phone || fallbackContactSettings.phone;
   const displayEmail = contactSettings.email || fallbackContactSettings.email;
+  const displayAddress = contactSettings.address || fallbackContactSettings.address;
   const openingHours = contactSettings.business_hours || fallbackContactSettings.business_hours;
 
   return (
@@ -221,6 +224,12 @@ export default function Footer() {
                 >
                   {displayEmail}
                 </a>
+              </li>
+              <li className="flex items-start gap-3">
+                <MapPin size={15} className="mt-0.5 text-gold shrink-0" />
+                <p className="whitespace-pre-line text-sm leading-relaxed text-gray-400">
+                  {displayAddress}
+                </p>
               </li>
             </ul>
 

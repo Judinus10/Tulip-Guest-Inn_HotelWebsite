@@ -8,9 +8,18 @@ export type ContactSettings = {
   whatsapp_reservation_number: string;
   email: string;
   business_hours: string;
+  business_hours_mode: '24_7' | 'custom';
+  business_hours_schedule: string;
   facebook_link: string;
   instagram_link: string;
   map_embed_url: string;
+};
+
+export type BusinessDayHours = {
+  enabled: boolean;
+  all_day: boolean;
+  open: string;
+  close: string;
 };
 
 export type ContactFormPayload = {

@@ -551,23 +551,31 @@ function CombinedStatusModal({ booking, focus = 'booking', onClose, onSave }) {
   const [reference, setReference] = useState('')
   const [remarks, setRemarks] = useState('')
   const [sendEmail, setSendEmail] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
+
+    if (isSaving) return
 
     if (booking.booking_status !== 'cancelled' && bookingStatus === 'cancelled') {
       const confirmed = window.confirm('Cancel this booking? The customer can be notified by email if Send email is checked.')
       if (!confirmed) return
     }
 
-    onSave(booking.id, {
-      booking_status: bookingStatus,
-      payment_status: paymentStatus,
-      payment_method: paymentMethod,
-      transaction_reference: reference.trim(),
-      remarks: remarks.trim(),
-      send_email: sendEmail,
-    })
+    setIsSaving(true)
+    try {
+      await onSave(booking.id, {
+        booking_status: bookingStatus,
+        payment_status: paymentStatus,
+        payment_method: paymentMethod,
+        transaction_reference: reference.trim(),
+        remarks: remarks.trim(),
+        send_email: sendEmail,
+      })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -628,8 +636,8 @@ function CombinedStatusModal({ booking, focus = 'booking', onClose, onSave }) {
         </label>
 
         <div className="flex justify-end gap-3 pt-2">
-          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="submit">Save Statuses</Button>
+          <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>Cancel</Button>
+          <Button type="submit" disabled={isSaving}>{isSaving ? 'Saving...' : 'Save Statuses'}</Button>
         </div>
       </form>
     </Modal>
@@ -1418,6 +1426,27 @@ export default function Bookings() {
       setPaymentBooking(null)
       showToast('Statuses updated successfully. Email handled by the server.')
     } catch (error) {
+      // A status update can be committed even when a first-run mail-queue
+      // warning corrupts the HTTP response. Re-read the authoritative row
+      // before telling the administrator that the save failed.
+      try {
+        const freshBookings = await fetchBookings()
+        const savedBooking = freshBookings.find((booking) => booking.id === bookingId)
+        const expectedPayment = String(updates.payment_status || 'pending').toLowerCase().replace(/^payment\s+/, '').replace(/\s+/g, '_')
+        const statusWasSaved = savedBooking
+          && savedBooking.booking_status === updates.booking_status
+          && savedBooking.payment_status === expectedPayment
+
+        if (statusWasSaved) {
+          setBookings(freshBookings)
+          setStatusBooking(null)
+          setPaymentBooking(null)
+          showToast('Statuses saved successfully. Email notification is being handled by the server.')
+          return
+        }
+      } catch {
+        // Keep the original request error when verification is unavailable.
+      }
       showToast(error.message || 'Unable to update statuses.', 'error')
     }
   }

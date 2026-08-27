@@ -181,6 +181,13 @@ export default function RoomDetails() {
   if (!room) return <Navigate to="/rooms" replace />;
 
   const relatedRooms = roomList.filter((r) => r.id !== room.id).slice(0, 3);
+  const amenityItems = room.amenityCatalog?.length
+    ? room.amenityCatalog
+    : room.amenities.map((amenity, index) => ({ id: index, amenity_name: amenity, selected: true }));
+  const includedAmenities = amenityItems.filter((amenity) => amenity.selected);
+  const unavailableAmenities = room.showUnavailableAmenities
+    ? amenityItems.filter((amenity) => !amenity.selected)
+    : [];
 
   const prevImg = () => setActiveImg((i) => (i - 1 + room.images.length) % room.images.length);
   const nextImg = () => setActiveImg((i) => (i + 1) % room.images.length);
@@ -313,7 +320,7 @@ export default function RoomDetails() {
         </div>
 
         {/* Room Badge */}
-        <div className="absolute top-8 left-8">
+        <div className="absolute bottom-8 left-8">
           <span className="bg-gold text-white text-[9px] tracking-[0.2em] uppercase px-4 py-2">
             {room.category}
           </span>
@@ -377,19 +384,27 @@ export default function RoomDetails() {
 
                 {/* Amenities */}
                 <h3 className="font-serif text-xl text-dark font-light mb-5">Room Amenities</h3>
+                <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.18em] text-emerald-700">Included Amenities</p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {(room.amenityCatalog?.length
-                    ? room.amenityCatalog.filter((amenity) => amenity.selected || room.showUnavailableAmenities)
-                    : room.amenities.map((amenity, index) => ({ id: index, amenity_name: amenity, selected: true }))
-                  ).map((amenity) => (
+                  {includedAmenities.map((amenity) => (
                     <div key={`${amenity.id}-${amenity.amenity_name}`} className="flex items-center gap-2.5">
-                      {amenity.selected
-                        ? <Check size={13} className="text-gold shrink-0" />
-                        : <X size={13} className="text-red-500 shrink-0" />}
-                      <span className={`text-sm ${amenity.selected ? 'text-gray-600' : 'text-gray-400'}`}>{amenity.amenity_name}</span>
+                      <Check size={14} strokeWidth={2.5} className="text-emerald-600 shrink-0" />
+                      <span className="text-sm text-gray-600">{amenity.amenity_name}</span>
                     </div>
                   ))}
                 </div>
+
+                {unavailableAmenities.length > 0 && <div className="mt-7 border-t border-border pt-6">
+                  <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.18em] text-gray-400">Not Included</p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {unavailableAmenities.map((amenity) => (
+                      <div key={`${amenity.id}-${amenity.amenity_name}`} className="flex items-center gap-2.5">
+                        <X size={14} strokeWidth={2.2} className="text-red-500 shrink-0" />
+                        <span className="text-sm text-gray-400">{amenity.amenity_name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>}
 
                 {nearbyPlaces.length > 0 && (
                   <div className="mt-8 border-t border-border pt-8">

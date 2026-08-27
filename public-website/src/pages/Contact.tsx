@@ -34,24 +34,48 @@ const contactCards = [
   },
 ];
 
-const openingHours = [
-  { day: 'Monday – Friday', time: 'Open 24 Hours' },
-  { day: 'Saturday', time: 'Open 24 Hours' },
-  { day: 'Sunday', time: 'Open 24 Hours' },
-];
-
 const fallbackContactSettings: ContactSettings = {
   business_name: 'Tulip Guest Inn',
-  address: '189 V.M. Road, Point Pedro, Northern Province, Sri Lanka',
+  address: '189 V.M. Road\nPoint Pedro\nNorthern Province, Sri Lanka',
   phone: '+94 212 261 186',
   reception_contact_number: '+94 212 261 186',
   whatsapp_reservation_number: '+94 212 261 186',
   email: 'info@tulipguestinn.com',
   business_hours: 'Open 24 Hours',
+  business_hours_mode: '24_7',
+  business_hours_schedule: '{}',
   facebook_link: '',
   instagram_link: '',
   map_embed_url: '',
 };
+
+const weekDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
+
+function formatTime(value: string): string {
+  const [hours, minutes] = value.split(':').map(Number);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return value;
+  const suffix = hours >= 12 ? 'PM' : 'AM';
+  const displayHour = hours % 12 || 12;
+  return `${displayHour}:${String(minutes).padStart(2, '0')} ${suffix}`;
+}
+
+function getOpeningHours(settings: ContactSettings) {
+  if (settings.business_hours_mode !== 'custom') {
+    return [{ day: 'Every Day', time: settings.business_hours || 'Open 24 Hours' }];
+  }
+  try {
+    const schedule = JSON.parse(settings.business_hours_schedule || '{}');
+    return weekDays.map((day) => {
+      const hours = schedule?.[day];
+      const label = day.charAt(0).toUpperCase() + day.slice(1);
+      if (!hours?.enabled) return { day: label, time: 'Closed' };
+      if (hours.all_day) return { day: label, time: 'Open 24 Hours' };
+      return { day: label, time: `${formatTime(hours.open)} – ${formatTime(hours.close)}` };
+    });
+  } catch {
+    return [{ day: 'Every Day', time: settings.business_hours || 'Open 24 Hours' }];
+  }
+}
 
 function cleanPhoneForLink(phone: string) {
   return phone.replace(/[^+0-9]/g, '');
@@ -136,7 +160,8 @@ export default function Contact() {
   const activePhone = settings.phone || settings.reception_contact_number || fallbackContactSettings.phone;
   const activeEmail = settings.email || fallbackContactSettings.email;
   const activeAddress = settings.address || fallbackContactSettings.address;
-  const activeHours = settings.business_hours || fallbackContactSettings.business_hours;
+  const customHours = settings.business_hours_mode === 'custom';
+  const activeHours = customHours ? 'Weekly Schedule' : (settings.business_hours || fallbackContactSettings.business_hours);
   const phoneHref = `tel:${cleanPhoneForLink(activePhone)}`;
   const emailHref = `mailto:${activeEmail}`;
   const mapHref = getMapOpenUrl(activeAddress, settings.map_embed_url || '');
@@ -166,15 +191,15 @@ export default function Contact() {
       return { ...card, value: activeEmail, href: emailHref };
     }
     if (card.label === 'Address') {
-      return { ...card, value: activeAddress, subValue: settings.business_name || undefined };
+      return { ...card, value: activeAddress, subValue: settings.business_name || undefined, multiline: true };
     }
     if (card.label === 'Reception') {
-      return { ...card, value: activeHours, subValue: '7 Days a Week' };
+      return { ...card, value: activeHours, subValue: customHours ? 'See daily opening hours' : '7 Days a Week' };
     }
     return card;
   });
 
-  const dynamicOpeningHours = openingHours.map((item) => ({ ...item, time: activeHours }));
+  const dynamicOpeningHours = getOpeningHours(settings);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -222,12 +247,12 @@ export default function Contact() {
                 {card.href ? (
                   <a
                     href={card.href}
-                    className="font-serif text-lg font-light text-dark hover:text-gold transition-colors duration-200 block mb-1"
+                    className={`font-serif text-lg font-light text-dark hover:text-gold transition-colors duration-200 block mb-1 ${card.multiline ? 'whitespace-pre-line' : ''}`}
                   >
                     {card.value}
                   </a>
                 ) : (
-                  <p className="font-serif text-lg font-light text-dark mb-1">{card.value}</p>
+                  <p className={`font-serif text-lg font-light text-dark mb-1 ${card.multiline ? 'whitespace-pre-line' : ''}`}>{card.value}</p>
                 )}
                 {card.subValue && (
                   <p className="text-xs text-gray-400">{card.subValue}</p>
@@ -366,7 +391,7 @@ export default function Contact() {
                   </div>
                   <div className="mt-5 pt-5 border-t border-border">
                     <p className="text-xs text-gray-400 leading-relaxed">
-                      Our reception team is available 24 hours a day, 7 days a week to assist you.
+                      {customHours ? 'Opening times are managed by the hotel and may change when required.' : 'Our reception team is available 24 hours a day, 7 days a week to assist you.'}
                     </p>
                   </div>
                 </div>
@@ -450,7 +475,7 @@ export default function Contact() {
               Find Us Here
             </p>
 
-            <p className="text-white/90 text-sm mb-6 drop-shadow">
+            <p className="whitespace-pre-line text-white/90 text-sm mb-6 drop-shadow">
               {activeAddress}
             </p>
 

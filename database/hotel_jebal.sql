@@ -984,3 +984,16 @@ WHERE id = (
 )
 AND role <> 'super_admin';
 
+-- Tulip Guest Inn: optional weekly business-hours settings.
+-- Safe to run more than once. The existing 24/7 display remains the default.
+
+INSERT INTO website_settings (setting_key, setting_value)
+VALUES ('business_hours_mode', '24_7')
+ON DUPLICATE KEY UPDATE setting_value = setting_value;
+
+INSERT INTO website_settings (setting_key, setting_value)
+VALUES (
+  'business_hours_schedule',
+  '{"monday":{"enabled":true,"all_day":false,"open":"08:00","close":"18:00"},"tuesday":{"enabled":true,"all_day":false,"open":"08:00","close":"18:00"},"wednesday":{"enabled":true,"all_day":false,"open":"08:00","close":"18:00"},"thursday":{"enabled":true,"all_day":false,"open":"08:00","close":"18:00"},"friday":{"enabled":true,"all_day":false,"open":"08:00","close":"18:00"},"saturday":{"enabled":true,"all_day":false,"open":"08:00","close":"18:00"},"sunday":{"enabled":true,"all_day":false,"open":"08:00","close":"18:00"}}'
+)
+ON DUPLICATE KEY UPDATE setting_value = setting_value;

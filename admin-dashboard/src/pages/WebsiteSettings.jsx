@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle,
   CheckCircle2,
+  Clock3,
   Facebook,
   Globe2,
   Loader2,
@@ -27,6 +28,10 @@ const defaultSettings = {
   whatsapp_reservation_number: '+94 77 123 4567',
   email: 'reservations@tulipguestinn.com',
   business_hours: 'Daily · 7:00 AM – 10:00 PM',
+  business_hours_mode: '24_7',
+  business_hours_schedule: JSON.stringify(Object.fromEntries(
+    ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => [day, { enabled: true, all_day: false, open: '08:00', close: '18:00' }])
+  )),
   facebook_link: '',
   instagram_link: '',
   map_embed_url: '',
@@ -145,6 +150,14 @@ export default function WebsiteSettings() {
     setSettings((current) => ({ ...current, [field]: value }))
   }
 
+  const updateBusinessDay = (day, field, value) => {
+    setSettings((current) => {
+      const schedule = readWeeklySchedule(current.business_hours_schedule)
+      schedule[day] = { ...schedule[day], [field]: value }
+      return { ...current, business_hours_schedule: JSON.stringify(schedule) }
+    })
+  }
+
   const updateNearbyPlace = (index, field, value) => setPropertyContent((current) => ({
     nearby_places: current.nearby_places.map((place, itemIndex) => itemIndex === index ? { ...place, [field]: value } : place),
   }))
@@ -240,6 +253,7 @@ export default function WebsiteSettings() {
                     required
                   />
                 </FieldWithIcon>
+                <p className="text-xs text-text-secondary">Press Enter wherever the address should start on a new line.</p>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
@@ -300,14 +314,32 @@ export default function WebsiteSettings() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="business_hours">Business Hours</Label>
-                <Input
-                  id="business_hours"
-                  value={settings.business_hours}
-                  onChange={(event) => updateSetting('business_hours', event.target.value)}
-                  placeholder="Daily · 7:00 AM – 10:00 PM"
-                />
+              <div className="space-y-3 border-t border-border pt-5">
+                <div>
+                  <Label>Business Hours</Label>
+                  <p className="mt-1 text-xs text-text-secondary">Keep the current 24/7 display or configure each day separately.</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {[['24_7', 'Open 24/7'], ['custom', 'Custom Weekly Hours']].map(([value, label]) => (
+                    <button key={value} type="button" onClick={() => updateSetting('business_hours_mode', value)} className={`rounded-xl border px-4 py-3 text-left text-sm font-medium transition ${settings.business_hours_mode === value ? 'border-primary-500 bg-blue-50 text-primary-700' : 'border-border bg-white text-text-secondary hover:border-slate-300'}`}>
+                      <span className="flex items-center gap-2"><Clock3 className="h-4 w-4" />{label}</span>
+                    </button>
+                  ))}
+                </div>
+                {settings.business_hours_mode === 'custom' && (
+                  <div className="space-y-2 rounded-xl border border-border bg-slate-50 p-3">
+                    {weekDays.map((day) => {
+                      const hours = readWeeklySchedule(settings.business_hours_schedule)[day]
+                      return <div key={day} className="grid items-center gap-2 rounded-lg bg-white p-3 sm:grid-cols-[100px_80px_90px_1fr_1fr]">
+                        <span className="text-sm font-medium capitalize text-text-primary">{day}</span>
+                        <label className="flex items-center gap-2 text-xs text-text-secondary"><input type="checkbox" checked={hours.enabled} onChange={(event) => updateBusinessDay(day, 'enabled', event.target.checked)} /> Open</label>
+                        <label className={`flex items-center gap-2 text-xs text-text-secondary ${!hours.enabled ? 'opacity-40' : ''}`}><input type="checkbox" checked={hours.all_day} disabled={!hours.enabled} onChange={(event) => updateBusinessDay(day, 'all_day', event.target.checked)} /> 24 hrs</label>
+                        <Input type="time" value={hours.open} disabled={!hours.enabled || hours.all_day} onChange={(event) => updateBusinessDay(day, 'open', event.target.value)} aria-label={`${day} opening time`} />
+                        <Input type="time" value={hours.close} disabled={!hours.enabled || hours.all_day} onChange={(event) => updateBusinessDay(day, 'close', event.target.value)} aria-label={`${day} closing time`} />
+                      </div>
+                    })}
+                  </div>
+                )}
               </div>
             </FormSection>
 
@@ -407,4 +439,20 @@ export default function WebsiteSettings() {
       )}
     </div>
   )
+}
+
+const weekDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+
+function readWeeklySchedule(value) {
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value
+    return Object.fromEntries(weekDays.map((day) => [day, {
+      enabled: Boolean(parsed?.[day]?.enabled),
+      all_day: Boolean(parsed?.[day]?.all_day),
+      open: parsed?.[day]?.open || '08:00',
+      close: parsed?.[day]?.close || '18:00',
+    }]))
+  } catch {
+    return JSON.parse(defaultSettings.business_hours_schedule)
+  }
 }
