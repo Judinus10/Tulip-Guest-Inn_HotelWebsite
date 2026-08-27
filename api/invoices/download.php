@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../security/public-token-helper.php';
+require_once __DIR__ . '/invoice-helper.php';
 
 apply_cors_headers();
 
@@ -50,7 +51,7 @@ try {
     $pdo = get_db_connection();
 
     $stmt = $pdo->prepare(
-        'SELECT invoice_file_path, invoice_number, payment_status
+        'SELECT invoice_number, payment_status
          FROM bookings
          WHERE id = :id
          LIMIT 1'
@@ -58,31 +59,41 @@ try {
     $stmt->execute([':id' => $bookingId]);
     $booking = $stmt->fetch();
 
-    if (!$booking || empty($booking['invoice_file_path'])) {
+    if (!$booking) {
         header('Content-Type: application/json; charset=utf-8');
-        json_response(false, 'Invoice not found.', 404);
+        json_response(false, 'Booking not found.', 404);
     }
 
-    if ($hasGuestToken && (string) ($booking['payment_status'] ?? '') !== 'Paid') {
+    $paymentStmt = $pdo->prepare(
+        'SELECT *
+         FROM payments
+         WHERE booking_id = :booking_id
+         ORDER BY id DESC
+         LIMIT 1'
+    );
+    $paymentStmt->execute([':booking_id' => $bookingId]);
+    $payment = $paymentStmt->fetch() ?: [];
+
+    $invoice = build_invoice_data_for_booking($pdo, $bookingId, $payment);
+    if (!$invoice) {
         header('Content-Type: application/json; charset=utf-8');
-        json_response(false, 'Invoice is available only after successful payment.', 403);
+        json_response(false, 'Booking confirmation could not be generated.', 404);
     }
 
-    $filePath = realpath(__DIR__ . '/../' . $booking['invoice_file_path']);
-    $basePath = realpath(__DIR__ . '/../storage/invoices');
-
-    if (!$filePath || !$basePath || !str_starts_with($filePath, $basePath) || !is_file($filePath)) {
-        header('Content-Type: application/json; charset=utf-8');
-        json_response(false, 'Invoice file not found.', 404);
-    }
-
-    $invoiceNumber = preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($booking['invoice_number'] ?: 'invoice')) ?: 'invoice';
+    $isPaid = strcasecmp((string) ($booking['payment_status'] ?? ''), 'Paid') === 0;
+    $documentNumber = $isPaid
+        ? (string) ($invoice['invoice_number'] ?: generate_invoice_number($bookingId))
+        : 'BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT);
+    $invoiceNumber = preg_replace('/[^A-Za-z0-9_-]/', '', $documentNumber) ?: 'booking-confirmation';
+    $pdf = create_invoice_pdf_binary($invoice);
 
     header('Content-Type: application/pdf');
     header('Content-Disposition: attachment; filename="' . $invoiceNumber . '.pdf"');
-    header('Content-Length: ' . filesize($filePath));
+    header('Content-Length: ' . strlen($pdf));
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
 
-    readfile($filePath);
+    echo $pdf;
     exit;
 } catch (Throwable $e) {
     error_log('Invoice download error: ' . $e->getMessage());

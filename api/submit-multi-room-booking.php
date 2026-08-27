@@ -270,7 +270,8 @@ try {
     ]);
 } catch (Throwable $exception) {
     if ($pdo instanceof PDO && $pdo->inTransaction()) $pdo->rollBack();
-    error_log('Multi-room booking error: ' . $exception->getMessage());
+    $supportReference = strtoupper(substr(hash('sha256', uniqid('multi-booking-', true)), 0, 8));
+    error_log('Multi-room booking error [' . $supportReference . ']: ' . $exception->getMessage());
 
     $persistedBookingExists = $bookingCommitted;
     $persistenceVerificationFailed = false;
@@ -339,5 +340,8 @@ try {
         json_response(false, 'One of the selected rooms is no longer offered. Please search again.', 409, ['error_code' => 'ROOM_SELECTION_CHANGED']);
     }
 
-    json_response(false, 'Your multi-room booking could not be completed. Please review the room allocation and try again.', 500, ['error_code' => 'BOOKING_NOT_SAVED']);
+    json_response(false, 'The server could not save your multi-room booking. Please try once more or contact reception and mention reference ' . $supportReference . '.', 500, [
+        'error_code' => 'BOOKING_NOT_SAVED',
+        'support_reference' => $supportReference,
+    ]);
 }

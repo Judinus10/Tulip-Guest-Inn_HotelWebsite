@@ -125,6 +125,48 @@ function pdf_draw_jpeg(string &$content, float $x, float $y, float $w, float $h,
     $content .= sprintf("q %.2F 0 0 %.2F %.2F %.2F cm /%s Do Q\n", $w, $h, $x, $y, $name);
 }
 
+/**
+ * The built-in PDF writer embeds JPEG streams. Convert the supplied PNG logo
+ * to a temporary white-background JPEG without changing the source asset.
+ */
+function pdf_prepare_png_logo(string $pngPath): string
+{
+    if (!is_file($pngPath)) return '';
+
+    if (!function_exists('imagecreatefrompng') || !function_exists('imagejpeg')) {
+        error_log('Tulip invoice logo requires the PHP GD extension to read tulip-logo-mark.png.');
+        return '';
+    }
+
+    $source = @imagecreatefrompng($pngPath);
+    if ($source === false) return '';
+
+    $width = imagesx($source);
+    $height = imagesy($source);
+    $canvas = imagecreatetruecolor($width, $height);
+    if ($canvas === false) {
+        imagedestroy($source);
+        return '';
+    }
+
+    $white = imagecolorallocate($canvas, 255, 255, 255);
+    imagefill($canvas, 0, 0, $white);
+    imagealphablending($canvas, true);
+    imagecopy($canvas, $source, 0, 0, 0, 0, $width, $height);
+
+    $temporaryPath = tempnam(sys_get_temp_dir(), 'tulip-invoice-logo-');
+    if ($temporaryPath === false || !imagejpeg($canvas, $temporaryPath, 96)) {
+        if (is_string($temporaryPath) && is_file($temporaryPath)) @unlink($temporaryPath);
+        imagedestroy($canvas);
+        imagedestroy($source);
+        return '';
+    }
+
+    imagedestroy($canvas);
+    imagedestroy($source);
+    return $temporaryPath;
+}
+
 function invoice_find_room_image(PDO $pdo, string $roomName): string
 {
     try {
@@ -269,7 +311,7 @@ function create_invoice_pdf_binary(array $invoice): string
     $green = [0.22, 0.62, 0.28];
 
     $invoiceNumber = (string) ($invoice['invoice_number'] ?? '-');
-    $bookingCode = 'TGI-' . str_pad((string) ((int) ($invoice['booking_id'] ?? 0)), 6, '0', STR_PAD_LEFT);
+    $bookingCode = 'BK-' . str_pad((string) ((int) ($invoice['booking_id'] ?? 0)), 5, '0', STR_PAD_LEFT);
     $customerName = (string) ($invoice['customer_name'] ?? 'Guest');
     $customerEmail = (string) ($invoice['customer_email'] ?? '-');
     $customerPhone = (string) ($invoice['customer_phone'] ?? '-');
@@ -299,15 +341,27 @@ function create_invoice_pdf_binary(array $invoice): string
     $statusLabel = $isPaid ? 'Paid' : 'Pending';
     $collectionLabel = $isCash ? 'On Arrival' : ($isPaid ? 'Paid Online' : 'Online');
     $content = "";
+    $imageFile = pdf_prepare_png_logo(__DIR__ . '/assets/tulip-logo-mark.png');
+    $hasImage = is_file($imageFile);
 
     // Navy and gold booking-bill header.
     pdf_add_rect($content, 0, 712, 595, 130, $navy, $navy, 0.5);
-    pdf_add_text($content, 42, 780, 'TULIP', 34, 'F4', $white);
-    pdf_add_text($content, 54, 752, 'GUEST INN', 16, 'F2', $gold);
+    if ($hasImage) {
+        pdf_draw_jpeg($content, 40, 754, 58, 52);
+    }
+    pdf_add_line($content, 110, 748, 110, 808, $gold, 1.0);
+    pdf_add_text($content, 128, 780, 'TULIP', 34, 'F4', $white);
+    pdf_add_text($content, 140, 752, 'GUEST INN', 16, 'F2', $gold);
     pdf_add_line($content, 340, 740, 340, 808, $gold, 1.0);
     pdf_add_text($content, 362, 787, 'BOOKING BILL', 18, 'F2', $gold);
     pdf_add_text($content, 362, 766, 'Thank you for choosing Tulip Guest Inn.', 9.5, 'F1', $white);
     pdf_add_text($content, 362, 750, 'We look forward to welcoming you!', 9.5, 'F1', $white);
+    // Keep contact details with the hotel identity in the lower header strip.
+    pdf_add_text($content, 42, 726, $businessPhone, 7.5, 'F1', $white);
+    pdf_add_text($content, 160, 726, $businessEmail, 7.3, 'F1', $white);
+    pdf_add_wrapped_text($content, 302, 731, $businessAddress, 7.1, 145, 9, 'F1', $white, 2);
+    pdf_add_right_text($content, 553, 726, $businessWebsite, 7.1, 'F1', $white);
+    pdf_add_line($content, 0, 740, 595, 740, $gold, 1.1);
     pdf_add_rect($content, 0, 708, 595, 4, $gold, $gold, 0.5);
 
     // Booking reference and date.
@@ -323,8 +377,6 @@ function create_invoice_pdf_binary(array $invoice): string
     pdf_add_rect($content, 38, 395, 519, 184, $line, null, 0.7);
     pdf_add_text($content, 52, 553, 'BOOKING DETAILS', 13, 'F2', $navy);
     // Keep the downloaded bill independent from local/remote room-image paths.
-    $imageFile = '';
-    $hasImage = false;
     pdf_add_wrapped_text($content, 52, 516, $roomName, 17, 480, 19, 'F2', $navy, 2);
     pdf_add_text($content, 52, 480, $guests . ' ' . ($guests === 1 ? 'Guest' : 'Guests'), 10, 'F1', $navy);
     pdf_add_text($content, 222, 480, $rooms . ' ' . ($rooms === 1 ? 'Room' : 'Rooms'), 10, 'F1', $navy);
@@ -372,13 +424,6 @@ function create_invoice_pdf_binary(array $invoice): string
     pdf_add_center_text($content, 298, 80, 'Thank you!', 18, 'F3', $gold);
     pdf_add_center_text($content, 298, 62, 'Please keep this bill for your reference.', 9.5, 'F1', $navy);
 
-    // Compact contact footer.
-    pdf_add_rect($content, 0, 0, 595, 45, $navy, $navy, 0.5);
-    pdf_add_text($content, 36, 26, $businessPhone, 8.5, 'F1', $white);
-    pdf_add_text($content, 165, 26, $businessEmail, 8.2, 'F1', $white);
-    pdf_add_wrapped_text($content, 320, 29, $businessAddress, 8, 150, 10, 'F1', $white, 2);
-    pdf_add_right_text($content, 558, 26, $businessWebsite, 8, 'F1', $white);
-
     $objects = [];
     $resources = '/Font << /F1 4 0 R /F2 5 0 R /F3 6 0 R /F4 7 0 R >>';
     $imageObject = '';
@@ -389,6 +434,7 @@ function create_invoice_pdf_binary(array $invoice): string
             $resources .= ' /XObject << /Im1 9 0 R >>';
             $imageObject = "9 0 obj\n<< /Type /XObject /Subtype /Image /Width " . (int) $imageInfo[0] . ' /Height ' . (int) $imageInfo[1] . " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " . strlen($imageData) . " >>\nstream\n" . $imageData . "\nendstream\nendobj\n";
         }
+        @unlink($imageFile);
     }
 
     $objects[] = "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n";

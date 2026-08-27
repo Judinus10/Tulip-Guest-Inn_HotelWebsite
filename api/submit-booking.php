@@ -247,6 +247,12 @@ try {
         ]);
     }
 
+    $pdo->commit();
+    $bookingCommitted = true;
+
+    // Audit/email helpers may create or upgrade their own tables. Run them only
+    // after the booking and Cash payment are committed so optional side effects
+    // can never roll back or implicitly commit the core booking transaction.
     booking_audit_log($pdo, $bookingId, 'booking_created', 'Booking Created', 'Customer submitted booking details and a pending booking was created.', [
         'room_name' => $roomName,
         'amount' => $amount,
@@ -254,9 +260,6 @@ try {
         'payment_method' => $isOnlinePayment ? 'PayHere' : 'Cash',
     ]);
 
-    // Preserve the existing email behavior. Cash bookings send the existing
-    // booking-received emails here. PayHere emails remain controlled by the
-    // checkout/notify/queue flow already implemented in the payment endpoints.
     if ($isCashPayment) {
         $emailBooking = $bookingValues;
         $emailBooking['id'] = $bookingId;
@@ -268,9 +271,6 @@ try {
             error_log('Public Cash booking email error: ' . $emailError->getMessage());
         }
     }
-
-    $pdo->commit();
-    $bookingCommitted = true;
 
     json_response(true, 'Booking inquiry submitted successfully.', 201, [
         'inquiry_id' => $bookingId,
@@ -296,7 +296,8 @@ try {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    error_log('Booking submit error: ' . $e->getMessage());
+    $supportReference = strtoupper(substr(hash('sha256', uniqid('booking-', true)), 0, 8));
+    error_log('Booking submit error [' . $supportReference . ']: ' . $e->getMessage());
 
     // Never tell the customer that booking failed when the complete booking
     // and Cash payment records already exist. This also covers a database
@@ -396,7 +397,8 @@ try {
         ]);
     }
 
-    json_response(false, 'Your booking could not be completed. Please review your details and try again.', 500, [
+    json_response(false, 'The server could not save your booking. Please try once more or contact reception and mention reference ' . $supportReference . '.', 500, [
         'error_code' => 'BOOKING_NOT_SAVED',
+        'support_reference' => $supportReference,
     ]);
 }

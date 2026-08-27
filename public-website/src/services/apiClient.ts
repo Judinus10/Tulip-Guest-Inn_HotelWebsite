@@ -4,6 +4,8 @@ import { PublicRequestError, publicErrorMessage } from './publicErrors';
 export type ApiResponse<T> = {
   success?: boolean;
   message?: string;
+  error_code?: string;
+  support_reference?: string;
   data?: T;
   rooms?: T;
   room?: T;
@@ -31,7 +33,11 @@ export async function requestJson<T>(path: string, options: RequestInit = {}): P
   const payload = (await response.json().catch(() => null)) as ApiResponse<T> | null;
 
   if (!response.ok || !payload || payload.success === false) {
-    const wrapped = new PublicRequestError(payload?.message || '', { status: response.status, retryable: response.status >= 500 });
+    const wrapped = new PublicRequestError(payload?.message || '', {
+      code: payload?.error_code || 'REQUEST_FAILED',
+      status: response.status,
+      retryable: response.status >= 500,
+    });
     wrapped.message = publicErrorMessage(wrapped, context);
     throw wrapped;
   }

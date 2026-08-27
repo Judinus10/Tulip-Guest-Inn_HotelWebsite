@@ -114,11 +114,23 @@ function apply_cors_headers(): void
 
 function json_response(bool $success, string $message, int $statusCode = 200, array $extra = []): void
 {
+    // JSON endpoints must never include PHP notices/warnings or output from an
+    // included library. A single character before the JSON body makes
+    // response.json() fail even when the database transaction succeeded.
+    if (ob_get_level() > 0) {
+        $unexpectedOutput = ob_get_contents();
+        if (is_string($unexpectedOutput) && trim($unexpectedOutput) !== '') {
+            error_log('Discarded unexpected API output before JSON response: ' . substr(trim($unexpectedOutput), 0, 2000));
+        }
+        ob_clean();
+    }
+
     http_response_code($statusCode);
+    header('Content-Type: application/json; charset=utf-8', true);
     echo json_encode(array_merge([
         'success' => $success,
         'message' => $message,
-    ], $extra), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    ], $extra), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     exit;
 }
 

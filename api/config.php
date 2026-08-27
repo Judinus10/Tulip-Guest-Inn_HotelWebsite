@@ -225,10 +225,12 @@ if (APP_ENV === 'production') {
         'DB_NAME' => DB_NAME,
         'DB_USER' => DB_USER,
         'DB_PASS' => DB_PASS,
-        'PAYHERE_MERCHANT_ID' => PAYHERE_MERCHANT_ID,
-        'PAYHERE_MERCHANT_SECRET' => PAYHERE_MERCHANT_SECRET,
         'PUBLIC_TOKEN_SECRET' => PUBLIC_TOKEN_SECRET,
     ];
+    if (ONLINE_PAYMENT_ENABLED) {
+        $requiredProductionValues['PAYHERE_MERCHANT_ID'] = PAYHERE_MERCHANT_ID;
+        $requiredProductionValues['PAYHERE_MERCHANT_SECRET'] = PAYHERE_MERCHANT_SECRET;
+    }
     foreach ($requiredProductionValues as $key => $value) {
         if (trim((string) $value) === '') {
             http_response_code(500);

@@ -9,6 +9,7 @@ import { createCheckoutSession, fetchPublicFeatures, fetchPublicRooms, submitBoo
 import bannerBooking from '../assets/images/banners/banner-booking.jpg';
 import { useToast } from '../components/ui/ToastProvider';
 import { formatMoney } from '../services/formatters';
+import { PublicRequestError } from '../services/publicErrors';
 
 function buildRoomTypeOptions(roomList: Room[]) {
   return [
@@ -166,6 +167,28 @@ export default function Booking() {
     e.preventDefault();
     setSubmitError('');
 
+    const emailIsValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
+    const phoneDigits = form.phone.replace(/\D/g, '');
+    const validationMessage = !form.firstName.trim() || !form.lastName.trim()
+      ? 'Please enter both your first name and last name.'
+      : !emailIsValid
+        ? 'Please enter a valid email address, for example name@example.com.'
+        : phoneDigits.length < 7
+          ? 'Please enter a valid phone number including the country code.'
+          : !form.checkIn || !form.checkOut
+            ? 'Please select both check-in and check-out dates.'
+            : form.checkOut <= form.checkIn
+              ? 'Check-out must be after the check-in date.'
+              : Number(form.guests) < 1
+                ? 'Please select at least one guest.'
+                : '';
+
+    if (validationMessage) {
+      setSubmitError(validationMessage);
+      toast.warning(validationMessage);
+      return;
+    }
+
     if (!selectedRoom) {
       setSubmitError('Please select a valid room type.');
       toast.warning('Please select a valid room type.');
@@ -225,7 +248,8 @@ export default function Booking() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to submit booking request.';
       setSubmitError(message);
-      toast.error(message);
+      if (error instanceof PublicRequestError && error.status > 0 && error.status < 500) toast.warning(message);
+      else toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -386,7 +410,7 @@ export default function Booking() {
                     </div>
                     <p className="mt-3 text-[10px] leading-relaxed text-gray-400">
                       {form.paymentMethod === 'Cash'
-                        ? 'Your booking request will be reviewed by the property. Payment is collected when you arrive.'
+                        ? 'Booking request submitted successfully. A confirmation email will be sent to your email address shortly'
                         : 'You will continue to the secure PayHere payment page after submitting.'}
                     </p>
                   </div>
