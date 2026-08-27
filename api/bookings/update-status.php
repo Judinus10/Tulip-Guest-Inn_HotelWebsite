@@ -1,16 +1,15 @@
 <?php
 declare(strict_types=1);
 
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+ob_start();
+
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../mail/email-helper.php';
+require_once __DIR__ . '/multi-room-helper.php';
 
 apply_cors_headers();
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(204);
-    exit;
-}
-
 require_admin_auth();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -18,114 +17,153 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $data = read_request_data();
-$bookingId = (int) ($data['id'] ?? 0);
-function normalize_workflow_status(mixed $value, string $prefix = ''): string
-{
-    $normalized = strtolower(trim((string) $value));
-    $normalized = preg_replace('/\s+/', '_', $normalized) ?? $normalized;
-    $normalized = str_replace('-', '_', $normalized);
-    if ($prefix !== '') {
-        $normalized = preg_replace('/^' . preg_quote($prefix, '/') . '_+/', '', $normalized) ?? $normalized;
-    }
-    return trim($normalized, '_');
+$id = (int) ($data['id'] ?? 0);
+$status = strtolower(clean_string($data['status'] ?? '', 30));
+$status = str_replace([' ', '-'], '_', $status);
+if ($status === 'canceled') $status = 'cancelled';
+
+$allowedStatuses = ['confirmed', 'checked_in', 'checked_out', 'cancelled', 'no_show'];
+if ($id < 1 || !in_array($status, $allowedStatuses, true)) {
+    json_response(false, 'Valid booking ID and action are required.', 422);
 }
 
-$requestedKey = normalize_workflow_status($data['status'] ?? '', 'booking');
-
-$statusMap = [
-    'pending' => 'Pending',
-    'confirmed' => 'Confirmed',
-    'checked_in' => 'Checked In',
-    'checked_out' => 'Checked Out',
-    'cancelled' => 'Cancelled',
-    'canceled' => 'Cancelled',
-    'no_show' => 'No Show',
-];
-
-if ($bookingId < 1 || !isset($statusMap[$requestedKey])) {
-    json_response(false, 'Invalid booking or status.', 422);
+function calendar_status_key(mixed $value): string
+{
+    return str_replace([' ', '-'], '_', strtolower(trim((string) $value)));
 }
 
 try {
     $pdo = get_db_connection();
     $pdo->beginTransaction();
 
-    $stmt = $pdo->prepare('SELECT id, booking_group_id, status, payment_status FROM bookings WHERE id = :id LIMIT 1 FOR UPDATE');
-    $stmt->execute([':id' => $bookingId]);
+    $stmt = $pdo->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1 FOR UPDATE');
+    $stmt->execute([':id' => $id]);
     $booking = $stmt->fetch();
     if (!$booking) {
         $pdo->rollBack();
-        json_response(false, 'Booking not found.', 404);
+        json_response(false, 'Booking was not found.', 404);
     }
 
-    $currentStatus = normalize_workflow_status($booking['status'], 'booking');
-    $paymentStatus = normalize_workflow_status($booking['payment_status'], 'payment');
-    $paymentAliases = [
-        'paid' => 'paid',
-        'no_pay' => 'no_pay',
-        'nopay' => 'no_pay',
-        'no_payment' => 'no_pay',
-    ];
-    $paymentStatus = $paymentAliases[$paymentStatus] ?? $paymentStatus;
-    $paymentAllowed = in_array($paymentStatus, ['paid', 'no_pay'], true);
-
-    if ($requestedKey === 'confirmed' && (!$paymentAllowed || $currentStatus !== 'pending')) {
-        $pdo->rollBack();
-        json_response(false, 'Only a pending booking with Paid or No Pay payment can be confirmed. Current booking status: ' . $currentStatus . '; payment status: ' . $paymentStatus . '.', 409);
-    }
-    if ($requestedKey === 'checked_in' && (!$paymentAllowed || $currentStatus !== 'confirmed')) {
-        $pdo->rollBack();
-        json_response(false, 'Confirm the booking and set payment to Paid or No Pay before check-in.', 409);
-    }
-    if ($requestedKey === 'checked_out' && $currentStatus !== 'checked_in') {
-        $pdo->rollBack();
-        json_response(false, 'A booking can be checked out only after it is checked in.', 409);
-    }
-    if ($requestedKey === 'cancelled' && in_array($currentStatus, ['cancelled', 'checked_out'], true)) {
-        $pdo->rollBack();
-        json_response(false, 'This booking can no longer be cancelled.', 409);
-    }
-
-    $newStatus = $statusMap[$requestedKey];
     $groupId = (int) ($booking['booking_group_id'] ?? 0);
-    if ($groupId > 0) {
-        $update = $pdo->prepare('UPDATE bookings SET status = :status, updated_at = NOW() WHERE booking_group_id = :group_id');
-        $update->execute([':status' => $newStatus, ':group_id' => $groupId]);
-    } else {
-        $update = $pdo->prepare('UPDATE bookings SET status = :status, updated_at = NOW() WHERE id = :id');
-        $update->execute([':status' => $newStatus, ':id' => $bookingId]);
-    }
-    $pdo->commit();
+    $primaryBookingId = $groupId > 0 ? multi_room_primary_booking_id($pdo, $groupId) : $id;
+    $paymentStmt = $pdo->prepare('SELECT * FROM payments WHERE booking_id = :id ORDER BY id DESC LIMIT 1 FOR UPDATE');
+    $paymentStmt->execute([':id' => $primaryBookingId]);
+    $payment = $paymentStmt->fetch() ?: [];
 
-    if ($requestedKey === 'confirmed' && $paymentAllowed && $currentStatus !== 'confirmed') {
-        try {
-            $freshStmt = $pdo->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1');
-            $freshStmt->execute([':id' => $bookingId]);
-            $freshBooking = $freshStmt->fetch();
-            if ($freshBooking) {
-                cancel_pending_payment_email_jobs($pdo, $bookingId, 'Skipped because the paid booking was confirmed before the pending reminder.');
-                queue_payment_success_emails($pdo, $freshBooking, [
-                    'amount' => (float) ($freshBooking['amount'] ?? 0),
-                    'currency' => (string) ($freshBooking['currency'] ?? PAYMENT_CURRENCY),
-                    'method' => 'Manual',
-                ]);
-            }
-        } catch (Throwable $emailException) {
-            error_log('Booking confirmed but confirmation emails could not be queued for booking #' . $bookingId . ': ' . $emailException->getMessage());
+    $oldStatus = calendar_status_key($booking['status'] ?? 'Pending');
+    $paymentStatus = (string) ($booking['payment_status'] ?? 'Payment Pending');
+    $paymentKey = calendar_status_key(preg_replace('/^payment\s+/i', '', $paymentStatus) ?? $paymentStatus);
+    $paymentMethod = trim((string) ($payment['method'] ?? ''));
+
+    $transitions = [
+        'pending' => ['confirmed', 'cancelled', 'no_show'],
+        'confirmed' => ['checked_in', 'cancelled', 'no_show'],
+        'checked_in' => ['checked_out'],
+        'checked_out' => [],
+        'cancelled' => [],
+        'no_show' => [],
+    ];
+
+    if (!in_array($status, $transitions[$oldStatus] ?? [], true)) {
+        $pdo->rollBack();
+        json_response(false, 'This action is not allowed for the current booking status.', 409);
+    }
+
+    $isCashPayment = strcasecmp($paymentMethod, 'Cash') === 0;
+    if ($status === 'confirmed' && $paymentKey !== 'paid' && !$isCashPayment) {
+        $pdo->rollBack();
+        json_response(false, 'Payment must be Paid before confirming the booking.', 409);
+    }
+
+    if ($status === 'no_show' && date('Y-m-d') < (string) ($booking['check_in_date'] ?? '')) {
+        $pdo->rollBack();
+        json_response(false, 'No Show is available only on or after the check-in date.', 409);
+    }
+
+    if ($status === 'confirmed') {
+        $conflict = $pdo->prepare("SELECT id FROM bookings WHERE id <> :id AND room_name = :room_name AND status IN ('Confirmed','Checked In') AND :check_in < check_out_date AND :check_out > check_in_date LIMIT 1");
+        $conflict->execute([
+            ':id' => $id,
+            ':room_name' => $booking['room_name'],
+            ':check_in' => $booking['check_in_date'],
+            ':check_out' => $booking['check_out_date'],
+        ]);
+        if ($conflict->fetch()) {
+            $pdo->rollBack();
+            json_response(false, 'Cannot confirm because this room has an overlapping active booking.', 409);
         }
     }
 
-    json_response(true, 'Booking status updated.', 200, [
-        'data' => [
-            'id' => $bookingId,
-            'status' => $newStatus,
-            'booking_status' => strtolower(str_replace(' ', '_', $newStatus)),
-        ],
-    ]);
-} catch (Throwable $exception) {
-    if (isset($pdo) && $pdo->inTransaction()) {
-        $pdo->rollBack();
+    $displayMap = [
+        'confirmed' => 'Confirmed',
+        'checked_in' => 'Checked In',
+        'checked_out' => 'Checked Out',
+        'cancelled' => 'Cancelled',
+        'no_show' => 'No Show',
+    ];
+    $displayStatus = $displayMap[$status];
+    $refundRequired = false;
+
+    if ($status === 'no_show' && $paymentKey === 'paid') {
+        if (strcasecmp($paymentMethod, 'PayHere') === 0) {
+            $refundRequired = true;
+        }
+    } elseif ($status === 'cancelled' && !in_array($paymentKey, ['paid', 'refunded'], true)) {
+        $paymentStatus = 'Cancelled';
+        $paymentKey = 'cancelled';
     }
-    error_log('Booking status update failed: ' . $exception->getMessage());
+
+    if ($groupId > 0) {
+        $update = $pdo->prepare('UPDATE bookings SET status = :status, payment_status = :payment_status, updated_at = NOW() WHERE booking_group_id = :group_id');
+        $update->execute([':status' => $displayStatus, ':payment_status' => $paymentStatus, ':group_id' => $groupId]);
+    } else {
+        $update = $pdo->prepare('UPDATE bookings SET status = :status, payment_status = :payment_status, updated_at = NOW() WHERE id = :id');
+        $update->execute([':status' => $displayStatus, ':payment_status' => $paymentStatus, ':id' => $id]);
+    }
+
+    if ($payment) {
+        $paymentUpdate = $pdo->prepare('UPDATE payments SET status = :status, updated_at = NOW() WHERE id = :id');
+        $paymentUpdate->execute([':status' => $paymentStatus, ':id' => (int) $payment['id']]);
+    }
+
+    $pdo->commit();
+    $booking['status'] = $displayStatus;
+    $booking['payment_status'] = $paymentStatus;
+    if ($groupId > 0) {
+        $groupRows = multi_room_group_rows($pdo, $groupId);
+        $booking['booking_no'] = multi_room_booking_number($booking);
+        $booking['room_name'] = implode(', ', array_column($groupRows, 'room_name'));
+        $booking['guests'] = array_sum(array_map(static fn(array $row): int => (int) $row['guests'], $groupRows));
+        $booking['amount'] = array_sum(array_map(static fn(array $row): float => (float) $row['amount'], $groupRows));
+    }
+
+    try {
+        if ($status === 'confirmed') send_booking_confirmed_email($pdo, $booking);
+        if ($status === 'cancelled') send_booking_cancelled_emails($pdo, $booking);
+    } catch (Throwable $emailError) {
+        error_log('Calendar status email error: ' . $emailError->getMessage());
+    }
+
+    $unexpectedOutput = ob_get_contents();
+    if (is_string($unexpectedOutput) && trim($unexpectedOutput) !== '') {
+        error_log('Discarded unexpected calendar status output: ' . trim($unexpectedOutput));
+    }
+    if (ob_get_level() > 0) ob_clean();
+
+    $message = $refundRequired
+        ? 'Booking marked No Show. PayHere payment remains Paid; complete the real refund before marking it Refunded.'
+        : 'Booking status updated successfully.';
+
+    json_response(true, $message, 200, ['data' => [
+        'id' => $id,
+        'booking_status' => $status,
+        'payment_status' => $paymentStatus,
+        'payment_method' => $paymentMethod,
+        'refund_required' => $refundRequired,
+    ]]);
+} catch (Throwable $e) {
+    if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+    error_log('Admin calendar status update error: ' . $e->getMessage());
+    if (ob_get_level() > 0) ob_clean();
     json_response(false, 'Unable to update booking status.', 500);
 }

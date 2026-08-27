@@ -143,6 +143,7 @@ jebal_define('SMTP_USER', (string) jebal_env_value('SMTP_USER', ''));
 jebal_define('SMTP_PASS', (string) jebal_env_value('SMTP_PASS', ''));
 jebal_define('SMTP_PORT', (int) jebal_env_value('SMTP_PORT', 587));
 jebal_define('SMTP_SECURE', (string) jebal_env_value('SMTP_SECURE', 'tls'));
+jebal_define('MAIL_CREDENTIAL_ENCRYPTION_KEY', (string) jebal_env_value('MAIL_CREDENTIAL_ENCRYPTION_KEY', ''));
 
 jebal_define('ADMIN_EMAIL', (string) jebal_env_value('ADMIN_EMAIL', jebal_env_value('SMTP_USER', '')));
 jebal_define('BOOKING_ADMIN_EMAIL', (string) jebal_env_value('BOOKING_ADMIN_EMAIL', jebal_env_value('ADMIN_EMAIL', jebal_env_value('SMTP_USER', ''))));
@@ -185,6 +186,7 @@ jebal_define('ADMIN_SMTP_SECURE', (string) jebal_env_value('ADMIN_SMTP_SECURE', 
 
 jebal_define('PAYHERE_MERCHANT_ID', (string) jebal_env_value('PAYHERE_MERCHANT_ID', ''));
 jebal_define('PAYHERE_MERCHANT_SECRET', (string) jebal_env_value('PAYHERE_MERCHANT_SECRET', ''));
+jebal_define('ONLINE_PAYMENT_ENABLED', filter_var(jebal_env_value('ONLINE_PAYMENT_ENABLED', 'false'), FILTER_VALIDATE_BOOLEAN));
 
 jebal_define('ALLOWED_ORIGINS', jebal_env_csv('ALLOWED_ORIGINS'));
 
@@ -203,6 +205,9 @@ jebal_define('PUBLIC_TOKEN_SECRET', (string) jebal_env_value('PUBLIC_TOKEN_SECRE
 jebal_define('BOOKING_LINK_TTL_SECONDS', max(300, (int) jebal_env_value('BOOKING_LINK_TTL_SECONDS', 86400)));
 jebal_define('INVOICE_LINK_TTL_SECONDS', max(300, (int) jebal_env_value('INVOICE_LINK_TTL_SECONDS', 604800)));
 jebal_define('ALLOW_LEGACY_PUBLIC_TOKENS_UNTIL', (string) jebal_env_value('ALLOW_LEGACY_PUBLIC_TOKENS_UNTIL', ''));
+jebal_define('PUBLIC_LINK_SIGNING_KEY', PUBLIC_TOKEN_SECRET);
+jebal_define('PUBLIC_LINK_TTL_SECONDS', BOOKING_LINK_TTL_SECONDS);
+jebal_define('PUBLIC_LINK_LEGACY_UNTIL', ALLOW_LEGACY_PUBLIC_TOKENS_UNTIL);
 jebal_define('MAX_REQUEST_BODY_BYTES', max(1024, (int) jebal_env_value('MAX_REQUEST_BODY_BYTES', 1048576)));
 jebal_define('MAX_UPLOAD_BYTES', max(1024, (int) jebal_env_value('MAX_UPLOAD_BYTES', 8388608)));
 jebal_define('MAX_IMAGE_WIDTH', max(1, (int) jebal_env_value('MAX_IMAGE_WIDTH', 6000)));

@@ -9,14 +9,19 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../bookings/booking-expiry-helper.php';
+require_once __DIR__ . '/../calendar/ics-helper.php';
 require_once __DIR__ . '/../bookings/booking-audit-helper.php';
 require_once __DIR__ . '/../mail/email-helper.php';
-require_once __DIR__ . '/../calendar/ics-helper.php';
+require_once __DIR__ . '/../security/public-token-helper.php';
 
 apply_cors_headers();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(false, 'Only POST requests are allowed.', 405);
+}
+
+if (!ONLINE_PAYMENT_ENABLED) {
+    json_response(false, 'Online payment is temporarily unavailable. Please select Pay on Arrival.', 503);
 }
 
 rate_limit_or_fail('create_checkout_session', 10, 15);
@@ -42,20 +47,11 @@ function generate_payhere_order_id(int $bookingId): string
 
 function create_checkout_token(string $orderId, int $bookingId, string $amount): string
 {
-    return create_public_token('payhere-checkout', [
+    return create_public_token('payment-status', [
         'order_id' => $orderId,
         'booking_id' => $bookingId,
         'amount' => $amount,
-    ], BOOKING_LINK_TTL_SECONDS);
-}
-
-function create_booking_status_token(string $orderId, int $bookingId, string $amount): string
-{
-    return create_public_token('booking-status', [
-        'order_id' => $orderId,
-        'booking_id' => $bookingId,
-        'amount' => $amount,
-    ], BOOKING_LINK_TTL_SECONDS);
+    ], PUBLIC_LINK_TTL_SECONDS);
 }
 
 function get_public_base_url(): string
@@ -126,6 +122,7 @@ try {
     $pdo = get_db_connection();
     expire_pending_bookings($pdo, $bookingId, true);
     ensure_booking_audit_table($pdo);
+    ensure_email_queue_table($pdo);
     $pdo->beginTransaction();
 
     $bookingStmt = $pdo->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1 FOR UPDATE');
@@ -168,10 +165,7 @@ try {
         json_response(false, 'Booking dates are no longer valid for payment.', 422);
     }
 
-    $bookingGroupId = (int) ($booking['booking_group_id'] ?? 0);
-    $amount = $bookingGroupId > 0
-        ? (float) $pdo->query('SELECT total_amount FROM booking_groups WHERE id = ' . $bookingGroupId)->fetchColumn()
-        : calculate_booking_amount($roomName, $checkInDate, $checkOutDate);
+    $amount = calculate_booking_amount($roomName, $checkInDate, $checkOutDate);
 
     if ($amount <= 0) {
         $pdo->rollBack();
@@ -198,9 +192,9 @@ try {
 
     $roomIdStmt = $pdo->prepare('SELECT id FROM rooms WHERE room_name = :room_name LIMIT 1');
     $roomIdStmt->execute([':room_name' => $roomName]);
-    $roomId = (int) $roomIdStmt->fetchColumn();
+    $roomId = (int) ($roomIdStmt->fetchColumn() ?: 0);
 
-    if ($conflict->fetch() || $roomId < 1 || ics_room_conflict($pdo, $roomId, $checkInDate, $checkOutDate)) {
+    if ($conflict->fetch() || ($roomId > 0 && ics_room_conflict($pdo, $roomId, $checkInDate, $checkOutDate))) {
         $pdo->rollBack();
         json_response(false, 'Sorry, this room is no longer available for the selected dates.', 409, ['available' => false]);
     }
@@ -210,8 +204,7 @@ try {
     $orderId = generate_payhere_order_id($bookingId);
 
     $checkoutToken = create_checkout_token($orderId, $bookingId, $amountFormatted);
-    $statusToken = create_booking_status_token($orderId, $bookingId, $amountFormatted);
-    $returnUrl = build_booking_bill_url($bookingId, $orderId, $statusToken);
+    $returnUrl = build_booking_bill_url($bookingId, $orderId, $checkoutToken);
     $cancelUrl = build_room_details_url($pdo, $roomName, $bookingId, $orderId, 'failed');
     $notifyUrl = (API_BASE_URL !== '' ? API_BASE_URL : '') . '/payments/payhere-notify.php';
 
@@ -221,7 +214,7 @@ try {
         'cancel_url' => $cancelUrl,
         'notify_url' => $notifyUrl,
         'order_id' => $orderId,
-        'items' => $bookingGroupId > 0 ? 'Tulip Guest Inn multi-room booking MB-' . str_pad((string) $bookingGroupId, 6, '0', STR_PAD_LEFT) : 'Tulip Guest Inn booking #' . $bookingId . ' - ' . $roomName,
+        'items' => 'Tulip Guest Inn booking #' . $bookingId . ' - ' . $roomName,
         'currency' => $currency,
         'amount' => $amountFormatted,
         'first_name' => (string) ($booking['full_name'] ?? 'Guest'),
@@ -276,47 +269,51 @@ try {
         ':payment_status' => 'Payment Pending',
         ':id' => $bookingId,
     ]);
-    if ($bookingGroupId > 0) {
-        $pdo->prepare("UPDATE bookings SET payment_status = 'Payment Pending', status = 'Pending', updated_at = NOW() WHERE booking_group_id = :group_id")
-            ->execute([':group_id' => $bookingGroupId]);
-    }
 
     booking_audit_log($pdo, $bookingId, 'booking_payment_hold_refreshed', 'Booking Payment Hold Active', 'Booking remains reserved while awaiting payment.', [
         'order_id' => $orderId,
         'hold_minutes' => booking_hold_minutes(),
     ]);
 
+    $booking['status'] = 'Pending';
+    $booking['payment_status'] = 'Payment Pending';
+    $booking['amount'] = $amount;
+    $booking['currency'] = $currency;
+
+    /*
+     * Commit the booking/payment transaction before touching the email queue.
+     * Queue helpers may perform one-time schema checks/upgrades, and MySQL DDL
+     * implicitly commits the current transaction. Running those helpers inside
+     * this transaction caused the later commit() call to fail with
+     * "There is no active transaction".
+     */
+    if (!$pdo->inTransaction()) {
+        throw new RuntimeException('Checkout transaction ended unexpectedly before commit.');
+    }
+
     $pdo->commit();
 
-    // Queue the one-time payment-pending emails now, but delay delivery using available_at.
-    // This makes the queue visible immediately and the existing cron sends it only after the configured delay.
+    // Email scheduling is intentionally outside the booking transaction.
+    // A queue failure must not undo an already-created PayHere checkout session.
     try {
-        $pendingDelayMinutes = function_exists('jebal_env_value')
-            ? (int) jebal_env_value('PAYMENT_PENDING_EMAIL_DELAY_MINUTES', '10')
-            : 10;
-        $pendingDelayMinutes = max(5, min(180, $pendingDelayMinutes));
-        $pendingAvailableAt = (new DateTimeImmutable())->modify('+' . $pendingDelayMinutes . ' minutes')->format('Y-m-d H:i:s');
-
-        $bookingForEmail = $booking;
-        $bookingForEmail['amount'] = $amount;
-        $bookingForEmail['currency'] = $currency;
-        $bookingForEmail['payment_status'] = 'Payment Pending';
-        $bookingForEmail['status'] = 'Pending';
-
-        queue_payment_pending_emails_once($pdo, $bookingForEmail, [
+        queue_booking_pending_emails($pdo, $booking, [
             'order_id' => $orderId,
             'amount' => $amount,
             'currency' => $currency,
             'status' => 'Payment Pending',
-            'method' => 'PayHere',
             'bill_url' => $returnUrl,
-            'available_at' => $pendingAvailableAt,
-        ]);
-    } catch (Throwable $emailQueueError) {
-        error_log('Payment pending email queue failed for booking #' . $bookingId . ': ' . $emailQueueError->getMessage());
+        ], 10);
+    } catch (Throwable $queueException) {
+        error_log(
+            'Pending booking email scheduling failed for booking #'
+            . $bookingId
+            . ': '
+            . $queueException->getMessage()
+        );
     }
 
-    // Final success/failed emails are still queued after PayHere confirms the payment outcome.
+    // Pending emails are scheduled through the existing queue for ten minutes later.
+    // The queue worker re-checks the latest booking/payment state before delivery.
 
     $baseApiUrl = API_BASE_URL !== '' ? API_BASE_URL : rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/api/payments')), '/');
     $checkoutUrl = $baseApiUrl . '/payments/payhere-redirect.php?order_id=' . rawurlencode($orderId) . '&booking_id=' . $bookingId . '&token=' . rawurlencode($checkoutToken);

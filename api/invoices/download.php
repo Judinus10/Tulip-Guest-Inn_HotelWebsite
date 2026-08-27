@@ -9,7 +9,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
-require_once __DIR__ . '/invoice-helper.php';
+require_once __DIR__ . '/../security/public-token-helper.php';
 
 apply_cors_headers();
 
@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 $bookingId = (int) ($_GET['id'] ?? 0);
-$token = (string) ($_GET['token'] ?? '');
+$token = clean_string($_GET['token'] ?? '', 1024);
 
 if ($bookingId < 1) {
     header('Content-Type: application/json; charset=utf-8');
@@ -32,27 +32,25 @@ if ($bookingId < 1) {
 
 function invoice_download_token(int $bookingId): string
 {
-    return create_public_token('invoice-download', ['booking_id' => $bookingId], INVOICE_LINK_TTL_SECONDS);
+    return hash_hmac('sha256', (string) $bookingId, PAYHERE_MERCHANT_SECRET);
 }
 
-$hasGuestToken = false;
-if ($token !== '') {
-    rate_limit_or_fail('invoice_download', 12, 15);
-    $hasGuestToken = verify_public_token($token, 'invoice-download', ['booking_id' => $bookingId]);
-    if (!$hasGuestToken && legacy_public_tokens_allowed()) {
-        $hasGuestToken = hash_equals(hash_hmac('sha256', (string) $bookingId, PAYHERE_MERCHANT_SECRET), $token);
-    }
+$hasGuestToken = $token !== '' && verify_public_token($token, 'invoice-download', ['booking_id' => $bookingId]);
+if (!$hasGuestToken && $token !== '' && legacy_public_tokens_allowed()) {
+    $hasGuestToken = hash_equals(invoice_download_token($bookingId), $token);
 }
 
 if (!$hasGuestToken) {
     require_admin_auth();
+} else {
+    rate_limit_or_fail('invoice_download', 20, 15);
 }
 
 try {
     $pdo = get_db_connection();
 
     $stmt = $pdo->prepare(
-        'SELECT invoice_number, payment_status
+        'SELECT invoice_file_path, invoice_number, payment_status
          FROM bookings
          WHERE id = :id
          LIMIT 1'
@@ -60,45 +58,31 @@ try {
     $stmt->execute([':id' => $bookingId]);
     $booking = $stmt->fetch();
 
-    if (!$booking) {
+    if (!$booking || empty($booking['invoice_file_path'])) {
         header('Content-Type: application/json; charset=utf-8');
         json_response(false, 'Invoice not found.', 404);
     }
 
-    $paymentStmt = $pdo->prepare(
-        'SELECT *
-         FROM payments
-         WHERE booking_id = :booking_id
-         ORDER BY id DESC
-         LIMIT 1'
-    );
-    $paymentStmt->execute([':booking_id' => $bookingId]);
-    $payment = $paymentStmt->fetch() ?: [];
-
-    $isPaid = strcasecmp((string) ($booking['payment_status'] ?? ''), 'Paid') === 0;
-    $isCash = strcasecmp((string) ($payment['method'] ?? ''), 'Cash') === 0;
-    if ($hasGuestToken && !$isPaid && !$isCash) {
+    if ($hasGuestToken && (string) ($booking['payment_status'] ?? '') !== 'Paid') {
         header('Content-Type: application/json; charset=utf-8');
-        json_response(false, 'Receipt is available only after successful payment.', 403);
+        json_response(false, 'Invoice is available only after successful payment.', 403);
     }
 
-    $invoice = build_invoice_data_for_booking($pdo, $bookingId, $payment);
-    if (!$invoice) {
+    $filePath = realpath(__DIR__ . '/../' . $booking['invoice_file_path']);
+    $basePath = realpath(__DIR__ . '/../storage/invoices');
+
+    if (!$filePath || !$basePath || !str_starts_with($filePath, $basePath) || !is_file($filePath)) {
         header('Content-Type: application/json; charset=utf-8');
-        json_response(false, 'Invoice not found.', 404);
+        json_response(false, 'Invoice file not found.', 404);
     }
 
-    $documentNumber = $isCash ? 'BK-' . str_pad((string) $bookingId, 6, '0', STR_PAD_LEFT) : (string) ($invoice['invoice_number'] ?: generate_invoice_number($bookingId));
-    $invoiceNumber = preg_replace('/[^A-Za-z0-9_-]/', '', $documentNumber) ?: ($isCash ? 'booking-confirmation' : 'invoice');
-    $pdf = create_invoice_pdf_binary($invoice);
+    $invoiceNumber = preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($booking['invoice_number'] ?: 'invoice')) ?: 'invoice';
 
     header('Content-Type: application/pdf');
     header('Content-Disposition: attachment; filename="' . $invoiceNumber . '.pdf"');
-    header('Content-Length: ' . strlen($pdf));
-    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-    header('Pragma: no-cache');
+    header('Content-Length: ' . filesize($filePath));
 
-    echo $pdf;
+    readfile($filePath);
     exit;
 } catch (Throwable $e) {
     error_log('Invoice download error: ' . $e->getMessage());

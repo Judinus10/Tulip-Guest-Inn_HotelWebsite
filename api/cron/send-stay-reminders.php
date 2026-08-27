@@ -13,37 +13,18 @@ if (!$isCli) {
         ? trim((string) jebal_env_value('STAY_REMINDER_CRON_TOKEN', ''))
         : '';
 
+    // HTTP execution must fail closed. CLI execution remains available for
+    // server-managed scheduled jobs and does not require an HTTP token.
     if ($configuredToken === '') {
-        error_log('Stay reminder cron denied: STAY_REMINDER_CRON_TOKEN is not configured.');
-        json_response(false, 'Cron endpoint is not configured.', 503);
+        error_log('Stay reminder HTTP cron disabled: STAY_REMINDER_CRON_TOKEN is not configured.');
+        json_response(false, 'HTTP cron execution is disabled.', 503);
     }
 
-    $requestToken = trim((string) (
-        $_SERVER['HTTP_X_CRON_TOKEN']
-        ?? $_GET['token']
-        ?? ''
-    ));
+    $requestToken = trim((string) ($_SERVER['HTTP_X_CRON_TOKEN'] ?? $_GET['token'] ?? ''));
     if ($requestToken === '' || !hash_equals($configuredToken, $requestToken)) {
-        json_response(false, 'Unauthorized cron request.', 401);
+        json_response(false, 'Forbidden.', 403);
     }
 }
-
-$cronLock = fopen(sys_get_temp_dir() . '/tulip-send-stay-reminders.lock', 'c');
-if ($cronLock === false || !flock($cronLock, LOCK_EX | LOCK_NB)) {
-    if (is_resource($cronLock)) {
-        fclose($cronLock);
-    }
-    if ($isCli) {
-        fwrite(STDOUT, "Stay reminder cron is already running.\n");
-        exit(0);
-    }
-    json_response(false, 'Stay reminder cron is already running.', 409);
-}
-
-register_shutdown_function(static function () use ($cronLock): void {
-    flock($cronLock, LOCK_UN);
-    fclose($cronLock);
-});
 
 function stay_reminder_fetch_bookings(PDO $pdo, string $date, string $field): array
 {
@@ -117,9 +98,9 @@ function stay_reminder_bookings_html(array $bookings, string $emptyText): string
 
 function queue_stay_reminder_email(PDO $pdo, string $date, array $checkIns, array $checkOuts): int
 {
-    $adminEmail = defined('ADMIN_EMAIL') ? trim((string) ADMIN_EMAIL) : '';
+    $adminEmail = booking_admin_email();
     if ($adminEmail === '' || !filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
-        error_log('Stay reminder skipped: ADMIN_EMAIL is missing or invalid.');
+        error_log('Stay reminder skipped: BOOKING_ADMIN_EMAIL is missing or invalid.');
         return 0;
     }
 
@@ -202,7 +183,7 @@ try {
         exit(1);
     }
 
-    json_response(false, 'Stay reminder cron failed.', 500, [
-        'error' => defined('APP_ENV') && APP_ENV === 'production' ? null : $e->getMessage(),
+    json_response(false, 'Stay reminders could not be processed. Review the protected cron log.', 500, [
+        'error_code' => 'STAY_REMINDER_FAILED',
     ]);
 }

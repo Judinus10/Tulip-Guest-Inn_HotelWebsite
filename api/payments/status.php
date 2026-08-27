@@ -10,8 +10,9 @@ require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../invoices/invoice-helper.php';
 require_once __DIR__ . '/../bookings/booking-expiry-helper.php';
 require_once __DIR__ . '/../bookings/booking-audit-helper.php';
+require_once __DIR__ . '/../bookings/multi-room-helper.php';
 require_once __DIR__ . '/../mail/email-helper.php';
-require_once __DIR__ . '/../rooms/_room_helpers.php';
+require_once __DIR__ . '/../security/public-token-helper.php';
 
 apply_cors_headers();
 
@@ -22,17 +23,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     json_response(false, 'Only GET requests are allowed.', 405);
-}
-
-rate_limit_or_fail('payment_status_lookup', 30, 15);
-
-function public_checkout_token(string $orderId, int $bookingId, string $amount): string
-{
-    return create_public_token('booking-status', [
-        'order_id' => $orderId,
-        'booking_id' => $bookingId,
-        'amount' => $amount,
-    ], BOOKING_LINK_TTL_SECONDS);
 }
 
 function public_invoice_download_token(int $bookingId): string
@@ -98,34 +88,16 @@ function public_room_url(PDO $pdo, string $roomName): string
     return $publicBaseUrl . '/rooms';
 }
 
-
-function public_room_main_image(PDO $pdo, string $roomName): string
-{
-    try {
-        ensure_room_images_table($pdo);
-        $stmt = $pdo->prepare('SELECT id FROM rooms WHERE room_name = :room_name LIMIT 1');
-        $stmt->execute([':room_name' => $roomName]);
-        $roomId = (int) ($stmt->fetchColumn() ?: 0);
-        if ($roomId < 1) return '';
-
-        $images = fetch_room_images($pdo, [$roomId]);
-        $roomImages = $images[$roomId] ?? [];
-        if ($roomImages === []) return '';
-
-        return (string) ($roomImages[0]['image_url'] ?? '');
-    } catch (Throwable $exception) {
-        error_log('Unable to load public room main image: ' . $exception->getMessage());
-        return '';
-    }
-}
-
 $bookingId = (int) ($_GET['booking_id'] ?? 0);
 $orderId = clean_string($_GET['order_id'] ?? '', 100);
-$token = clean_string($_GET['token'] ?? '', 512);
+$token = clean_string($_GET['token'] ?? '', 1024);
 
 if ($bookingId < 1 || $orderId === '' || $token === '') {
     json_response(false, 'Booking ID, order ID, and token are required.', 422);
 }
+// PayHere bills poll every 15 seconds and Cash bills every 7 minutes.
+// Allow normal bill monitoring without letting the endpoint run unrestricted.
+rate_limit_or_fail('payment_status_lookup', 120, 15);
 
 try {
     $pdo = get_db_connection();
@@ -158,22 +130,8 @@ try {
         json_response(false, 'Payment record was not found.', 404);
     }
 
-    $bookingGroupId = (int) ($record['booking_group_id'] ?? 0);
-    if ($bookingGroupId > 0) {
-        $groupStmt = $pdo->prepare(
-            "SELECT GROUP_CONCAT(room_name ORDER BY is_group_primary DESC, id ASC SEPARATOR ', ') AS room_names,
-                    SUM(guests) AS total_guests, COUNT(*) AS total_rooms
-             FROM bookings WHERE booking_group_id = :group_id"
-        );
-        $groupStmt->execute([':group_id' => $bookingGroupId]);
-        $group = $groupStmt->fetch() ?: [];
-        $record['room_name'] = (string) ($group['room_names'] ?? $record['room_name']);
-        $record['guests'] = (int) ($group['total_guests'] ?? $record['guests']);
-        $record['rooms'] = (int) ($group['total_rooms'] ?? 1);
-    }
-
     $amountForToken = number_format((float) ($record['paid_amount'] ?? $record['amount'] ?? 0), 2, '.', '');
-    $validToken = verify_public_token($token, 'booking-status', [
+    $validToken = verify_public_token($token, 'payment-status', [
         'order_id' => $orderId,
         'booking_id' => $bookingId,
         'amount' => $amountForToken,
@@ -191,24 +149,59 @@ try {
     // Do not trigger booking emails from the public bill/status polling endpoint.
     // Emails are queued by the verified PayHere notify endpoint and delivered by cron.
 
-    // Invoice PDFs are no longer stored locally. They are generated only when downloaded.
+    if ($paymentStatus === 'Paid' && (empty($record['invoice_id']) || empty($record['invoice_file_path']))) {
+        try {
+            booking_audit_log($pdo, $bookingId, 'invoice_generation_started', 'Invoice Generation Started', 'Invoice generation was triggered from the bill page.', ['order_id' => $orderId]);
+
+            generate_invoice_for_booking($pdo, $bookingId, [
+                'amount' => (float) ($record['paid_amount'] ?? $record['amount'] ?? 0),
+                'currency' => (string) ($record['paid_currency'] ?? $record['currency'] ?? PAYMENT_CURRENCY),
+                'method' => (string) ($record['payment_method'] ?? 'PayHere'),
+                'paid_at' => (string) ($record['payment_updated_at'] ?? date('Y-m-d H:i:s')),
+            ]);
+
+            $freshStmt = $pdo->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1');
+            $freshStmt->execute([':id' => $bookingId]);
+            $freshBooking = $freshStmt->fetch();
+            if ($freshBooking) {
+                $record = array_merge($record, $freshBooking);
+            }
+        } catch (Throwable $exception) {
+            error_log('Public payment status invoice generation failed: ' . $exception->getMessage());
+        }
+    }
 
     $paymentHistory = load_payment_history($pdo, $bookingId);
+    $bookingGroupId = (int) ($record['booking_group_id'] ?? 0);
+    $groupRooms = $bookingGroupId > 0 ? multi_room_group_rows($pdo, $bookingGroupId) : [];
+    $groupBookingNo = $bookingGroupId > 0
+        ? 'MB-' . str_pad((string) $bookingGroupId, 6, '0', STR_PAD_LEFT)
+        : 'BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT);
+    $displayRoomName = $groupRooms
+        ? implode(', ', array_map(static fn(array $room): string => (string) $room['room_name'], $groupRooms))
+        : (string) ($record['room_name'] ?? '');
+    $displayGuests = $groupRooms
+        ? array_sum(array_map(static fn(array $room): int => (int) $room['guests'], $groupRooms))
+        : (int) ($record['guests'] ?? 0);
 
+    $expiresAt = booking_expires_at($record);
+    $secondsRemaining = $paymentStatus === 'Payment Pending' ? booking_seconds_remaining($record) : 0;
     $paymentMethod = strtolower((string) ($record['payment_method'] ?? ''));
-    $isCashPayment = $paymentMethod === 'cash';
-    $expiresAt = $isCashPayment ? null : booking_expires_at($record);
-    $secondsRemaining = !$isCashPayment && $paymentStatus === 'Payment Pending' ? booking_seconds_remaining($record) : 0;
-    $canRetryPayment = !$isCashPayment && in_array($paymentStatus, ['Payment Pending', 'Failed', 'Cancelled'], true)
+    $isOnlinePayment = str_contains($paymentMethod, 'payhere');
+    $canRetryPayment = $isOnlinePayment
+        && in_array($paymentStatus, ['Payment Pending', 'Failed', 'Cancelled'], true)
         && (string) ($record['status'] ?? '') !== 'Confirmed';
 
-    // A booking bill is available for every valid booking. For online payments
-    // the generated PDF reflects the current payment state (pending/paid/etc.).
-    $baseApiUrl = API_BASE_URL !== '' ? API_BASE_URL : rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/api/payments')), '/');
-    $invoiceDownloadUrl = $baseApiUrl . '/invoices/download.php?' . http_build_query([
-        'id' => $bookingId,
-        'token' => public_invoice_download_token($bookingId),
-    ]);
+    $invoiceDownloadUrl = null;
+    if ($paymentStatus === 'Paid' && !empty($record['invoice_file_path'])) {
+        $baseApiUrl = API_BASE_URL !== '' ? API_BASE_URL : rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/api/payments')), '/');
+        $invoiceDownloadUrl = $baseApiUrl . '/invoices/download.php?' . http_build_query([
+            'id' => $bookingId,
+            'booking_no' => $groupBookingNo,
+            'booking_group_id' => $bookingGroupId ?: null,
+            'token' => public_invoice_download_token($bookingId),
+        ]);
+    }
 
     json_response(true, 'Payment status loaded.', 200, [
         'booking' => [
@@ -216,12 +209,10 @@ try {
             'full_name' => (string) ($record['full_name'] ?? ''),
             'email' => (string) ($record['email'] ?? ''),
             'phone' => (string) ($record['phone'] ?? ''),
-            'room_name' => (string) ($record['room_name'] ?? ''),
+            'room_name' => $displayRoomName,
             'check_in_date' => (string) ($record['check_in_date'] ?? ''),
             'check_out_date' => (string) ($record['check_out_date'] ?? ''),
-            'guests' => (int) ($record['guests'] ?? 0),
-            'rooms' => (int) ($record['rooms'] ?? 1),
-            'booking_group_id' => $bookingGroupId ?: null,
+            'guests' => $displayGuests,
             'booking_status' => (string) ($record['status'] ?? 'Pending'),
             'payment_status' => $paymentStatus,
             'amount' => (float) ($record['paid_amount'] ?? $record['amount'] ?? 0),
@@ -231,13 +222,20 @@ try {
             'payment_id' => (string) ($record['payment_id'] ?? ''),
             'payment_method' => (string) ($record['payment_method'] ?? 'PayHere'),
             'room_url' => public_room_url($pdo, (string) ($record['room_name'] ?? '')),
-            'room_main_image' => public_room_main_image($pdo, (string) ($record['room_name'] ?? '')),
             'invoice_download_url' => $invoiceDownloadUrl,
             'hold_minutes' => booking_hold_minutes(),
             'expires_at' => $expiresAt,
             'seconds_remaining' => $secondsRemaining,
             'can_retry_payment' => $canRetryPayment,
             'payment_history' => $paymentHistory,
+            'rooms' => array_map(static fn(array $room): array => [
+                'booking_id' => (int) $room['id'],
+                'room_id' => (int) ($room['room_id'] ?? 0),
+                'room_name' => (string) $room['room_name'],
+                'guests' => (int) $room['guests'],
+                'amount' => (float) $room['amount'],
+                'currency' => (string) $room['currency'],
+            ], $groupRooms),
         ],
     ]);
 } catch (Throwable $exception) {

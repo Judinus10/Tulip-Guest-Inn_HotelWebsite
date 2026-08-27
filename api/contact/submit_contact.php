@@ -50,8 +50,6 @@ try {
     $queuedCount = 0;
 
     try {
-        // Queue email notifications for the existing cron/mail worker.
-        // Do not send SMTP mail during the contact form request, otherwise the frontend waits.
         $queuedCount = queue_contact_enquiry_emails(
             $pdo,
             $id,
@@ -62,7 +60,7 @@ try {
             $message
         );
     } catch (Throwable $queueError) {
-        // The enquiry is saved and visible to admin. Never fail the visitor message because queue insert had a problem.
+        // The enquiry is saved. Never make the visitor wait/fail because queue insert had a problem.
         error_log('Contact email queue insert failed for enquiry #' . $id . ': ' . $queueError->getMessage());
     }
 

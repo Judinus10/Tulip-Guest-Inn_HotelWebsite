@@ -8,6 +8,13 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../security/public-token-helper.php';
+
+if (!ONLINE_PAYMENT_ENABLED) {
+    http_response_code(503);
+    header('Content-Type: text/plain; charset=utf-8');
+    exit('Online payment is temporarily unavailable.');
+}
 
 function redirect_error(string $message, int $statusCode = 400): void
 {
@@ -24,16 +31,16 @@ function payhere_redirect_format_amount(float $amount): string
 
 function expected_checkout_token(string $orderId, int $bookingId, string $amount): string
 {
-    return create_public_token('payhere-checkout', [
+    return create_public_token('payment-status', [
         'order_id' => $orderId,
         'booking_id' => $bookingId,
         'amount' => $amount,
-    ], BOOKING_LINK_TTL_SECONDS);
+    ], PUBLIC_LINK_TTL_SECONDS);
 }
 
 $orderId = clean_string($_GET['order_id'] ?? '', 100);
 $bookingId = (int) ($_GET['booking_id'] ?? 0);
-$token = clean_string($_GET['token'] ?? '', 512);
+$token = clean_string($_GET['token'] ?? '', 1024);
 
 if ($orderId === '' || $bookingId < 1 || $token === '') {
     redirect_error('Invalid checkout link.', 422);
@@ -53,13 +60,14 @@ try {
     }
 
     $amount = payhere_redirect_format_amount((float) $payment['amount']);
-    $validToken = verify_public_token($token, 'payhere-checkout', [
+    $validToken = verify_public_token($token, 'payment-status', [
         'order_id' => $orderId,
         'booking_id' => $bookingId,
         'amount' => $amount,
     ]);
     if (!$validToken && legacy_public_tokens_allowed()) {
-        $validToken = hash_equals(hash_hmac('sha256', $orderId . '|' . $bookingId . '|' . $amount, PAYHERE_MERCHANT_SECRET), $token);
+        $legacy = hash_hmac('sha256', $orderId . '|' . $bookingId . '|' . $amount, PAYHERE_MERCHANT_SECRET);
+        $validToken = hash_equals($legacy, $token);
     }
     if (!$validToken) {
         redirect_error('Invalid checkout token.', 403);
@@ -78,15 +86,6 @@ try {
     ? 'https://www.payhere.lk/pay/checkout'
     : 'https://sandbox.payhere.lk/pay/checkout';
 
-    $payhereOrigin = (string) parse_url($payhereUrl, PHP_URL_SCHEME) . '://' . (string) parse_url($payhereUrl, PHP_URL_HOST);
-    $scriptNonce = base64_encode(random_bytes(18));
-    header_remove('Content-Security-Policy');
-    header(
-        "Content-Security-Policy: default-src 'none'; "
-        . "script-src 'nonce-{$scriptNonce}'; "
-        . "form-action {$payhereOrigin}; "
-        . "frame-ancestors 'none'; base-uri 'none'"
-    );
     header('Content-Type: text/html; charset=utf-8');
 } catch (Throwable $e) {
     error_log('PayHere redirect error: ' . $e->getMessage());
@@ -106,9 +105,9 @@ try {
         <?php foreach ($payload as $key => $value): ?>
             <input type="hidden" name="<?= htmlspecialchars((string) $key, ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8') ?>">
         <?php endforeach; ?>
-        <button type="submit">Continue to PayHere</button>
+        <noscript><button type="submit">Continue to PayHere</button></noscript>
     </form>
-    <script nonce="<?= htmlspecialchars($scriptNonce, ENT_QUOTES, 'UTF-8') ?>">
+    <script>
         document.getElementById('payhere-checkout-form').submit();
     </script>
 </body>

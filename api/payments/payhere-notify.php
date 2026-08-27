@@ -15,8 +15,13 @@ require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../bookings/booking-expiry-helper.php';
 require_once __DIR__ . '/../bookings/booking-audit-helper.php';
 require_once __DIR__ . '/../invoices/invoice-helper.php';
-require_once __DIR__ . '/../calendar/ics-helper.php';
 require_once __DIR__ . '/../mail/email-helper.php';
+
+if (!ONLINE_PAYMENT_ENABLED) {
+    http_response_code(503);
+    header('Content-Type: text/plain; charset=utf-8');
+    exit('Online payment is temporarily unavailable');
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -81,7 +86,6 @@ $incomingPaymentStatus = payhere_status_for_db($statusCode);
 $sideEffects = [
     'send_success' => false,
     'send_failed' => false,
-    'failure_status' => '',
     'booking_id' => 0,
     'amount' => (float) $payhereAmount,
     'currency' => $payhereCurrency,
@@ -92,6 +96,7 @@ $sideEffects = [
 try {
     $pdo = get_db_connection();
     ensure_booking_audit_table($pdo);
+    ensure_email_queue_table($pdo);
     $pdo->beginTransaction();
 
     $paymentStmt = $pdo->prepare('SELECT * FROM payments WHERE order_id = :order_id LIMIT 1 FOR UPDATE');
@@ -174,12 +179,25 @@ try {
 
     // Duplicate success notification: acknowledge without doing side effects again.
     if ($currentPaymentStatus === 'Paid' && $incomingPaymentStatus === 'Paid') {
-        booking_audit_log($pdo, $bookingId, 'duplicate_payment_notify', 'Duplicate Payment Notification Ignored', 'PayHere sent a duplicate successful notification. No email or invoice was sent again.', [
+        booking_audit_log($pdo, $bookingId, 'duplicate_payment_notify', 'Duplicate Payment Notification Ignored', 'PayHere sent a duplicate successful notification. No email or invoice was queued again.', [
             'order_id' => $orderId,
             'payment_id' => $paymentId,
         ]);
         $pdo->commit();
         notify_text_response(200, 'OK duplicate ignored');
+    }
+
+    // A final result for this PayHere order is immutable. This prevents contradictory
+    // confirmation and failure emails when duplicate/out-of-order callbacks arrive.
+    if (in_array($currentPaymentStatus, ['Paid', 'Failed', 'Cancelled'], true)) {
+        booking_audit_log($pdo, $bookingId, 'duplicate_payment_notify', 'Duplicate Payment Notification Ignored', 'PayHere sent a notification after this payment order had already reached a final state.', [
+            'order_id' => $orderId,
+            'payment_id' => $paymentId,
+            'current_status' => $currentPaymentStatus,
+            'incoming_status' => $incomingPaymentStatus,
+        ]);
+        $pdo->commit();
+        notify_text_response(200, 'OK final state already processed');
     }
 
     // If the user did not pay and the booking hold is expired, release the room now.
@@ -208,17 +226,7 @@ try {
         );
         $conflictStatement->execute([':booking_id' => $bookingId]);
 
-        $roomIdStmt = $pdo->prepare('SELECT id FROM rooms WHERE room_name = :room_name LIMIT 1');
-        $roomIdStmt->execute([':room_name' => (string) ($booking['room_name'] ?? '')]);
-        $roomId = (int) $roomIdStmt->fetchColumn();
-        $bookingComConflict = $roomId > 0 && ics_room_conflict(
-            $pdo,
-            $roomId,
-            (string) ($booking['check_in_date'] ?? ''),
-            (string) ($booking['check_out_date'] ?? '')
-        );
-
-        if ($conflictStatement->fetch() || $bookingComConflict) {
+        if ($conflictStatement->fetch()) {
             $finalPaymentStatus = 'Paid';
             $finalBookingStatus = 'Pending';
             $statusMessage = trim($statusMessage . ' Paid but booking has a confirmed overlap; manual review required.');
@@ -273,11 +281,6 @@ try {
         ':currency' => $payhereCurrency,
         ':id' => $bookingId,
     ]);
-    $groupId = (int) ($booking['booking_group_id'] ?? 0);
-    if ($groupId > 0) {
-        $pdo->prepare('UPDATE bookings SET status = :status, payment_status = :payment_status, currency = :currency, updated_at = NOW() WHERE booking_group_id = :group_id')
-            ->execute([':status' => $finalBookingStatus, ':payment_status' => $finalPaymentStatus, ':currency' => $payhereCurrency, ':group_id' => $groupId]);
-    }
 
     if ($finalPaymentStatus === 'Paid') {
         booking_audit_log($pdo, $bookingId, 'payment_success', 'Payment Success', 'PayHere payment was verified and booking was confirmed.', [
@@ -301,11 +304,18 @@ try {
         ]);
     }
 
+    if (in_array($finalPaymentStatus, ['Paid', 'Failed', 'Cancelled'], true)) {
+        cancel_scheduled_pending_booking_emails(
+            $pdo,
+            $bookingId,
+            'PayHere verified final payment status: ' . $finalPaymentStatus
+        );
+    }
+
     $pdo->commit();
 
     $sideEffects['send_success'] = $finalPaymentStatus === 'Paid' && $currentPaymentStatus !== 'Paid' && $finalBookingStatus === 'Confirmed';
-    $sideEffects['send_failed'] = in_array($finalPaymentStatus, ['Failed', 'Cancelled', 'Refunded'], true) && $currentPaymentStatus !== $finalPaymentStatus;
-    $sideEffects['failure_status'] = $sideEffects['send_failed'] ? $finalPaymentStatus : '';
+    $sideEffects['send_failed'] = in_array($finalPaymentStatus, ['Failed', 'Cancelled'], true) && !in_array($currentPaymentStatus, ['Failed', 'Cancelled'], true);
     $sideEffects['amount'] = (float) $payhereAmount;
     $sideEffects['currency'] = $payhereCurrency;
     $sideEffects['method'] = $method ?: 'PayHere';
@@ -325,7 +335,6 @@ if ($sideEffects['booking_id'] > 0) {
 
         if ($freshBooking) {
             if ($sideEffects['send_success']) {
-                cancel_pending_payment_email_jobs($pdo, (int) $sideEffects['booking_id'], 'Skipped because PayHere confirmed payment before the 10-minute reminder.');
                 booking_audit_log($pdo, (int) $sideEffects['booking_id'], 'invoice_generation_started', 'Invoice Generation Started', 'Creating invoice after verified PayHere payment.', []);
 
                 $invoice = generate_invoice_for_booking($pdo, (int) $sideEffects['booking_id'], [
@@ -348,11 +357,10 @@ if ($sideEffects['booking_id'] > 0) {
                     'transaction_id' => (string) $sideEffects['payment_id'],
                     'invoice' => $invoice,
                 ]);
-                booking_audit_log($pdo, (int) $sideEffects['booking_id'], 'success_email_queued', 'Success Email Queued', 'Payment success emails were queued for cron delivery to customer/admin.', []);
+                booking_audit_log($pdo, (int) $sideEffects['booking_id'], 'confirmation_email_queued', 'Confirmation Email Queued', 'Customer, admin, and applicable staying-guest confirmation emails were queued for delivery.', []);
             } elseif ($sideEffects['send_failed']) {
-                cancel_pending_payment_email_jobs($pdo, (int) $sideEffects['booking_id'], 'Skipped because PayHere returned ' . (string) $sideEffects['failure_status'] . ' before the 10-minute reminder.');
-                queue_payment_failed_email($pdo, $freshBooking, (string) $sideEffects['failure_status']);
-                booking_audit_log($pdo, (int) $sideEffects['booking_id'], 'failed_email_queued', 'Failed Payment Email Queued', 'Payment failed/cancelled emails were queued for cron delivery.', []);
+                queue_payment_failed_email($pdo, $freshBooking);
+                booking_audit_log($pdo, (int) $sideEffects['booking_id'], 'failed_email_queued', 'Failed Email Queued', 'Customer and admin payment-failed emails were queued for delivery.', []);
             }
         }
     } catch (Throwable $e) {
