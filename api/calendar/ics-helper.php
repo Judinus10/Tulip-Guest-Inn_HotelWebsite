@@ -19,6 +19,10 @@ function ics_timezone(): DateTimeZone
 
 function ics_connections(): array
 {
+    if (!ics_enabled()) {
+        return [];
+    }
+
     $raw = jebal_env_value('ICS_ROOM_MAPPINGS_JSON', '[]');
     $rows = is_array($raw) ? $raw : json_decode((string) $raw, true);
     if (!is_array($rows)) {
@@ -89,6 +93,10 @@ function ensure_ics_schema(PDO $pdo): void
 
 function ics_room_conflict(PDO $pdo, int $roomId, string $checkIn, string $checkOut): bool
 {
+    if (!ics_enabled()) {
+        return false;
+    }
+
     ensure_ics_schema($pdo);
     $stmt = $pdo->prepare(
         "SELECT id FROM external_calendar_events
@@ -253,6 +261,15 @@ function fetch_ics(string $url): string
 
 function sync_ics_room(PDO $pdo, array $map): array
 {
+    if (!ics_enabled()) {
+        return [
+            'room_id' => (int) ($map['room_id'] ?? 0),
+            'success' => false,
+            'events' => 0,
+            'error' => 'Calendar synchronization is disabled.',
+        ];
+    }
+
     ensure_ics_schema($pdo);
     $roomId = (int) $map['room_id'];
     $now = (new DateTimeImmutable())->format('Y-m-d H:i:s');

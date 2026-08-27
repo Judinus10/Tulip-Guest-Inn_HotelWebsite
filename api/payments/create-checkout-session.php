@@ -21,7 +21,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 if (!ONLINE_PAYMENT_ENABLED) {
-    json_response(false, 'Online payment is temporarily unavailable. Please select Pay on Arrival.', 503);
+    json_response(false, 'Online payment is not available at the moment. Please use Pay on Arrival.', 200, [
+        'severity' => 'warning',
+        'error_code' => 'ONLINE_PAYMENT_DISABLED',
+        'fallback_payment_method' => 'Cash',
+    ]);
 }
 
 rate_limit_or_fail('create_checkout_session', 10, 15);

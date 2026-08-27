@@ -5,7 +5,7 @@ import PageHero from '../components/ui/PageHero';
 import AnimatedSection from '../components/ui/AnimatedSection';
 import { rooms as fallbackRooms } from '../data/rooms';
 import type { Room } from '../data/rooms';
-import { createCheckoutSession, fetchPublicRooms, submitBookingRequest } from '../services/publicApi';
+import { createCheckoutSession, fetchPublicFeatures, fetchPublicRooms, submitBookingRequest } from '../services/publicApi';
 import bannerBooking from '../assets/images/banners/banner-booking.jpg';
 import { useToast } from '../components/ui/ToastProvider';
 import { formatMoney } from '../services/formatters';
@@ -70,6 +70,32 @@ export default function Booking() {
   const [bookingRooms, setBookingRooms] = useState<Room[]>(fallbackRooms);
   const [submitError, setSubmitError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [onlinePaymentEnabled, setOnlinePaymentEnabled] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchPublicFeatures()
+      .then((features) => {
+        if (!mounted) return;
+        setOnlinePaymentEnabled(Boolean(features.online_payment_enabled));
+        if (!features.online_payment_enabled) {
+          setForm((current) => ({ ...current, paymentMethod: 'Cash' }));
+        }
+      })
+      .catch(() => {
+        if (mounted) setOnlinePaymentEnabled(false);
+      });
+    return () => { mounted = false; };
+  }, []);
+
+  const selectPaymentMethod = (method: 'Cash' | 'PayHere') => {
+    if (method === 'PayHere' && !onlinePaymentEnabled) {
+      setForm((current) => ({ ...current, paymentMethod: 'Cash' }));
+      toast.warning('Online payment is not available at the moment. Please use Pay on Arrival.');
+      return;
+    }
+    setForm((current) => ({ ...current, paymentMethod: method }));
+  };
 
   useEffect(() => {
     const params = readBookingParams();
@@ -143,6 +169,11 @@ export default function Booking() {
     if (!selectedRoom) {
       setSubmitError('Please select a valid room type.');
       toast.warning('Please select a valid room type.');
+      return;
+    }
+
+    if (form.paymentMethod === 'PayHere' && !onlinePaymentEnabled) {
+      selectPaymentMethod('PayHere');
       return;
     }
 
@@ -336,7 +367,7 @@ export default function Booking() {
                           name="paymentMethod"
                           value="Cash"
                           checked={form.paymentMethod === 'Cash'}
-                          onChange={handleChange}
+                          onChange={() => selectPaymentMethod('Cash')}
                           className="h-4 w-4 accent-gold"
                         />
                         <span>Pay on Arrival</span>
@@ -347,7 +378,7 @@ export default function Booking() {
                           name="paymentMethod"
                           value="PayHere"
                           checked={form.paymentMethod === 'PayHere'}
-                          onChange={handleChange}
+                          onChange={() => selectPaymentMethod('PayHere')}
                           className="h-4 w-4 accent-gold"
                         />
                         <span>Pay Online</span>

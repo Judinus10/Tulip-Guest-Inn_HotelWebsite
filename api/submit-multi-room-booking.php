@@ -33,7 +33,11 @@ $isCashPayment = in_array($paymentMethod, ['cash', 'pay on arrival'], true);
 $isOnlinePayment = in_array($paymentMethod, ['payhere', 'online', 'pay online'], true);
 
 if ($isOnlinePayment && !ONLINE_PAYMENT_ENABLED) {
-    json_response(false, 'Online payment is temporarily unavailable. Please select Pay on Arrival.', 503);
+    json_response(false, 'Online payment is not available at the moment. Please use Pay on Arrival.', 200, [
+        'severity' => 'warning',
+        'error_code' => 'ONLINE_PAYMENT_DISABLED',
+        'fallback_payment_method' => 'Cash',
+    ]);
 }
 if (!$isCashPayment && !$isOnlinePayment) {
     json_response(false, 'Please select a valid payment method.', 422);
@@ -78,7 +82,9 @@ try {
     // MySQL DDL implicitly commits an active transaction. The ICS helper runs
     // CREATE TABLE IF NOT EXISTS during its one-time schema check, so it must
     // be initialized before the atomic multi-room booking transaction starts.
-    ensure_ics_schema($pdo);
+    if (ics_enabled()) {
+        ensure_ics_schema($pdo);
+    }
 
     $pdo->beginTransaction();
 

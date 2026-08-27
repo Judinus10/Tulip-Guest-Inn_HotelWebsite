@@ -23,7 +23,6 @@ export default function PageHero({ title, subtitle, image, breadcrumb }: PageHer
           className="w-full h-full object-cover"
           loading="eager"
           decoding="async"
-          fetchPriority="high"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/60" />
       </motion.div>

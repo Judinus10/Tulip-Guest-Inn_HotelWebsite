@@ -78,7 +78,9 @@ try {
     // The ICS helper may create/upgrade its tables the first time it runs.
     // MySQL DDL implicitly commits an active transaction, so initialise the
     // schema before beginning the atomic booking update below.
-    ensure_ics_schema($pdo);
+    if (ics_enabled()) {
+        ensure_ics_schema($pdo);
+    }
     $pdo->beginTransaction();
 
     $bookingStmt = $pdo->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1 FOR UPDATE');
@@ -145,7 +147,7 @@ try {
     }
 
     $oldAmount = (float) ($booking['amount'] ?? 0);
-    $currency = (string) ($room['currency'] ?? $booking['currency'] ?? 'LKR');
+    $currency = (string) ($room['currency'] ?? $booking['currency'] ?? 'USD');
 
     $paymentStmt = $pdo->prepare('SELECT * FROM payments WHERE booking_id = :id ORDER BY id DESC LIMIT 1 FOR UPDATE');
     $paymentStmt->execute([':id' => $id]);

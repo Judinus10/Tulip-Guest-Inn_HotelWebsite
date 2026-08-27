@@ -46,7 +46,11 @@ if (!$isCashPayment && !$isOnlinePayment) {
 // Keep the PayHere flow intact for future use, but do not create a booking when
 // online payment is intentionally disabled in the environment.
 if ($isOnlinePayment && !ONLINE_PAYMENT_ENABLED) {
-    json_response(false, 'Online payment is temporarily unavailable. Please select Pay on Arrival.', 503);
+    json_response(false, 'Online payment is not available at the moment. Please use Pay on Arrival.', 200, [
+        'severity' => 'warning',
+        'error_code' => 'ONLINE_PAYMENT_DISABLED',
+        'fallback_payment_method' => 'Cash',
+    ]);
 }
 
 if ($fullName === '' || $email === '' || $phone === '' || $roomName === '' || $checkInDate === '' || $checkOutDate === '' || $guests < 1) {
@@ -113,7 +117,9 @@ try {
     // Initialize the ICS tables before starting the booking transaction.
     // Running CREATE TABLE IF NOT EXISTS inside a MySQL transaction causes an
     // implicit commit and later produces "There is no active transaction".
-    ensure_ics_schema($pdo);
+    if (ics_enabled()) {
+        ensure_ics_schema($pdo);
+    }
 
     $pdo->beginTransaction();
 

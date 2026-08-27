@@ -26,6 +26,15 @@ export type CheckoutSession = {
   currency: string;
 };
 
+export type PublicFeatures = {
+  online_payment_enabled: boolean;
+  calendar_sync_enabled: boolean;
+};
+
+export async function fetchPublicFeatures(): Promise<PublicFeatures> {
+  return requestJson('/settings/public-features.php');
+}
+
 export type PaymentHistoryItem = {
   attempt: number;
   order_id: string;
