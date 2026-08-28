@@ -42,5 +42,21 @@ export async function requestJson<T>(path: string, options: RequestInit = {}): P
     throw wrapped;
   }
 
-  return (payload.data ?? payload.rooms ?? payload.room ?? payload) as T;
+  if (payload.data !== undefined) return payload.data as T;
+
+  // Booking endpoints return their result fields at the top level. A
+  // multi-room result also contains a `rooms` array, but that array is only
+  // one part of the response. Returning it here would discard booking_id,
+  // order_id and bill_url after the booking has already been committed.
+  const responseEnvelope = payload as ApiResponse<T> & Record<string, unknown>;
+  if (
+    'booking_id' in responseEnvelope ||
+    'booking_no' in responseEnvelope ||
+    'bill_url' in responseEnvelope ||
+    'checkout_url' in responseEnvelope
+  ) {
+    return responseEnvelope as unknown as T;
+  }
+
+  return (payload.rooms ?? payload.room ?? payload) as T;
 }
