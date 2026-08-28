@@ -541,10 +541,32 @@ export default function BookingCalendar() {
                     const isToday = date.toDateString() === new Date().toDateString()
 
                     return (
-                      <div key={date.toISOString()} className="border-r border-slate-200 p-3 last:border-r-0">
-                        <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${isToday ? 'bg-blue-600 text-white' : isCurrentMonth ? 'text-slate-900' : 'text-slate-300'}`}>
-                          {date.getDate()}
-                        </span>
+                      <div
+                        key={date.toISOString()}
+                        className={`relative border-r border-slate-200 p-3 last:border-r-0 ${
+                          isToday
+                            ? 'bg-gradient-to-br from-[#f7f3ef] via-[#fcfaf8] to-[#eee7df]/80 shadow-[inset_0_0_0_1px_rgba(145,118,88,0.3)]'
+                            : ''
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
+                              isToday
+                                ? 'border border-[#bda58a] bg-white text-[#6f5438] shadow-[0_3px_12px_rgba(111,84,56,0.16)] ring-4 ring-[#e8ddd2]/75'
+                                : isCurrentMonth
+                                  ? 'text-slate-900'
+                                  : 'text-slate-300'
+                            }`}
+                          >
+                            {date.getDate()}
+                          </span>
+                          {isToday ? (
+                            <span className="rounded-full border border-[#cdbba8] bg-white/90 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-[#765c41] shadow-sm">
+                              Today
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
                     )
                   })}
