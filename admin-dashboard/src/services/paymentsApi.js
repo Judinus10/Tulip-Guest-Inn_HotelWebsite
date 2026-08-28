@@ -45,10 +45,21 @@ function dbPaymentStatus(status) {
 function normalizePayment(payment) {
   const paymentStatus = normalizePaymentStatus(payment.payment_status || payment.status)
   const bookingId = Number(payment.booking_id || 0)
+  const groupRooms = Array.isArray(payment.group_rooms)
+    ? payment.group_rooms.map((room) => ({
+        booking_id: Number(room.booking_id || 0),
+        room_name: room.room_name || 'Room',
+        guests: Number(room.guests || 0),
+        amount: Number(room.amount || 0),
+        currency: room.currency || payment.currency || 'LKR',
+        is_primary: Boolean(room.is_primary),
+      }))
+    : []
 
   return {
     id: Number(payment.id || 0),
     booking_id: bookingId,
+    booking_group_id: Number(payment.booking_group_id || 0),
     booking_no: payment.booking_no || `BK-${String(bookingId).padStart(5, '0')}`,
     guest_name: payment.guest_name || payment.staying_guest_name || payment.full_name || 'Guest',
     guest_email: payment.guest_email || payment.staying_guest_email || payment.email || '',
@@ -68,6 +79,8 @@ function normalizePayment(payment) {
     total_nights: Number(payment.total_nights || payment.nights || 0),
     special_request: payment.special_request || payment.special_requests || payment.message || '',
     room_name: payment.room_name || '-',
+    total_rooms: Number(payment.total_rooms || groupRooms.length || 1),
+    group_rooms: groupRooms,
     order_id: payment.order_id || '',
     payment_id: payment.payment_id || '',
     amount: Number(payment.amount || 0),

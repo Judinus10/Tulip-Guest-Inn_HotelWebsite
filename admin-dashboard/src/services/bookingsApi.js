@@ -273,6 +273,8 @@ export async function updateBookingAndPaymentStatus(bookingId, updates) {
     booking_status: normalizeBookingStatus(data.booking_status || updates.booking_status),
     payment_status: normalizePaymentStatus(data.payment_status || updates.payment_status),
     payment_method: data.payment_method || updates.payment_method || 'Manual',
+    refund_required: Boolean(data.refund_required),
+    message: payload.message || '',
   }
 }
 

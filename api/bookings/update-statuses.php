@@ -89,7 +89,7 @@ try {
     $requestedPaymentStatusNormalized = strtolower(str_replace([' ', '-'], '_', trim($requestedPaymentStatusRaw)));
 
     $submittedPaymentMethod = admin_payment_method_for_db_unified($data['payment_method'] ?? 'Manual');
-    if ($submittedPaymentMethod === 'PayHere' && in_array($requestedPaymentStatusNormalized, ['paid', 'payment_paid'], true)) {
+    if ($bookingStatus !== 'Cancelled' && $submittedPaymentMethod === 'PayHere' && in_array($requestedPaymentStatusNormalized, ['paid', 'payment_paid'], true)) {
         json_response(false, 'Paid status is locked. PayHere payments can only be marked Paid by the verified PayHere notify webhook.', 200, [
             'severity' => 'warning',
             'error_code' => 'PAYHERE_PAID_LOCKED',
@@ -115,20 +115,27 @@ try {
 
     $oldBookingStatus = (string) ($booking['status'] ?? 'Pending');
     $oldPaymentStatus = (string) ($booking['payment_status'] ?? 'Payment Pending');
+    $oldPaymentKey = strtolower(trim(preg_replace('/^payment\s+/i', '', $oldPaymentStatus) ?? $oldPaymentStatus));
+    $oldPaymentKey = str_replace([' ', '-'], '_', $oldPaymentKey);
+    $refundRequired = false;
 
-    $cashConfirmationAllowed = $bookingStatus === 'Confirmed' && $paymentMethod === 'Cash';
-    if (in_array($bookingStatus, ['Confirmed', 'Checked In'], true) && $paymentStatus !== 'Paid' && $paymentStatus !== 'No Pay' && !$cashConfirmationAllowed) {
-        $pdo->rollBack();
-        json_response(false, 'Payment must be Paid or No Pay before confirming or checking in.', 200, [
-            'severity' => 'warning',
-            'error_code' => 'PAYMENT_REQUIRED',
-        ]);
+    // Cancellation owns the payment outcome. Do not trust a contradictory
+    // payment value submitted by the browser.
+    if ($bookingStatus === 'Cancelled') {
+        if ($oldPaymentKey === 'paid') {
+            $paymentStatus = 'Refunded';
+            $refundRequired = true;
+        } elseif ($oldPaymentKey === 'refunded') {
+            $paymentStatus = 'Refunded';
+        } else {
+            $paymentStatus = 'Cancelled';
+        }
     }
 
     $allowedTransitions = [
         'Pending' => ['Pending', 'Confirmed', 'Cancelled', 'No Show'],
         'Confirmed' => ['Confirmed', 'Checked In', 'Cancelled', 'No Show'],
-        'Checked In' => ['Checked In', 'Checked Out'],
+        'Checked In' => ['Checked In', 'Checked Out', 'Cancelled'],
         'Checked Out' => ['Checked Out'],
         'Cancelled' => ['Cancelled'],
         'No Show' => ['No Show'],
@@ -287,7 +294,11 @@ try {
     if (ob_get_length() !== false && ob_get_length() > 0) {
         ob_clean();
     }
-    json_response(true, 'Statuses updated successfully.', 200, [
+    $responseMessage = $refundRequired
+        ? 'Booking cancelled and payment status changed to Refunded. Complete or verify the actual payment refund separately.'
+        : 'Statuses updated successfully.';
+
+    json_response(true, $responseMessage, 200, [
         'data' => [
             'id' => $bookingId,
             'booking_status' => strtolower($bookingStatus),
@@ -295,6 +306,7 @@ try {
             'payment_method' => $paymentMethod,
             'payment_id' => $paymentId,
             'email_sent' => $sendEmail && ($bookingChanged || $paymentChanged),
+            'refund_required' => $refundRequired,
         ],
     ]);
 } catch (Throwable $e) {

@@ -4,8 +4,8 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { PageHeader, SectionCard } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { fetchBookings, updateBookingStatus } from '@/services/bookingsApi'
-import { notifyError } from '@/utils/notifications'
+import { fetchBookings, updateBookingStatus, updatePaymentStatus } from '@/services/bookingsApi'
+import { notifyError, notifySuccess, notifyWarning } from '@/utils/notifications'
 
 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -257,7 +257,7 @@ function FloatingBookingTooltip({ tooltip }) {
   )
 }
 
-function BookingDetailsModal({ booking, onClose, onStatusChange, updatingStatus }) {
+function BookingDetailsModal({ booking, onClose, onStatusChange, onMarkPaid, updatingStatus }) {
   useEffect(() => {
     if (!booking) return undefined
 
@@ -275,12 +275,12 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, updatingStatus 
 
   const isBookingCom = isBookingComBooking(booking)
   const bookingStatus = getBookingStatusKey(booking.booking_status)
-  const paymentStatus = getBookingStatusKey(booking.payment_status)
-  const paymentAllowsStayActions = paymentStatus === 'paid' || paymentStatus === 'no_pay'
-  const canConfirm = paymentAllowsStayActions && bookingStatus === 'pending'
-  const canCheckIn = paymentAllowsStayActions && bookingStatus === 'confirmed'
+  const canConfirm = bookingStatus === 'pending'
+  const canCheckIn = bookingStatus === 'confirmed'
   const canCheckOut = bookingStatus === 'checked_in'
-  const canCancel = !['cancelled', 'checked_out'].includes(bookingStatus)
+  const canCancel = ['pending', 'confirmed', 'checked_in'].includes(bookingStatus)
+  const paymentStatus = getBookingStatusKey(booking.payment_status)
+  const canMarkPaid = ['pending', 'payment_pending'].includes(paymentStatus)
 
   const handleBackdropClick = (event) => {
     if (event.target === event.currentTarget) {
@@ -344,17 +344,20 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, updatingStatus 
           {!isBookingCom ? <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 md:col-span-2">
             <h3 className="text-sm font-bold text-blue-950">Quick Actions</h3>
             <div className="mt-3 flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" disabled={updatingStatus || !canConfirm} title={!paymentAllowsStayActions ? 'Payment must be Paid or No Pay.' : !canConfirm ? 'Only pending bookings can be confirmed.' : ''} onClick={() => onStatusChange(booking.id, 'confirmed')}>
+              <Button size="sm" variant="outline" disabled={updatingStatus || !canConfirm} title={!canConfirm ? 'Only pending bookings can be confirmed.' : ''} onClick={() => onStatusChange(booking.id, 'confirmed')}>
                 Confirm booking
               </Button>
               <Button size="sm" variant="outline" disabled={updatingStatus || !canCancel} onClick={() => onStatusChange(booking.id, 'cancelled')}>
                 Cancel booking
               </Button>
-              <Button size="sm" variant="outline" disabled={updatingStatus || !canCheckIn} title={!paymentAllowsStayActions ? 'Payment must be Paid or No Pay.' : !canCheckIn ? 'Confirm the booking before check-in.' : ''} onClick={() => onStatusChange(booking.id, 'checked_in')}>
+              <Button size="sm" variant="outline" disabled={updatingStatus || !canCheckIn} title={!canCheckIn ? 'Confirm the booking before check-in.' : ''} onClick={() => onStatusChange(booking.id, 'checked_in')}>
                 Mark checked in
               </Button>
               <Button size="sm" variant="outline" disabled={updatingStatus || !canCheckOut} title={!canCheckOut ? 'The booking must be checked in first.' : ''} onClick={() => onStatusChange(booking.id, 'checked_out')}>
                 Mark checked out
+              </Button>
+              <Button size="sm" variant="outline" disabled={updatingStatus || !canMarkPaid} title={!canMarkPaid ? 'Only pending payments can be marked as paid.' : ''} onClick={() => onMarkPaid(booking)}>
+                Mark as paid
               </Button>
             </div>
           </div> : <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm font-semibold text-blue-800 md:col-span-2">This reservation is managed in Booking.com and updated automatically by calendar sync.</div>}
@@ -440,8 +443,44 @@ export default function BookingCalendar() {
           ? { ...current, ...updatedBooking, booking_status: updatedBooking.booking_status || status }
           : current
       )
+
+      if (updatedBooking.refund_required) {
+        notifyWarning(updatedBooking.message || 'Payment status changed to Refunded. Complete or verify the actual refund separately.')
+      } else {
+        notifySuccess(updatedBooking.message || 'Booking status updated successfully.')
+      }
     } catch (err) {
       const message = err.message || 'Unable to update booking status.'
+      setError(message)
+      notifyError(err)
+    } finally {
+      setUpdatingStatus(false)
+    }
+  }
+
+  const handleMarkPaid = async (booking) => {
+    try {
+      setUpdatingStatus(true)
+      setError('')
+      const updatedPayment = await updatePaymentStatus(
+        booking.id,
+        'paid',
+        booking.payment_method || 'Manual'
+      )
+
+      setCalendarBookings((current) =>
+        current.map((item) =>
+          item.id === booking.id ? { ...item, ...updatedPayment } : item
+        )
+      )
+      setSelectedBooking((current) =>
+        current && current.id === booking.id
+          ? { ...current, ...updatedPayment }
+          : current
+      )
+      notifySuccess('Payment status changed to Paid successfully.')
+    } catch (err) {
+      const message = err.message || 'Unable to update payment status.'
       setError(message)
       notifyError(err)
     } finally {
@@ -580,6 +619,7 @@ export default function BookingCalendar() {
           booking={selectedBooking}
           onClose={() => setSelectedBooking(null)}
           onStatusChange={handleStatusChange}
+          onMarkPaid={handleMarkPaid}
           updatingStatus={updatingStatus}
         />
       )}

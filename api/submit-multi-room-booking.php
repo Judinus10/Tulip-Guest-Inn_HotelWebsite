@@ -191,7 +191,7 @@ try {
     $pdo->prepare('UPDATE booking_groups SET booking_no = :booking_no, primary_booking_id = :primary_booking_id WHERE id = :id')
         ->execute([':booking_no' => $bookingNumber, ':primary_booking_id' => $primaryBookingId, ':id' => $groupId]);
 
-    $orderId = ($isCashPayment ? 'CASH-' : 'PAYHERE-') . $bookingNumber;
+    $orderId = ($isCashPayment ? 'CASH-' : 'ONLINE-') . $bookingNumber;
     if ($isCashPayment) {
         $paymentStmt = $pdo->prepare(
             "INSERT INTO payments

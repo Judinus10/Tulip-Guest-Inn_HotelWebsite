@@ -266,6 +266,8 @@ function PaymentDetailsModal({ payment, onClose }) {
   const guestText = guestCount > 0 ? `${guestCount} guest${guestCount === 1 ? '' : 's'}` : '-'
   const nights = Number(payment.total_nights || payment.nights || 0)
   const nightsText = nights > 0 ? `${nights} night${nights === 1 ? '' : 's'}` : '-'
+  const groupRooms = Array.isArray(payment.group_rooms) ? payment.group_rooms : []
+  const isMultiRoom = Number(payment.booking_group_id || 0) > 0 || groupRooms.length > 1
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
@@ -297,15 +299,27 @@ function PaymentDetailsModal({ payment, onClose }) {
           </div>
 
           <DetailSection title="Booking Details">
-            <DetailCard label="Booking Number" value={payment.booking_no} />
-            <DetailCard label="Booking ID" value={payment.booking_id} />
+            <DetailCard label="Booking ID" value={payment.booking_no} />
+            <DetailCard label="Booking Type" value={isMultiRoom ? `${payment.total_rooms || groupRooms.length} rooms` : 'Single room'} />
             <DetailCard label="Booking Status" value={payment.booking_status || payment.status || '-'} />
-            <DetailCard label="Room Name" value={payment.room_name} />
+            {!isMultiRoom ? <DetailCard label="Room Name" value={payment.room_name} /> : null}
             <DetailCard label="Check-in" value={formatStayDate(payment.check_in || payment.checkin_date)} />
             <DetailCard label="Check-out" value={formatStayDate(payment.check_out || payment.checkout_date)} />
             <DetailCard label="Nights" value={nightsText} />
             <DetailCard label="Guests" value={guestText} />
           </DetailSection>
+
+          {isMultiRoom ? (
+            <DetailSection title="Rooms in this booking">
+              {groupRooms.map((room) => (
+                <DetailCard
+                  key={room.booking_id || room.room_name}
+                  label={room.is_primary ? 'Primary room' : 'Room'}
+                  value={`${room.room_name} · ${room.guests} guest${room.guests === 1 ? '' : 's'} · ${formatCurrency(room.amount)}`}
+                />
+              ))}
+            </DetailSection>
+          ) : null}
 
           <DetailSection title="Guest Details">
             <DetailCard label="Guest Name" value={payment.guest_name} />

@@ -1575,7 +1575,10 @@ export default function Bookings() {
       setBookings((current) => current.map((booking) => (booking.id === bookingId ? { ...booking, ...updatedBooking } : booking)))
       setStatusBooking(null)
       setPaymentBooking(null)
-      showToast('Statuses updated successfully. Email handled by the server.')
+      showToast(
+        updatedBooking.message || 'Statuses updated successfully. Email handled by the server.',
+        updatedBooking.refund_required ? 'warning' : 'success'
+      )
     } catch (error) {
       // A status update can be committed even when a first-run mail-queue
       // warning corrupts the HTTP response. Re-read the authoritative row

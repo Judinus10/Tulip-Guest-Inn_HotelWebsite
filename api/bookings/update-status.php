@@ -58,7 +58,7 @@ try {
     $transitions = [
         'pending' => ['confirmed', 'cancelled', 'no_show'],
         'confirmed' => ['checked_in', 'cancelled', 'no_show'],
-        'checked_in' => ['checked_out'],
+        'checked_in' => ['checked_out', 'cancelled'],
         'checked_out' => [],
         'cancelled' => [],
         'no_show' => [],
@@ -69,15 +69,6 @@ try {
         json_response(false, 'This action is not allowed for the current booking status.', 200, [
             'severity' => 'warning',
             'error_code' => 'INVALID_STATUS_TRANSITION',
-        ]);
-    }
-
-    $isCashPayment = strcasecmp($paymentMethod, 'Cash') === 0;
-    if ($status === 'confirmed' && $paymentKey !== 'paid' && !$isCashPayment) {
-        $pdo->rollBack();
-        json_response(false, 'Payment must be Paid before confirming the booking.', 200, [
-            'severity' => 'warning',
-            'error_code' => 'PAYMENT_REQUIRED',
         ]);
     }
 
@@ -116,13 +107,23 @@ try {
     $displayStatus = $displayMap[$status];
     $refundRequired = false;
 
-    if ($status === 'no_show' && $paymentKey === 'paid') {
+    if ($status === 'cancelled') {
+        if ($paymentKey === 'paid') {
+            // This records the required financial outcome. The actual gateway
+            // refund must still be completed/verified outside this endpoint.
+            $paymentStatus = 'Refunded';
+            $paymentKey = 'refunded';
+            $refundRequired = true;
+        } elseif ($paymentKey === 'refunded') {
+            $paymentStatus = 'Refunded';
+        } else {
+            $paymentStatus = 'Cancelled';
+            $paymentKey = 'cancelled';
+        }
+    } elseif ($status === 'no_show' && $paymentKey === 'paid') {
         if (strcasecmp($paymentMethod, 'PayHere') === 0) {
             $refundRequired = true;
         }
-    } elseif ($status === 'cancelled' && !in_array($paymentKey, ['paid', 'refunded'], true)) {
-        $paymentStatus = 'Cancelled';
-        $paymentKey = 'cancelled';
     }
 
     if ($groupId > 0) {
@@ -162,9 +163,13 @@ try {
     }
     if (ob_get_level() > 0) ob_clean();
 
-    $message = $refundRequired
-        ? 'Booking marked No Show. PayHere payment remains Paid; complete the real refund before marking it Refunded.'
-        : 'Booking status updated successfully.';
+    if ($status === 'cancelled' && $refundRequired) {
+        $message = 'Booking cancelled and payment status changed to Refunded. Complete or verify the actual payment refund separately.';
+    } elseif ($refundRequired) {
+        $message = 'Booking marked No Show. PayHere payment remains Paid; complete the real refund before marking it Refunded.';
+    } else {
+        $message = 'Booking status updated successfully.';
+    }
 
     json_response(true, $message, 200, ['data' => [
         'id' => $id,

@@ -11,6 +11,7 @@ require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../bookings/booking-expiry-helper.php';
 require_once __DIR__ . '/../calendar/ics-helper.php';
 require_once __DIR__ . '/../bookings/booking-audit-helper.php';
+require_once __DIR__ . '/../bookings/multi-room-helper.php';
 require_once __DIR__ . '/../mail/email-helper.php';
 require_once __DIR__ . '/../security/public-token-helper.php';
 
@@ -35,10 +36,11 @@ function payhere_format_amount(float $amount): string
     return number_format($amount, 2, '.', '');
 }
 
-function generate_payhere_order_id(int $bookingId): string
+function generate_payhere_order_id(array $booking): string
 {
-    $bookingPart = str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT);
-    $microtimePart = str_replace('.', '', sprintf('%.6F', microtime(true)));
+    $bookingId = (int) ($booking['id'] ?? 0);
+    $groupId = multi_room_group_id($booking);
+    $reference = $groupId > 0 ? 'MB' . $groupId : 'BK' . $bookingId;
 
     try {
         $randomPart = strtoupper(bin2hex(random_bytes(3)));
@@ -46,7 +48,7 @@ function generate_payhere_order_id(int $bookingId): string
         $randomPart = strtoupper(substr(hash('sha256', uniqid((string) $bookingId, true)), 0, 6));
     }
 
-    return 'JH-' . date('YmdHis') . '-' . $bookingPart . '-' . substr($microtimePart, -6) . '-' . $randomPart;
+    return 'ONLINE-' . $reference . '-' . $randomPart;
 }
 
 function create_checkout_token(string $orderId, int $bookingId, string $amount): string
@@ -151,7 +153,10 @@ try {
         ]);
     }
 
-    $roomName = (string) ($booking['room_name'] ?? '');
+    $groupId = multi_room_group_id($booking);
+    $groupRows = $groupId > 0 ? multi_room_group_rows($pdo, $groupId) : [];
+    $paymentBookings = $groupRows !== [] ? $groupRows : [$booking];
+    $roomName = implode(', ', array_map(static fn(array $row): string => (string) ($row['room_name'] ?? ''), $paymentBookings));
     $checkInDate = (string) ($booking['check_in_date'] ?? '');
     $checkOutDate = (string) ($booking['check_out_date'] ?? '');
 
@@ -169,43 +174,56 @@ try {
         json_response(false, 'Booking dates are no longer valid for payment.', 422);
     }
 
-    $amount = calculate_booking_amount($roomName, $checkInDate, $checkOutDate);
+    $amount = array_reduce(
+        $paymentBookings,
+        static fn(float $total, array $row): float => $total + (float) ($row['amount'] ?? 0),
+        0.0
+    );
+    if ($amount <= 0 && count($paymentBookings) === 1) {
+        $amount = calculate_booking_amount((string) ($booking['room_name'] ?? ''), $checkInDate, $checkOutDate);
+    }
 
     if ($amount <= 0) {
         $pdo->rollBack();
         json_response(false, 'Unable to calculate payment amount.', 422);
     }
 
-    $conflict = $pdo->prepare(
-        "SELECT id
-         FROM bookings
-         WHERE id <> :booking_id
-           AND room_name = :room_name
-           " . active_booking_conflict_sql() . "
-           AND :requested_check_in < check_out_date
-           AND :requested_check_out > check_in_date
-         LIMIT 1"
-    );
-    $conflict->execute([
-        ':booking_id' => $bookingId,
-        ':room_name' => $roomName,
-        ':hold_cutoff' => booking_hold_cutoff_datetime(),
-        ':requested_check_in' => $checkInDate,
-        ':requested_check_out' => $checkOutDate,
-    ]);
+    foreach ($paymentBookings as $paymentBooking) {
+        $currentBookingId = (int) ($paymentBooking['id'] ?? 0);
+        $currentRoomName = (string) ($paymentBooking['room_name'] ?? '');
+        $conflict = $pdo->prepare(
+            "SELECT id FROM bookings
+             WHERE id <> :booking_id
+               AND (:group_id_filter = 0 OR COALESCE(booking_group_id, 0) <> :group_id_compare)
+               AND room_name = :room_name
+               " . active_booking_conflict_sql() . "
+               AND :requested_check_in < check_out_date
+               AND :requested_check_out > check_in_date
+             LIMIT 1"
+        );
+        $conflict->execute([
+            ':booking_id' => $currentBookingId,
+            ':group_id_filter' => $groupId,
+            ':group_id_compare' => $groupId,
+            ':room_name' => $currentRoomName,
+            ':hold_cutoff' => booking_hold_cutoff_datetime(),
+            ':requested_check_in' => $checkInDate,
+            ':requested_check_out' => $checkOutDate,
+        ]);
 
-    $roomIdStmt = $pdo->prepare('SELECT id FROM rooms WHERE room_name = :room_name LIMIT 1');
-    $roomIdStmt->execute([':room_name' => $roomName]);
-    $roomId = (int) ($roomIdStmt->fetchColumn() ?: 0);
+        $roomIdStmt = $pdo->prepare('SELECT id FROM rooms WHERE room_name = :room_name LIMIT 1');
+        $roomIdStmt->execute([':room_name' => $currentRoomName]);
+        $roomId = (int) ($roomIdStmt->fetchColumn() ?: 0);
 
-    if ($conflict->fetch() || ($roomId > 0 && ics_room_conflict($pdo, $roomId, $checkInDate, $checkOutDate))) {
-        $pdo->rollBack();
-        json_response(false, 'Sorry, this room is no longer available for the selected dates.', 409, ['available' => false]);
+        if ($conflict->fetch() || ($roomId > 0 && ics_room_conflict($pdo, $roomId, $checkInDate, $checkOutDate))) {
+            $pdo->rollBack();
+            json_response(false, 'Sorry, one or more rooms are no longer available for the selected dates.', 409, ['available' => false]);
+        }
     }
 
     $amountFormatted = payhere_format_amount($amount);
     $currency = PAYMENT_CURRENCY;
-    $orderId = generate_payhere_order_id($bookingId);
+    $orderId = generate_payhere_order_id($booking);
 
     $checkoutToken = create_checkout_token($orderId, $bookingId, $amountFormatted);
     $returnUrl = build_booking_bill_url($bookingId, $orderId, $checkoutToken);
@@ -218,7 +236,7 @@ try {
         'cancel_url' => $cancelUrl,
         'notify_url' => $notifyUrl,
         'order_id' => $orderId,
-        'items' => 'Tulip Guest Inn booking #' . $bookingId . ' - ' . $roomName,
+        'items' => 'Tulip Guest Inn ' . multi_room_booking_number($booking) . ' - ' . $roomName,
         'currency' => $currency,
         'amount' => $amountFormatted,
         'first_name' => (string) ($booking['full_name'] ?? 'Guest'),
@@ -266,13 +284,22 @@ try {
         'currency' => $currency,
     ]);
 
-    $updateBooking = $pdo->prepare("UPDATE bookings SET amount = :amount, currency = :currency, status = 'Pending', payment_status = :payment_status, updated_at = NOW() WHERE id = :id");
-    $updateBooking->execute([
-        ':amount' => $amount,
-        ':currency' => $currency,
-        ':payment_status' => 'Payment Pending',
-        ':id' => $bookingId,
-    ]);
+    if ($groupId > 0) {
+        $updateBooking = $pdo->prepare("UPDATE bookings SET currency = :currency, status = 'Pending', payment_status = :payment_status, updated_at = NOW() WHERE booking_group_id = :group_id");
+        $updateBooking->execute([
+            ':currency' => $currency,
+            ':payment_status' => 'Payment Pending',
+            ':group_id' => $groupId,
+        ]);
+    } else {
+        $updateBooking = $pdo->prepare("UPDATE bookings SET amount = :amount, currency = :currency, status = 'Pending', payment_status = :payment_status, updated_at = NOW() WHERE id = :id");
+        $updateBooking->execute([
+            ':amount' => $amount,
+            ':currency' => $currency,
+            ':payment_status' => 'Payment Pending',
+            ':id' => $bookingId,
+        ]);
+    }
 
     booking_audit_log($pdo, $bookingId, 'booking_payment_hold_refreshed', 'Booking Payment Hold Active', 'Booking remains reserved while awaiting payment.', [
         'order_id' => $orderId,
