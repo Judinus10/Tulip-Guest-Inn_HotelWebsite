@@ -86,10 +86,21 @@ export function normalizeBooking(booking) {
   const guests = Number(booking.guests || booking.guest_count || booking.no_of_guests || booking.adults || 1)
   const totalNights = Number(booking.total_nights || booking.nights || calculateNights(checkIn, checkOut))
   const amount = Number(booking.total_amount || booking.amount || booking.payment_amount || (Number(room?.price_per_night || 0) * totalNights) || 0)
+  const groupRooms = Array.isArray(booking.group_rooms) ? booking.group_rooms.map((groupRoom) => ({
+    booking_id: Number(groupRoom.booking_id || 0),
+    room_id: Number(groupRoom.room_id || 0),
+    room_name: groupRoom.room_name || '',
+    guests: Number(groupRoom.guests || 0),
+    capacity: Number(groupRoom.capacity || 0),
+    price_per_night: Number(groupRoom.price_per_night || 0),
+    amount: Number(groupRoom.amount || 0),
+  })) : []
 
   return {
     id: Number(booking.id || booking.booking_id || 0),
     booking_group_id: Number(booking.booking_group_id || 0),
+    group_rooms: groupRooms,
+    room_count: Number(booking.room_count || groupRooms.length || 1),
     booking_no: booking.booking_no || booking.bookingNo || booking.booking_number || `BK-${String(booking.id || booking.booking_id || 0).padStart(5, '0')}`,
     guest_name: booking.guest_name || booking.staying_guest_name || booking.full_name || booking.customer_name || booking.name || 'Guest',
     guest_email: booking.guest_email || booking.staying_guest_email || booking.email || booking.customer_email || '',
@@ -298,6 +309,46 @@ export async function updateBookingDetails(bookingId, updates) {
     email_queued: Boolean(payload.email_queued),
     message: payload.message || 'Booking details updated successfully.',
   }
+}
+
+export async function updateGroupBookingDetails(bookingId, updates) {
+  const response = await apiFetch(`${BOOKINGS_API_BASE_URL}/update-group-details.php`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: bookingId,
+      full_name: updates.full_name,
+      email: updates.email,
+      phone: updates.phone,
+      check_in_date: updates.check_in_date,
+      check_out_date: updates.check_out_date,
+      message: updates.message || '',
+      rooms: updates.rooms,
+      send_email: updates.send_email !== false,
+    }),
+  })
+
+  const payload = await readJsonResponse(response)
+  return {
+    booking: normalizeBooking(payload.data || payload),
+    adjustment: payload.adjustment || null,
+    email_queued: Boolean(payload.email_queued),
+    message: payload.message || 'Multi-room booking updated successfully.',
+  }
+}
+
+export async function checkGroupRoomAvailability(bookingGroupId, checkInDate, checkOutDate) {
+  const response = await apiFetch(`${BOOKINGS_API_BASE_URL}/group-room-availability.php`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      booking_group_id: bookingGroupId,
+      check_in_date: checkInDate,
+      check_out_date: checkOutDate,
+    }),
+  })
+  const payload = await readJsonResponse(response)
+  return Array.isArray(payload.data) ? payload.data : []
 }
 
 export async function deleteBooking(bookingId) {

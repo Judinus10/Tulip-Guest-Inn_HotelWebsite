@@ -32,12 +32,14 @@ import { bookingRooms, bookingStatuses, initialBookings, paymentStatuses } from 
 import { listRooms } from '@/services/roomsApi'
 import { exportCsv, exportExcel, exportPdf } from '@/utils/exportData'
 import {
+  checkGroupRoomAvailability,
   createManualBooking,
   deleteBooking,
   fetchBookings,
   paymentMethodOptions,
   updateBookingAndPaymentStatus,
   updateBookingDetails,
+  updateGroupBookingDetails,
   updateBookingStatus,
   updatePaymentStatus,
 } from '@/services/bookingsApi'
@@ -380,7 +382,6 @@ function ActionsDropdown({ booking, onView, onEdit, onUpdateStatus, onCancel }) 
   const [open, setOpen] = useState(false)
   const isExternal = Boolean(booking.is_external)
   const canEdit = !isExternal
-    && !booking.booking_group_id
     && !['checked_in', 'checked_out', 'cancelled', 'no_show'].includes(booking.booking_status)
   const dropdownRef = useRef(null)
 
@@ -419,7 +420,7 @@ function ActionsDropdown({ booking, onView, onEdit, onUpdateStatus, onCancel }) 
             <>
               <button type="button" disabled={!canEdit} onClick={() => handleAction(onEdit)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45">
                 <Pencil className="h-4 w-4 text-amber-600" />
-                {booking.booking_group_id ? 'Edit group unavailable' : 'Edit Booking'}
+                Edit Booking
               </button>
               <button type="button" onClick={() => handleAction(onUpdateStatus)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50">
                 <CheckCircle2 className="h-4 w-4 text-emerald-600" />
@@ -957,6 +958,122 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
   )
 }
 
+function EditGroupBookingModal({ booking, rooms, onClose, onSave }) {
+  const earliestCheckIn = addDaysToInputDate(getTodayInputDate(), 1)
+  const existingByRoomId = useMemo(() => new Map((booking.group_rooms || []).map((room) => [Number(room.room_id), room])), [booking.group_rooms])
+  const roomOptions = useMemo(() => rooms.map((room) => {
+    const existing = existingByRoomId.get(Number(room.id))
+    return {
+      room_id: Number(room.id),
+      booking_id: Number(existing?.booking_id || 0),
+      room_name: room.room_name,
+      capacity: Number(room.capacity || 1),
+      price_per_night: Number(room.price_per_night || 0),
+      selected: Boolean(existing),
+      guests: existing ? Number(existing.guests || 1) : 0,
+    }
+  }), [rooms, existingByRoomId])
+  const [form, setForm] = useState({
+    full_name: booking.booker_name || booking.guest_name || '',
+    email: booking.booker_email || booking.guest_email || '',
+    phone: booking.booker_phone || booking.guest_phone || '',
+    check_in_date: booking.check_in || '',
+    check_out_date: booking.check_out || '',
+    message: booking.special_requests || '',
+    total_guests: Number(booking.guests || 1),
+    rooms: roomOptions,
+    send_email: true,
+  })
+  const [warning, setWarning] = useState('')
+  const [availability, setAvailability] = useState({})
+  const [checkingAvailability, setCheckingAvailability] = useState(false)
+  const earliestCheckOut = addDaysToInputDate(form.check_in_date, 1)
+  const nights = getNights(form.check_in_date, form.check_out_date)
+  const selectedRooms = form.rooms.filter((room) => room.selected)
+  const estimatedTotal = selectedRooms.reduce((sum, room) => sum + Number(room.price_per_night || 0) * nights, 0)
+  const allocatedGuests = selectedRooms.reduce((sum, room) => sum + Number(room.guests || 0), 0)
+
+  useEffect(() => {
+    if (!form.check_in_date || !form.check_out_date || form.check_out_date <= form.check_in_date) return undefined
+    let active = true
+    setCheckingAvailability(true)
+    checkGroupRoomAvailability(booking.booking_group_id, form.check_in_date, form.check_out_date)
+      .then((result) => {
+        if (!active) return
+        setAvailability(Object.fromEntries(result.map((room) => [Number(room.room_id), Boolean(room.available)])))
+      })
+      .catch((error) => { if (active) setWarning(error.message || 'Unable to check room availability.') })
+      .finally(() => { if (active) setCheckingAvailability(false) })
+    return () => { active = false }
+  }, [booking.booking_group_id, form.check_in_date, form.check_out_date])
+
+  const updateField = (name, value) => {
+    setWarning('')
+    setForm((current) => name === 'check_in_date'
+      ? { ...current, check_in_date: value, check_out_date: current.check_out_date > value ? current.check_out_date : '' }
+      : { ...current, [name]: value })
+  }
+  const updateRoomGuests = (roomId, value) => {
+    setWarning('')
+    setForm((current) => ({ ...current, rooms: current.rooms.map((room) => room.room_id === roomId ? { ...room, guests: Number(value) } : room) }))
+  }
+  const toggleRoom = (roomId) => {
+    setWarning('')
+    setForm((current) => ({ ...current, rooms: current.rooms.map((room) => room.room_id === roomId
+      ? { ...room, selected: !room.selected, guests: room.selected ? 0 : 1 }
+      : room) }))
+  }
+  const submit = (event) => {
+    event.preventDefault()
+    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())
+    const chosenRooms = form.rooms.filter((room) => room.selected)
+    const invalidRoom = chosenRooms.find((room) => Number(room.guests) < 1 || Number(room.guests) > Number(room.capacity || 0))
+    const unavailableRoom = chosenRooms.find((room) => availability[room.room_id] === false)
+    const message = !form.full_name.trim() ? 'Guest name is required.'
+      : !emailValid ? 'Please enter a valid email address.'
+      : !form.phone.trim() ? 'Phone number is required.'
+      : !form.check_in_date || form.check_in_date < earliestCheckIn ? 'Check-in must be after today.'
+      : !form.check_out_date || form.check_out_date <= form.check_in_date ? 'Check-out must be after check-in.'
+      : chosenRooms.length === 0 ? 'Select at least one room.'
+      : invalidRoom ? `${invalidRoom.room_name} allows 1 to ${invalidRoom.capacity} guests.`
+      : unavailableRoom ? `${unavailableRoom.room_name} is unavailable for the selected dates.`
+      : Number(form.total_guests) < 1 ? 'Total guests must be at least one.'
+      : allocatedGuests !== Number(form.total_guests) ? `Allocate all ${form.total_guests} guests. Currently allocated: ${allocatedGuests}.` : ''
+    if (message) { setWarning(message); return }
+    onSave(booking.id, { ...form, rooms: chosenRooms.map(({ room_id, guests }) => ({ room_id, guests })) })
+  }
+
+  return <Modal title="Edit multi-room booking" description={`${booking.booking_no} · ${selectedRooms.length} room${selectedRooms.length === 1 ? '' : 's'}`} onClose={onClose} size="max-w-4xl">
+    <form onSubmit={submit} className="space-y-5">
+      {warning ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{warning}</div> : null}
+      <div className="grid gap-4 md:grid-cols-3">
+        <div><Label>Guest name *</Label><Input value={form.full_name} onChange={(event) => updateField('full_name', event.target.value)} /></div>
+        <div><Label>Email *</Label><Input type="email" value={form.email} onChange={(event) => updateField('email', event.target.value)} /></div>
+        <div><Label>Phone *</Label><Input value={form.phone} onChange={(event) => updateField('phone', event.target.value)} /></div>
+        <div><Label>Check-in *</Label><Input type="date" min={earliestCheckIn} value={form.check_in_date} onChange={(event) => updateField('check_in_date', event.target.value)} /></div>
+        <div><Label>Check-out *</Label><Input type="date" min={earliestCheckOut} disabled={!form.check_in_date} value={form.check_out_date} onChange={(event) => updateField('check_out_date', event.target.value)} /></div>
+        <div><Label>Total guests *</Label><Input type="number" min="1" value={form.total_guests} onChange={(event) => updateField('total_guests', Number(event.target.value))} /></div>
+      </div>
+      <div className="rounded-xl border border-border p-4">
+        <div className="mb-4 flex items-center justify-between gap-3"><div><h3 className="font-bold text-text-primary">Rooms and guest allocation</h3><p className="mt-1 text-xs text-text-secondary">Add or remove rooms, then allocate exactly {form.total_guests || 0} guests.</p></div><span className="text-xs font-semibold text-text-secondary">{checkingAvailability ? 'Checking availability…' : `${allocatedGuests}/${form.total_guests || 0} allocated`}</span></div>
+        <div className="grid gap-3 md:grid-cols-2">{form.rooms.map((room) => {
+          const isAvailable = availability[room.room_id] !== false
+          return <div key={room.room_id} className={`rounded-xl border p-4 ${room.selected ? 'border-blue-300 bg-blue-50/50' : 'border-border bg-slate-50'}`}>
+            <div className="flex items-start justify-between gap-3">
+              <div><p className="font-semibold text-text-primary">{room.room_name}</p><p className="text-xs text-text-secondary">Maximum {room.capacity} guests · {formatMoney(room.price_per_night)}/night</p><p className={`mt-1 text-xs font-semibold ${isAvailable ? 'text-emerald-700' : 'text-red-600'}`}>{isAvailable ? 'Available' : 'Unavailable for these dates'}</p></div>
+              <Button type="button" size="sm" variant={room.selected ? 'outline' : 'default'} disabled={!room.selected && (!isAvailable || checkingAvailability)} onClick={() => toggleRoom(room.room_id)}>{room.selected ? 'Remove' : 'Add'}</Button>
+            </div>
+            {room.selected ? <div className="mt-3 flex items-center justify-between border-t border-border pt-3"><Label>Guests in room</Label><Input type="number" min="1" max={room.capacity} value={room.guests} onChange={(event) => updateRoomGuests(room.room_id, event.target.value)} className="w-24" /></div> : null}
+          </div>
+        })}</div>
+      </div>
+      <div><Label>Message / special request</Label><textarea rows={3} value={form.message} onChange={(event) => updateField('message', event.target.value)} className="w-full rounded-lg border border-border px-3 py-2 text-sm" /></div>
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Estimated group total: <strong>{formatMoney(estimatedTotal)}</strong> · {nights} night{nights === 1 ? '' : 's'} · {selectedRooms.length} room{selectedRooms.length === 1 ? '' : 's'}</div>
+      <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" disabled={checkingAvailability}>Save Group Changes</Button></div>
+    </form>
+  </Modal>
+}
+
 function EditBookingModal({ booking, rooms, bookings, onClose, onSave }) {
   const today = getTodayInputDate()
   const earliestCheckIn = addDaysToInputDate(today, 1)
@@ -1169,6 +1286,8 @@ function EditBookingModal({ booking, rooms, bookings, onClose, onSave }) {
 
 function BookingDetailsModal({ booking, rooms, onClose }) {
   const room = getRoom(booking.room_id, booking.room_name, rooms)
+  const groupRooms = Array.isArray(booking.group_rooms) ? booking.group_rooms : []
+  const isGroupBooking = Boolean(booking.booking_group_id && groupRooms.length > 0)
 
   return (
     <Modal title="Booking details" description={booking.booking_no} onClose={onClose}>
@@ -1198,6 +1317,7 @@ function BookingDetailsModal({ booking, rooms, onClose }) {
               <div><p className="text-xs font-semibold uppercase text-text-secondary">Check-out</p><p className="mt-1 font-semibold text-text-primary">{formatDate(booking.check_out)}</p></div>
               <div><p className="text-xs font-semibold uppercase text-text-secondary">Guests</p><p className="mt-1 font-semibold text-text-primary">{booking.guests}</p></div>
               <div><p className="text-xs font-semibold uppercase text-text-secondary">Total nights</p><p className="mt-1 font-semibold text-text-primary">{booking.total_nights}</p></div>
+              {isGroupBooking ? <div><p className="text-xs font-semibold uppercase text-text-secondary">Rooms</p><p className="mt-1 font-semibold text-text-primary">{groupRooms.length}</p></div> : null}
             </div>
           </section>
 
@@ -1209,14 +1329,40 @@ function BookingDetailsModal({ booking, rooms, onClose }) {
 
         <div className="space-y-5">
           <section className="rounded-2xl border border-border bg-slate-50 p-5">
-            <div className="flex items-center gap-3">
-              <div className="rounded-xl bg-blue-100 p-3 text-blue-700"><Hotel className="h-6 w-6" /></div>
-              <div><p className="text-sm font-bold text-text-primary">{room?.room_name || booking.room_name || 'Unknown room'}</p><p className="text-sm text-text-secondary">{room?.room_type || booking.room_type} · Capacity {room?.capacity || '-'}</p></div>
-            </div>
-            <div className="mt-5 grid gap-3 text-sm">
-              <div className="flex justify-between border-t border-border pt-4"><span className="text-text-secondary">Price per night</span><span className="font-semibold text-text-primary">{formatMoney(room?.price_per_night)}</span></div>
-              <div className="flex justify-between"><span className="text-text-secondary">Total amount</span><span className="text-lg font-bold text-text-primary">{formatMoney(booking.total_amount)}</span></div>
-            </div>
+            {isGroupBooking ? (
+              <>
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="rounded-xl bg-blue-100 p-3 text-blue-700"><Hotel className="h-6 w-6" /></div>
+                  <div><p className="text-sm font-bold text-text-primary">Multiple-room booking</p><p className="text-sm text-text-secondary">{groupRooms.length} rooms in this booking</p></div>
+                </div>
+                <div className="space-y-3">
+                  {groupRooms.map((groupRoom) => (
+                    <div key={groupRoom.booking_id || groupRoom.room_id} className="rounded-xl border border-border bg-white p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-bold text-text-primary">{groupRoom.room_name || 'Unknown room'}</p>
+                          <p className="mt-1 text-xs text-text-secondary">{groupRoom.guests} guest{Number(groupRoom.guests) === 1 ? '' : 's'} · Capacity {groupRoom.capacity || '-'}</p>
+                        </div>
+                        <p className="text-sm font-bold text-text-primary">{formatMoney(groupRoom.amount)}</p>
+                      </div>
+                      <p className="mt-2 text-xs text-text-secondary">{formatMoney(groupRoom.price_per_night)} per night</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 flex justify-between border-t border-border pt-4"><span className="text-sm text-text-secondary">Group total</span><span className="text-lg font-bold text-text-primary">{formatMoney(booking.total_amount)}</span></div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="rounded-xl bg-blue-100 p-3 text-blue-700"><Hotel className="h-6 w-6" /></div>
+                  <div><p className="text-sm font-bold text-text-primary">{room?.room_name || booking.room_name || 'Unknown room'}</p><p className="text-sm text-text-secondary">{room?.room_type || booking.room_type} · Capacity {room?.capacity || '-'}</p></div>
+                </div>
+                <div className="mt-5 grid gap-3 text-sm">
+                  <div className="flex justify-between border-t border-border pt-4"><span className="text-text-secondary">Price per night</span><span className="font-semibold text-text-primary">{formatMoney(room?.price_per_night)}</span></div>
+                  <div className="flex justify-between"><span className="text-text-secondary">Total amount</span><span className="text-lg font-bold text-text-primary">{formatMoney(booking.total_amount)}</span></div>
+                </div>
+              </>
+            )}
           </section>
 
           <section className="rounded-2xl border border-border bg-white p-5">
@@ -1478,7 +1624,10 @@ export default function Bookings() {
 
   const handleEditBooking = async (bookingId, updates) => {
     try {
-      const result = await updateBookingDetails(bookingId, updates)
+      const targetBooking = bookings.find((booking) => booking.id === bookingId)
+      const result = targetBooking?.booking_group_id
+        ? await updateGroupBookingDetails(bookingId, updates)
+        : await updateBookingDetails(bookingId, updates)
       setBookings((current) => current.map((booking) => (booking.id === bookingId ? { ...booking, ...result.booking } : booking)))
       setEditBooking(null)
 
@@ -1720,7 +1869,11 @@ export default function Bookings() {
 
       {isAddBookingOpen ? <AddBookingModal rooms={rooms} bookings={bookings} onClose={() => setIsAddBookingOpen(false)} onSave={handleAddBooking} /> : null}
       {selectedBooking ? <BookingDetailsModal booking={selectedBooking} rooms={rooms} onClose={() => setSelectedBooking(null)} /> : null}
-      {editBooking ? <EditBookingModal booking={editBooking} rooms={rooms} bookings={bookings} onClose={() => setEditBooking(null)} onSave={handleEditBooking} /> : null}
+      {editBooking ? (
+        editBooking.booking_group_id
+          ? <EditGroupBookingModal booking={editBooking} rooms={rooms} onClose={() => setEditBooking(null)} onSave={handleEditBooking} />
+          : <EditBookingModal booking={editBooking} rooms={rooms} bookings={bookings} onClose={() => setEditBooking(null)} onSave={handleEditBooking} />
+      ) : null}
       {statusBooking ? <CombinedStatusModal booking={statusBooking} focus={statusFocus} onClose={() => setStatusBooking(null)} onSave={handleCombinedStatusSave} /> : null}
       {paymentBooking ? <PaymentStatusModal booking={paymentBooking} onClose={() => setPaymentBooking(null)} onSave={handlePaymentSave} /> : null}
       {deleteTargetBooking ? <DeleteBookingModal booking={deleteTargetBooking} onClose={() => setDeleteTargetBooking(null)} onConfirm={handleDeleteBooking} /> : null}

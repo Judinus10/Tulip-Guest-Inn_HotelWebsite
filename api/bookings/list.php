@@ -80,10 +80,36 @@ try {
             b.updated_at
          FROM bookings b
          LEFT JOIN rooms r ON r.room_name = b.room_name
+         WHERE b.booking_group_id IS NULL OR b.is_group_primary = 1
          ORDER BY b.created_at DESC"
     );
 
     $data = $stmt->fetchAll();
+    foreach ($data as &$bookingRow) {
+        $groupId = (int) ($bookingRow['booking_group_id'] ?? 0);
+        if ($groupId < 1) {
+            $bookingRow['group_rooms'] = [];
+            $bookingRow['room_count'] = 1;
+            continue;
+        }
+
+        $groupRows = multi_room_group_rows($pdo, $groupId);
+        $bookingRow['group_rooms'] = array_map(static fn(array $row): array => [
+            'booking_id' => (int) $row['id'],
+            'room_id' => (int) ($row['room_id'] ?? 0),
+            'room_name' => (string) ($row['room_name'] ?? ''),
+            'guests' => (int) ($row['guests'] ?? 0),
+            'capacity' => (int) ($row['max_guests'] ?? 0),
+            'price_per_night' => (float) ($row['base_price'] ?? 0),
+            'amount' => (float) ($row['amount'] ?? 0),
+        ], $groupRows);
+        $bookingRow['room_count'] = count($groupRows);
+        $bookingRow['room_name'] = implode(', ', array_column($groupRows, 'room_name'));
+        $bookingRow['guests'] = array_sum(array_map(static fn(array $row): int => (int) ($row['guests'] ?? 0), $groupRows));
+        $bookingRow['adults'] = $bookingRow['guests'];
+        $bookingRow['total_amount'] = array_sum(array_map(static fn(array $row): float => (float) ($row['amount'] ?? 0), $groupRows));
+    }
+    unset($bookingRow);
     $external = [];
     if (ics_enabled()) {
         ensure_ics_schema($pdo);
