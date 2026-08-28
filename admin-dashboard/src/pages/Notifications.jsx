@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Dropdown } from '@/components/ui/dropdown'
 import { useToastState } from '@/context/ToastContext'
 
 import { fetchNotificationActivities, getNotificationNavigation, markNotificationActivityRead } from '@/services/notificationsApi'
@@ -370,24 +371,14 @@ export default function Notifications() {
                       <td className="whitespace-nowrap px-4 py-3 text-text-secondary">{formatDate(item.created_at)}</td>
                       <td className="whitespace-nowrap px-4 py-3"><Badge variant={statusVariants[item.status]}>{item.status}</Badge></td>
                       <td className="whitespace-nowrap px-4 py-3">
-                        <div className="relative inline-block text-left" data-notification-action-menu>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-9 gap-2"
-                            onClick={() => setOpenActionId((current) => (current === item.id ? null : item.id))}
-                          >
-                            Actions
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-
-                          {openActionId === item.id && (
-                            <div className="absolute right-0 z-30 mt-2 w-44 overflow-hidden rounded-xl border border-border bg-white py-1 shadow-xl">
+                        <Dropdown className="inline-block text-left" contentClassName="w-44 py-1" trigger={<Button size="sm" variant="outline" className="h-9 gap-2">Actions<MoreHorizontal className="h-4 w-4" /></Button>}>
+                          {(close) => (
+                            <>
                               <button
                                 type="button"
                                 onClick={() => {
                                   setSelectedActivity(item)
-                                  setOpenActionId(null)
+                                  close()
                                 }}
                                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-text-primary hover:bg-blue-50"
                               >
@@ -398,7 +389,7 @@ export default function Notifications() {
                                 type="button"
                                 onClick={() => {
                                   goToRelatedCase(item)
-                                  setOpenActionId(null)
+                                  close()
                                 }}
                                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-text-primary hover:bg-blue-50"
                               >
@@ -409,7 +400,7 @@ export default function Notifications() {
                                 type="button"
                                 onClick={() => {
                                   markViewed(item.id)
-                                  setOpenActionId(null)
+                                  close()
                                 }}
                                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-text-primary hover:bg-blue-50"
                               >
@@ -419,7 +410,7 @@ export default function Notifications() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setOpenActionId(null)
+                                  close()
                                   deleteActivity(item.id)
                                 }}
                                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
@@ -427,9 +418,9 @@ export default function Notifications() {
                                 <Trash2 className="h-4 w-4" />
                                 Delete
                               </button>
-                            </div>
+                            </>
                           )}
-                        </div>
+                        </Dropdown>
                       </td>
                     </tr>
                     )

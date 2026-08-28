@@ -501,23 +501,14 @@ export default function Messages() {
                         <Badge variant={statusVariant[item.status]}>{item.status}</Badge>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="relative inline-block text-left" data-message-action-menu>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setOpenActionId((current) => (current === item.id ? null : item.id))}
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                            Actions
-                          </Button>
-
-                          {openActionId === item.id && (
-                            <div className="absolute right-0 z-30 mt-2 w-48 overflow-hidden rounded-xl border border-border bg-white py-1 shadow-xl">
+                        <Dropdown className="inline-block text-left" contentClassName="w-48 py-1" trigger={<Button size="sm" variant="outline"><MoreHorizontal className="h-4 w-4" />Actions</Button>}>
+                          {(close) => (
+                            <>
                               <button
                                 type="button"
                                 onClick={() => {
                                   setSelectedInquiry(item)
-                                  setOpenActionId(null)
+                                  close()
                                 }}
                                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-text-primary hover:bg-blue-50"
                               >
@@ -528,7 +519,7 @@ export default function Messages() {
                                 type="button"
                                 onClick={() => {
                                   updateStatus(item.id, 'Read')
-                                  setOpenActionId(null)
+                                  close()
                                 }}
                                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-text-primary hover:bg-blue-50"
                               >
@@ -539,7 +530,7 @@ export default function Messages() {
                                 type="button"
                                 onClick={() => {
                                   updateStatus(item.id, 'Replied')
-                                  setOpenActionId(null)
+                                  close()
                                 }}
                                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-text-primary hover:bg-blue-50"
                               >
@@ -549,7 +540,7 @@ export default function Messages() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setOpenActionId(null)
+                                  close()
                                   deleteInquiry(item.id)
                                 }}
                                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
@@ -557,9 +548,9 @@ export default function Messages() {
                                 <Trash2 className="h-4 w-4" />
                                 Delete
                               </button>
-                            </div>
+                            </>
                           )}
-                        </div>
+                        </Dropdown>
                       </td>
                     </tr>
                     )

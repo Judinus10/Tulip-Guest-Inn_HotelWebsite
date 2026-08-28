@@ -25,6 +25,7 @@ import {
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Dropdown } from '@/components/ui/dropdown'
 import { Input, Label, Textarea } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { createAmenity, createRoom, deleteAmenity, deleteRoomById, deleteRoomImage, listAmenities, listRooms, updateAmenity, updateRoom } from '@/services/roomsApi'
@@ -396,33 +397,13 @@ function ManageAmenitiesModal({ amenities, onChange, onClose }) {
 }
 
 function RoomActionsDropdown({ room, isOpen, onToggle, onView, onEdit, onDelete }) {
-  const dropdownRef = useRef(null)
-
-  useEffect(() => {
-    if (!isOpen) return undefined
-
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        onToggle()
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [isOpen, onToggle])
-
   return (
-    <div ref={dropdownRef} className="relative inline-flex justify-end">
-      <Button type="button" variant="outline" size="sm" onClick={onToggle} className="gap-2">
-        Actions
-        <MoreHorizontal className="h-4 w-4" />
-      </Button>
-
-      {isOpen && (
-        <div className="absolute right-0 top-full z-40 mt-2 w-44 overflow-hidden rounded-xl border border-border bg-white py-1 shadow-xl shadow-slate-900/10">
+    <Dropdown className="inline-flex justify-end" contentClassName="w-44 py-1" trigger={<Button type="button" variant="outline" size="sm" className="gap-2">Actions<MoreHorizontal className="h-4 w-4" /></Button>}>
+      {(close) => (
+        <>
           <button
             type="button"
-            onClick={() => onView(room)}
+            onClick={() => { onView(room); close() }}
             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50"
           >
             <Eye className="h-4 w-4 text-primary-600" />
@@ -430,7 +411,7 @@ function RoomActionsDropdown({ room, isOpen, onToggle, onView, onEdit, onDelete 
           </button>
           <button
             type="button"
-            onClick={() => onEdit(room)}
+            onClick={() => { onEdit(room); close() }}
             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50"
           >
             <Pencil className="h-4 w-4 text-primary-600" />
@@ -438,15 +419,15 @@ function RoomActionsDropdown({ room, isOpen, onToggle, onView, onEdit, onDelete 
           </button>
           <button
             type="button"
-            onClick={() => onDelete(room)}
+            onClick={() => { onDelete(room); close() }}
             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-red-600 transition hover:bg-red-50"
           >
             <Trash2 className="h-4 w-4" />
             Delete Room
           </button>
-        </div>
+        </>
       )}
-    </div>
+    </Dropdown>
   )
 }
 

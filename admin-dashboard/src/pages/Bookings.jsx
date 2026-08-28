@@ -379,57 +379,36 @@ function MobileBookingCard({ booking, shouldFlashBooking, setRef, onView, onEdit
 }
 
 function ActionsDropdown({ booking, onView, onEdit, onUpdateStatus, onCancel }) {
-  const [open, setOpen] = useState(false)
   const isExternal = Boolean(booking.is_external)
   const canEdit = !isExternal
     && !['checked_in', 'checked_out', 'cancelled', 'no_show'].includes(booking.booking_status)
-  const dropdownRef = useRef(null)
-
-  useEffect(() => {
-    if (!open) return undefined
-
-    const handleOutsideClick = (event) => {
-      if (!dropdownRef.current?.contains(event.target)) {
-        setOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleOutsideClick)
-    return () => document.removeEventListener('mousedown', handleOutsideClick)
-  }, [open])
-
-  const handleAction = (callback) => {
-    callback?.()
-    setOpen(false)
-  }
 
   return (
-    <div ref={dropdownRef} className="relative flex justify-end">
-      <Button type="button" variant="outline" size="sm" onClick={() => setOpen((value) => !value)}>
-        <MoreVertical className="h-4 w-4" />
-        Actions
-      </Button>
-
-      {open ? (
-        <div className="absolute right-0 top-10 z-30 w-56 overflow-hidden rounded-xl border border-border bg-white py-1 shadow-xl">
-          <button type="button" onClick={() => handleAction(onView)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50">
+    <Dropdown
+      className="flex justify-end"
+      contentClassName="w-56 py-1"
+      trigger={<Button type="button" variant="outline" size="sm"><MoreVertical className="h-4 w-4" />Actions</Button>}
+    >
+      {(close) => (
+        <>
+          <button type="button" onClick={() => { onView?.(); close() }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50">
             <Eye className="h-4 w-4 text-blue-700" />
             View Details
           </button>
           {!isExternal ? (
             <>
-              <button type="button" disabled={!canEdit} onClick={() => handleAction(onEdit)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45">
+              <button type="button" disabled={!canEdit} onClick={() => { onEdit?.(); close() }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45">
                 <Pencil className="h-4 w-4 text-amber-600" />
                 Edit Booking
               </button>
-              <button type="button" onClick={() => handleAction(onUpdateStatus)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50">
+              <button type="button" onClick={() => { onUpdateStatus?.(); close() }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50">
                 <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                 Update Status
               </button>
               <button
                 type="button"
                 disabled={booking.booking_status === 'cancelled'}
-                onClick={() => handleAction(onCancel)}
+                onClick={() => { onCancel?.(); close() }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Trash2 className="h-4 w-4" />
@@ -437,9 +416,9 @@ function ActionsDropdown({ booking, onView, onEdit, onUpdateStatus, onCancel }) 
               </button>
             </>
           ) : null}
-        </div>
-      ) : null}
-    </div>
+        </>
+      )}
+    </Dropdown>
   )
 }
 

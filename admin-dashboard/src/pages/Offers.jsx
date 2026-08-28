@@ -17,6 +17,7 @@ import {
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Dropdown } from '@/components/ui/dropdown'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input, Label } from '@/components/ui/input'
 import { discountTypes, offerStatuses, packageCategories } from '@/data/offerData'
@@ -521,15 +522,12 @@ function PaginationControls({ currentPage, totalPages, totalItems, pageSize, onP
 
 function OfferActionsDropdown({ offer, onView, onEdit, onDelete }) {
   return (
-    <div className="group relative inline-flex justify-end">
-      <Button type="button" variant="outline" size="sm" className="gap-2">
-        <MoreHorizontal className="h-4 w-4" />
-        Actions
-      </Button>
-      <div className="invisible absolute right-0 top-full z-30 mt-2 w-48 overflow-hidden rounded-xl border border-border bg-white py-1 text-left opacity-0 shadow-xl transition-all group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+    <Dropdown className="inline-flex justify-end" contentClassName="w-48 py-1 text-left" trigger={<Button type="button" variant="outline" size="sm" className="gap-2"><MoreHorizontal className="h-4 w-4" />Actions</Button>}>
+      {(close) => (
+        <>
         <button
           type="button"
-          onClick={() => onView(offer)}
+          onClick={() => { onView(offer); close() }}
           className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium text-text-primary transition hover:bg-blue-50 hover:text-blue-700"
         >
           <Eye className="h-4 w-4" />
@@ -537,7 +535,7 @@ function OfferActionsDropdown({ offer, onView, onEdit, onDelete }) {
         </button>
         <button
           type="button"
-          onClick={() => onEdit(offer)}
+          onClick={() => { onEdit(offer); close() }}
           className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium text-text-primary transition hover:bg-blue-50 hover:text-blue-700"
         >
           <Pencil className="h-4 w-4" />
@@ -545,14 +543,15 @@ function OfferActionsDropdown({ offer, onView, onEdit, onDelete }) {
         </button>
         <button
           type="button"
-          onClick={() => onDelete(offer)}
+          onClick={() => { onDelete(offer); close() }}
           className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
         >
           <Trash2 className="h-4 w-4" />
           Delete Package
         </button>
-      </div>
-    </div>
+        </>
+      )}
+    </Dropdown>
   )
 }
 

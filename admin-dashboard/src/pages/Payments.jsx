@@ -153,51 +153,15 @@ function Toast({ message, type, onClose }) {
 }
 
 function ActionsDropdown({ payment, onView, onEdit }) {
-  const [open, setOpen] = useState(false)
-  const dropdownRef = useRef(null)
   const invoiceDownloadUrl = payment.invoice_number ? `/api/invoices/download.php?id=${payment.booking_id}` : ''
 
-  useEffect(() => {
-    if (!open) return undefined
-
-    const handleOutsideClick = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setOpen(false)
-      }
-    }
-
-    const handleEscape = (event) => {
-      if (event.key === 'Escape') setOpen(false)
-    }
-
-    document.addEventListener('mousedown', handleOutsideClick)
-    document.addEventListener('touchstart', handleOutsideClick)
-    document.addEventListener('keydown', handleEscape)
-
-    return () => {
-      document.removeEventListener('mousedown', handleOutsideClick)
-      document.removeEventListener('touchstart', handleOutsideClick)
-      document.removeEventListener('keydown', handleEscape)
-    }
-  }, [open])
-
-  const handleAction = (callback) => {
-    callback()
-    setOpen(false)
-  }
-
   return (
-    <div ref={dropdownRef} className="relative flex justify-end">
-      <Button type="button" variant="outline" size="sm" onClick={() => setOpen((value) => !value)}>
-        <MoreVertical className="h-4 w-4" />
-        Actions
-      </Button>
-
-      {open ? (
-        <div className="absolute right-0 top-10 z-30 w-52 overflow-hidden rounded-xl border border-border bg-white py-1 shadow-xl">
+    <Dropdown className="flex justify-end" contentClassName="w-52 py-1" trigger={<Button type="button" variant="outline" size="sm"><MoreVertical className="h-4 w-4" />Actions</Button>}>
+      {(close) => (
+        <>
           <button
             type="button"
-            onClick={() => handleAction(onView)}
+            onClick={() => { onView(); close() }}
             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50"
           >
             <Eye className="h-4 w-4 text-blue-700" />
@@ -205,7 +169,7 @@ function ActionsDropdown({ payment, onView, onEdit }) {
           </button>
           <button
             type="button"
-            onClick={() => handleAction(onEdit)}
+            onClick={() => { onEdit(); close() }}
             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50"
           >
             <Edit3 className="h-4 w-4 text-emerald-600" />
@@ -214,16 +178,16 @@ function ActionsDropdown({ payment, onView, onEdit }) {
           {invoiceDownloadUrl ? (
             <button
               type="button"
-              onClick={() => handleAction(() => window.open(invoiceDownloadUrl, '_blank', 'noopener,noreferrer'))}
+              onClick={() => { window.open(invoiceDownloadUrl, '_blank', 'noopener,noreferrer'); close() }}
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50"
             >
               <Download className="h-4 w-4 text-slate-700" />
               Download Invoice
             </button>
           ) : null}
-        </div>
-      ) : null}
-    </div>
+        </>
+      )}
+    </Dropdown>
   )
 }
 
