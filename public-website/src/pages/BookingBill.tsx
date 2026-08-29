@@ -251,8 +251,14 @@ export default function BookingBill() {
                   <div className="space-y-4 text-[12px]">
                     <div className="flex items-center justify-between gap-4">
                       <span className="text-[#4f5d57]">Room Charges ({nights} {nights === 1 ? 'Night' : 'Nights'})</span>
-                      <span className="font-medium text-[#14251f]">{formatAmount(booking.amount, booking.currency)}</span>
+                      <span className="font-medium text-[#14251f]">{formatAmount(booking.subtotal_amount ?? booking.amount, booking.currency)}</span>
                     </div>
+                    {(booking.discount_amount ?? 0) > 0 && (
+                      <div className="flex items-center justify-between gap-4 text-[#247a52]">
+                        <span>{booking.applied_offer_title || 'Automatic offer'}</span>
+                        <span className="font-semibold">-{formatAmount(booking.discount_amount ?? 0, booking.currency)}</span>
+                      </div>
+                    )}
                     <div className="mt-8 border-t border-[#eee8df] pt-5">
                       <div className="flex items-center justify-between gap-4">
                         <span className="font-serif text-[20px] font-bold text-[#14251f]">Total Amount</span>

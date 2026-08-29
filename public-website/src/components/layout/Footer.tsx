@@ -15,13 +15,6 @@ const quickLinks = [
   { label: 'Contact', path: '/contact' },
 ];
 
-const fallbackRoomLinks = [
-  { label: 'Standard Room', path: '/rooms/standard-room' },
-  { label: 'Deluxe Room', path: '/rooms/deluxe-room' },
-  { label: 'Family Room', path: '/rooms/family-room' },
-  { label: 'Garden Suite', path: '/rooms/garden-suite' },
-];
-
 const fallbackContactSettings: ContactSettings = {
   business_name: 'Tulip Guest Inn',
   address: '189 V.M. Road\nPoint Pedro\nNorthern Province, Sri Lanka',
@@ -48,7 +41,7 @@ function mailHref(email: string): string {
 
 export default function Footer() {
   const [contactSettings, setContactSettings] = useState<ContactSettings>(fallbackContactSettings);
-  const [footerRoomLinks, setFooterRoomLinks] = useState(fallbackRoomLinks);
+  const [footerRoomLinks, setFooterRoomLinks] = useState<Array<{ label: string; path: string }>>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -65,17 +58,17 @@ export default function Footer() {
 
     fetchPublicRooms()
       .then((rooms) => {
-        if (!isMounted || rooms.length === 0) return;
+        if (!isMounted) return;
 
         setFooterRoomLinks(
-          rooms.slice(0, 4).map((room) => ({
+          rooms.slice(0, 8).map((room) => ({
             label: room.name,
             path: `/rooms/${room.slug}`,
           }))
         );
       })
       .catch(() => {
-        if (isMounted) setFooterRoomLinks(fallbackRoomLinks);
+        if (isMounted) setFooterRoomLinks([]);
       });
 
     return () => {
@@ -184,21 +177,6 @@ export default function Footer() {
               ))}
             </ul>
 
-            <div className="mt-8">
-              <h3 className="text-[10px] tracking-[0.25em] uppercase text-gold mb-4 font-medium">
-                Newsletter
-              </h3>
-              <div className="flex">
-                <input
-                  type="email"
-                  placeholder="Your email"
-                  className="flex-1 bg-white/10 border border-white/20 px-4 py-2.5 text-xs text-white placeholder-gray-500 outline-none focus:border-gold transition-colors duration-200"
-                />
-                <button className="bg-gold px-4 py-2.5 text-white text-xs hover:bg-gold-dark transition-colors duration-200">
-                  Join
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* Contact */}

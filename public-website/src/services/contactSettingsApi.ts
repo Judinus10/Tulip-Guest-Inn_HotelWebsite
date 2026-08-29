@@ -2,6 +2,7 @@ import { requestJson } from './apiClient';
 
 export type ContactSettings = {
   business_name: string;
+  opening_year?: string;
   address: string;
   phone: string;
   reception_contact_number: string;

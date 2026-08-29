@@ -5,3 +5,4 @@ export * from './experienceApi';
 export * from './galleryApi';
 export * from './roomsApi';
 export * from './offersApi';
+export * from './homeStatisticsApi';

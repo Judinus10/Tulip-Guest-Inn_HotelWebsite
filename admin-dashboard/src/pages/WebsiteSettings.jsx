@@ -22,6 +22,7 @@ import { fetchContactSettings, fetchPropertyContent, saveContactSettings, savePr
 
 const defaultSettings = {
   business_name: 'Tulip Guest Inn',
+  opening_year: '2018',
   address: 'Tulip Guest Inn, Sri Lanka',
   phone: '+94 77 123 4567',
   reception_contact_number: '+94 21 222 4567',
@@ -238,6 +239,24 @@ export default function WebsiteSettings() {
                   placeholder="Tulip Guest Inn"
                   required
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="opening_year">Opening Year</Label>
+                <FieldWithIcon icon={Clock3}>
+                  <Input
+                    id="opening_year"
+                    type="number"
+                    min="1900"
+                    max={new Date().getFullYear()}
+                    value={settings.opening_year}
+                    onChange={(event) => updateSetting('opening_year', event.target.value)}
+                    className="pl-9"
+                    placeholder="2018"
+                    required
+                  />
+                </FieldWithIcon>
+                <p className="text-xs text-text-secondary">Used to calculate Years of Service automatically.</p>
               </div>
 
               <div className="space-y-2">

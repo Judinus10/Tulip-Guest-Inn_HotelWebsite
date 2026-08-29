@@ -19,6 +19,7 @@ function default_contact_settings(): array
 
     return [
         'business_name' => 'Tulip Guest Inn',
+        'opening_year' => (string) max(1900, (int) date('Y') - 8),
         'address' => 'Tulip Guest Inn, Sri Lanka',
         'phone' => '+94 77 123 4567',
         'reception_contact_number' => '+94 21 222 4567',
@@ -114,6 +115,13 @@ function save_contact_settings(PDO $pdo, array $settings): array
     if ($cleaned['business_name'] === '') {
         json_response(false, 'Business name is required.', 422);
     }
+
+    $openingYear = (int) $cleaned['opening_year'];
+    $currentYear = (int) date('Y');
+    if ($openingYear < 1900 || $openingYear > $currentYear) {
+        json_response(false, 'Opening year must be between 1900 and ' . $currentYear . '.', 422);
+    }
+    $cleaned['opening_year'] = (string) $openingYear;
 
     if (
         $cleaned['phone'] === '' &&

@@ -40,6 +40,9 @@ export type PaymentHistoryItem = {
   order_id: string;
   payment_id: string;
   amount: number;
+  subtotal_amount?: number;
+  discount_amount?: number;
+  applied_offer_title?: string;
   currency: string;
   status: string;
   method: string;

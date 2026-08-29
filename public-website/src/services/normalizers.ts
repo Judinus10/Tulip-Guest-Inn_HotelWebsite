@@ -132,5 +132,9 @@ export function normalizeOffer(offer: BackendOffer, index = 0): Offer {
     validity: asString(offer.validity, asString(offer.validity_label, asString(offer.subtitle))),
     image: asString(offer.image, asString(offer.image_path)),
     details: asStringArray(offer.details),
+    bookingScope: (['single', 'multi', 'both'].includes(asString(offer.booking_scope)) ? asString(offer.booking_scope) : 'both') as Offer['bookingScope'],
+    minimumNights: asNumber(offer.minimum_nights, 1),
+    minimumRooms: asNumber(offer.minimum_rooms, 1),
+    minimumGuests: asNumber(offer.minimum_guests, 1),
   };
 }

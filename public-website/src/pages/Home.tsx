@@ -23,7 +23,6 @@ import AttractionCard from "../components/ui/AttractionCard";
 import { rooms } from "../data/rooms";
 import { facilities } from "../data/facilities";
 import { galleryImages } from "../data/gallery";
-import { offers } from "../data/offers";
 import { statistics } from "../data/statistics";
 import { attractions } from "../data/attractions";
 import {
@@ -31,6 +30,7 @@ import {
   getPublicGalleryImages,
   getPublicOffers,
   getPublicRooms,
+  getPublicHomeStatistics,
 } from "../services/publicApi";
 import homeHero01 from "../assets/images/home/home-hero-01.jpg";
 import homeHero02 from "../assets/images/home/home-hero-02.jpg";
@@ -118,7 +118,8 @@ export default function Home() {
   const [homeRooms, setHomeRooms] = useState(rooms);
   const [homeGalleryImages, setHomeGalleryImages] = useState(galleryImages);
   const [homeAttractions, setHomeAttractions] = useState(attractions);
-  const [homeOffers, setHomeOffers] = useState(offers);
+  const [homeOffers, setHomeOffers] = useState<Awaited<ReturnType<typeof getPublicOffers>>>([]);
+  const [homeStatistics, setHomeStatistics] = useState(statistics);
 
   const previewImages = useMemo(
     () => pickRandomGalleryPreview(homeGalleryImages, 10),
@@ -147,12 +148,13 @@ export default function Home() {
     let isMounted = true;
 
     async function loadHomeData() {
-      const [roomsResult, galleryResult, attractionsResult, offersResult] =
+      const [roomsResult, galleryResult, attractionsResult, offersResult, statisticsResult] =
         await Promise.allSettled([
           getPublicRooms(),
           getPublicGalleryImages(),
           getPublicAttractions(),
           getPublicOffers(),
+          getPublicHomeStatistics(),
         ]);
 
       if (!isMounted) return;
@@ -194,11 +196,10 @@ export default function Home() {
         setHomeAttractions(attractionsResult.value);
       }
 
-      if (
-        offersResult.status === "fulfilled" &&
-        offersResult.value.length > 0
-      ) {
-        setHomeOffers(offersResult.value);
+      setHomeOffers(offersResult.status === "fulfilled" ? offersResult.value : []);
+
+      if (statisticsResult.status === "fulfilled" && statisticsResult.value.length > 0) {
+        setHomeStatistics(statisticsResult.value);
       }
     }
 
@@ -557,7 +558,7 @@ export default function Home() {
       </section>
 
       {/* ── SPECIAL OFFERS ────────────────────────────────── */}
-      <section className="section-padding bg-background">
+      {homeOffers.length > 0 && <section className="section-padding bg-background">
         <div className="container-custom">
           <SectionTitle
             eyebrow="Special Offers"
@@ -570,13 +571,13 @@ export default function Home() {
             ))}
           </div>
         </div>
-      </section>
+      </section>}
 
       {/* ── STATISTICS ────────────────────────────────────── */}
       <section className="bg-dark py-20">
         <div className="container-custom">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-12">
-            {statistics.map((stat) => (
+            {homeStatistics.map((stat) => (
               <StatCounter key={stat.id} stat={stat} />
             ))}
           </div>

@@ -152,6 +152,26 @@ try {
     $paymentHistory = load_payment_history($pdo, $bookingId);
     $bookingGroupId = (int) ($record['booking_group_id'] ?? 0);
     $groupRooms = $bookingGroupId > 0 ? multi_room_group_rows($pdo, $bookingGroupId) : [];
+    $priceSummary = [
+        'subtotal_amount' => (float) ($record['subtotal_amount'] ?? $record['amount'] ?? 0),
+        'discount_amount' => (float) ($record['discount_amount'] ?? 0),
+        'applied_offer_title' => (string) ($record['applied_offer_title'] ?? ''),
+    ];
+    if ($bookingGroupId > 0) {
+        $groupPriceStmt = $pdo->prepare(
+            'SELECT subtotal_amount, discount_amount, applied_offer_title
+             FROM booking_groups WHERE id = :id LIMIT 1'
+        );
+        $groupPriceStmt->execute([':id' => $bookingGroupId]);
+        $groupPrice = $groupPriceStmt->fetch(PDO::FETCH_ASSOC);
+        if ($groupPrice) {
+            $priceSummary = [
+                'subtotal_amount' => (float) ($groupPrice['subtotal_amount'] ?? $record['paid_amount'] ?? 0),
+                'discount_amount' => (float) ($groupPrice['discount_amount'] ?? 0),
+                'applied_offer_title' => (string) ($groupPrice['applied_offer_title'] ?? ''),
+            ];
+        }
+    }
     $groupBookingNo = $bookingGroupId > 0
         ? 'MB-' . str_pad((string) $bookingGroupId, 6, '0', STR_PAD_LEFT)
         : 'BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT);
@@ -194,6 +214,9 @@ try {
             'booking_status' => (string) ($record['status'] ?? 'Pending'),
             'payment_status' => $paymentStatus,
             'amount' => (float) ($record['paid_amount'] ?? $record['amount'] ?? 0),
+            'subtotal_amount' => $priceSummary['subtotal_amount'],
+            'discount_amount' => $priceSummary['discount_amount'],
+            'applied_offer_title' => $priceSummary['applied_offer_title'],
             'currency' => (string) ($record['paid_currency'] ?? $record['currency'] ?? PAYMENT_CURRENCY),
             'invoice_number' => (string) ($record['invoice_number'] ?? $record['payment_invoice_number'] ?? ''),
             'order_id' => $orderId,

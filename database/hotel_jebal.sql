@@ -997,3 +997,29 @@ VALUES (
   '{"monday":{"enabled":true,"all_day":false,"open":"08:00","close":"18:00"},"tuesday":{"enabled":true,"all_day":false,"open":"08:00","close":"18:00"},"wednesday":{"enabled":true,"all_day":false,"open":"08:00","close":"18:00"},"thursday":{"enabled":true,"all_day":false,"open":"08:00","close":"18:00"},"friday":{"enabled":true,"all_day":false,"open":"08:00","close":"18:00"},"saturday":{"enabled":true,"all_day":false,"open":"08:00","close":"18:00"},"sunday":{"enabled":true,"all_day":false,"open":"08:00","close":"18:00"}}'
 )
 ON DUPLICATE KEY UPDATE setting_value = setting_value;
+
+-- Tulip automatic offer pricing. Back up the database before running.
+ALTER TABLE offers
+  ADD COLUMN IF NOT EXISTS booking_scope VARCHAR(20) NOT NULL DEFAULT 'both',
+  ADD COLUMN IF NOT EXISTS minimum_nights INT UNSIGNED NOT NULL DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS minimum_rooms INT UNSIGNED NOT NULL DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS minimum_guests INT UNSIGNED NOT NULL DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS priority INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS automatic_apply TINYINT(1) NOT NULL DEFAULT 1;
+
+ALTER TABLE bookings
+  ADD COLUMN IF NOT EXISTS subtotal_amount DECIMAL(12,2) NULL,
+  ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  ADD COLUMN IF NOT EXISTS applied_offer_id INT UNSIGNED NULL,
+  ADD COLUMN IF NOT EXISTS applied_offer_title VARCHAR(150) NULL,
+  ADD COLUMN IF NOT EXISTS offer_snapshot_json LONGTEXT NULL;
+
+ALTER TABLE booking_groups
+  ADD COLUMN IF NOT EXISTS subtotal_amount DECIMAL(12,2) NULL,
+  ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  ADD COLUMN IF NOT EXISTS applied_offer_id INT UNSIGNED NULL,
+  ADD COLUMN IF NOT EXISTS applied_offer_title VARCHAR(150) NULL,
+  ADD COLUMN IF NOT EXISTS offer_snapshot_json LONGTEXT NULL;
+
+UPDATE bookings SET subtotal_amount = amount WHERE subtotal_amount IS NULL;
+UPDATE booking_groups SET subtotal_amount = total_amount WHERE subtotal_amount IS NULL;

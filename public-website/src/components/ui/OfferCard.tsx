@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import type { Offer } from '../../data/offers';
+import fallbackOfferImage from '../../assets/images/home/home-luxury-experience.jpg';
 
 interface OfferCardProps {
   offer: Offer;
@@ -19,10 +20,15 @@ export default function OfferCard({ offer, index = 0 }: OfferCardProps) {
       {/* Image */}
       <div className="relative h-52 overflow-hidden">
         <img
-          src={offer.image}
+          src={offer.image || fallbackOfferImage}
           alt={offer.name}
           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
           loading="lazy"
+          onError={(event) => {
+            if (event.currentTarget.src !== fallbackOfferImage) {
+              event.currentTarget.src = fallbackOfferImage;
+            }
+          }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
         <div className="absolute top-4 right-4 bg-gold text-white text-xs font-medium px-3 py-1.5 tracking-wide">
@@ -49,7 +55,7 @@ export default function OfferCard({ offer, index = 0 }: OfferCardProps) {
         </ul>
 
         <Link
-          to="/booking"
+          to={offer.bookingScope === 'multi' ? '/multi-room-booking' : '/rooms'}
           className="btn-outline w-full justify-center text-[9px] py-2.5"
         >
           Claim Offer
