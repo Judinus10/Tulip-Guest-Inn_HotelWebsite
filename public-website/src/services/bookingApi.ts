@@ -53,6 +53,7 @@ export type PaymentHistoryItem = {
 
 export type BookingPaymentStatus = {
   id: number;
+  booking_no: string;
   full_name: string;
   email: string;
   phone: string;
@@ -63,6 +64,9 @@ export type BookingPaymentStatus = {
   booking_status: string;
   payment_status: string;
   amount: number;
+  subtotal_amount?: number;
+  discount_amount?: number;
+  applied_offer_title?: string;
   currency: string;
   invoice_number: string;
   order_id: string;
