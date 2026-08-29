@@ -1,46 +1,23 @@
-Options -Indexes -MultiViews
+Options -Indexes
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
-  # Force HTTPS while preserving the current test/live host.
   RewriteCond %{HTTPS} !=on
-  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=302]
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=302,L]
 
-  # Never expose hidden, deployment, source-map or source files.
-  RewriteRule (^|/)\. - [F,L,NC]
-  RewriteRule \.(?:env|ini|log|sql|bak|backup|dist|sh|yml|yaml|lock|map|md|php[0-9]?|phtml|phar|cgi|pl|py)$ - [F,L,NC]
-
-  # Only these client-side admin URLs exist. Unknown /admin URLs return the
-  # visitor to the public website instead of exposing the admin shell.
-  RewriteCond %{REQUEST_URI} !^/admin/?$ [NC]
-  RewriteCond %{REQUEST_URI} !^/admin/(?:login|dashboard|rooms|bookings|booking-calendar|payments|gallery|offers|messages|website-settings|notifications|experience|admin-password|mail-settings)/?$ [NC]
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule ^ https://%{HTTP_HOST}/ [R=302,L]
-
-  # React SPA fallback for admin dashboard.
+  # Admin is deployed at /admin. React handles valid routes, authentication,
+  # and redirects unknown admin routes to the public website.
   RewriteBase /admin/
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . /admin/index.html [L]
+  RewriteRule ^ /admin/index.html [L]
 </IfModule>
 
 <IfModule mod_headers.c>
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
   Header always set X-Robots-Tag "noindex, nofollow"
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "DENY"
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
-  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
-  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-</IfModule>
-
-<FilesMatch "(^\.|\.(?:env|ini|log|sql|bak|backup|dist|sh|yml|yaml|lock|map|md|php[0-9]?|phtml|phar|cgi|pl|py)$)">
-  Require all denied
-</FilesMatch>
-
-<IfModule mod_deflate.c>
-  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json image/svg+xml
 </IfModule>

@@ -1,33 +1,14 @@
-Options -Indexes -MultiViews
+Options -Indexes
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
-  # Keep the requested host. This allows the test domain without redirecting
-  # it to the live Tulip domain.
+  # Use HTTPS but preserve test.compylx.com (or the current live host).
   RewriteCond %{HTTPS} !=on
   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=302,L]
 
-  # Never expose hidden files, deployment files, source maps or source code.
-  RewriteRule (^|/)\.(?!well-known/) - [F,L,NC]
-  RewriteRule \.(?:env|ini|log|sql|bak|backup|dist|sh|yml|yaml|lock|map|md|php[0-9]?|phtml|phar|cgi|pl|py)$ - [F,L,NC]
-
-  # Existing public assets are served normally. Every other URL is handled by
-  # React; its wildcard route displays the designed 404 page.
+  # React public-site fallback. Unknown routes reach the React 404 page.
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule ^ index.html [L]
 </IfModule>
-
-<IfModule mod_headers.c>
-  Header always set X-Content-Type-Options "nosniff"
-  Header always set X-Frame-Options "SAMEORIGIN"
-  Header always set Referrer-Policy "strict-origin-when-cross-origin"
-  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
-  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
-  Header always unset X-Powered-By
-</IfModule>
-
-<FilesMatch "(^\.|\.(?:env|ini|log|sql|bak|backup|dist|sh|yml|yaml|lock|map|md|php[0-9]?|phtml|phar|cgi|pl|py)$)">
-  Require all denied
-</FilesMatch>
