@@ -69,6 +69,17 @@ function formatReferenceId(value) {
   return `${reference.slice(0, 14)}...`
 }
 
+function formatRelatedRoom(value) {
+  const roomNames = String(value || '')
+    .split(',')
+    .map((roomName) => roomName.trim())
+    .filter(Boolean)
+
+  if (roomNames.length === 0) return '-'
+  if (roomNames.length > 1) return 'Multiple Rooms'
+  return roomNames[0]
+}
+
 function StatCard({ title, value, icon: Icon }) {
   return (
     <Card>
@@ -366,7 +377,9 @@ export default function Notifications() {
                           <p className="mt-0.5 line-clamp-1 text-xs text-text-secondary">{item.description}</p>
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-text-secondary">{item.related_room}</td>
+                      <td className="max-w-[180px] whitespace-nowrap px-4 py-3 text-text-secondary">
+                        <span className="block truncate">{formatRelatedRoom(item.related_room)}</span>
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3 text-text-secondary">{item.related_booking}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-text-secondary">{formatDate(item.created_at)}</td>
                       <td className="whitespace-nowrap px-4 py-3"><Badge variant={statusVariants[item.status]}>{item.status}</Badge></td>
