@@ -55,6 +55,12 @@ function fetch_all_rows(PDO $pdo, string $sql, array $params = []): array
     return $stmt->fetchAll();
 }
 
+function primary_booking_sql(string $alias = ''): string
+{
+    $prefix = $alias !== '' ? rtrim($alias, '.') . '.' : '';
+    return "({$prefix}booking_group_id IS NULL OR {$prefix}is_group_primary = 1)";
+}
+
 function normalize_payment_status(?string $status): string
 {
     $status = normalize_status_text($status);
@@ -113,7 +119,8 @@ function build_monthly_booking_trend(PDO $pdo): array
         $pdo,
         "SELECT YEAR(check_in_date) AS year_number, MONTH(check_in_date) AS month_number, COUNT(*) AS total
          FROM bookings
-         WHERE check_in_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 5 MONTH), '%Y-%m-01')
+         WHERE " . primary_booking_sql() . "
+           AND check_in_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 5 MONTH), '%Y-%m-01')
          GROUP BY YEAR(check_in_date), MONTH(check_in_date)"
     );
     $bookingComRows = ics_enabled() ? fetch_all_rows(
@@ -178,6 +185,7 @@ function build_booking_status_distribution(PDO $pdo): array
         $pdo,
         "SELECT status, COUNT(*) AS total
          FROM bookings
+         WHERE " . primary_booking_sql() . "
          GROUP BY status"
     );
 
@@ -285,6 +293,7 @@ function build_recent_bookings(PDO $pdo): array
             payment_status,
             created_at
          FROM bookings
+         WHERE " . primary_booking_sql() . "
          ORDER BY created_at DESC
          LIMIT 10"
     );
@@ -365,7 +374,8 @@ function build_upcoming_checkins(PDO $pdo): array
             status,
             created_at
          FROM bookings
-         WHERE status = 'Confirmed'
+         WHERE " . primary_booking_sql() . "
+           AND status = 'Confirmed'
            AND check_in_date >= CURDATE()
          ORDER BY check_in_date ASC
          LIMIT 5"
@@ -455,14 +465,26 @@ try {
         ensure_ics_schema($pdo);
     }
 
-    $websiteBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings");
+    $websiteBookings = (int) fetch_single_value(
+        $pdo,
+        "SELECT COUNT(*) FROM bookings WHERE " . primary_booking_sql()
+    );
     $bookingComBookings = ics_enabled()
         ? (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM external_calendar_events WHERE provider = 'booking.com'")
         : 0;
     $totalBookings = $websiteBookings + $bookingComBookings;
-    $pendingBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Pending'");
-    $confirmedBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Confirmed'");
-    $cancelledBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Cancelled'")
+    $pendingBookings = (int) fetch_single_value(
+        $pdo,
+        "SELECT COUNT(*) FROM bookings WHERE " . primary_booking_sql() . " AND status = 'Pending'"
+    );
+    $confirmedBookings = (int) fetch_single_value(
+        $pdo,
+        "SELECT COUNT(*) FROM bookings WHERE " . primary_booking_sql() . " AND status = 'Confirmed'"
+    );
+    $cancelledBookings = (int) fetch_single_value(
+        $pdo,
+        "SELECT COUNT(*) FROM bookings WHERE " . primary_booking_sql() . " AND status = 'Cancelled'"
+    )
         + (ics_enabled() ? (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM external_calendar_events WHERE provider = 'booking.com' AND is_active = 0") : 0);
 
     $totalEnquiries = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM enquiries");
