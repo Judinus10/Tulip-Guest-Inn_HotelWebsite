@@ -230,9 +230,13 @@ function build_invoice_data_for_booking(PDO $pdo, int $bookingId, array $payment
         $booking['room_name'] = (string) ($group['room_names'] ?? $booking['room_name']);
         $booking['guests'] = (int) ($group['total_guests'] ?? $booking['guests']);
         $booking['rooms'] = (int) ($group['total_rooms'] ?? 1);
-        $groupTotalStmt = $pdo->prepare('SELECT total_amount FROM booking_groups WHERE id = :group_id LIMIT 1');
+        $groupTotalStmt = $pdo->prepare('SELECT total_amount, subtotal_amount, discount_amount, applied_offer_title FROM booking_groups WHERE id = :group_id LIMIT 1');
         $groupTotalStmt->execute([':group_id' => $bookingGroupId]);
-        $booking['amount'] = (float) ($groupTotalStmt->fetchColumn() ?: $booking['amount']);
+        $groupPrice = $groupTotalStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $booking['amount'] = (float) ($groupPrice['total_amount'] ?? $booking['amount']);
+        $booking['subtotal_amount'] = (float) ($groupPrice['subtotal_amount'] ?? $booking['amount']);
+        $booking['discount_amount'] = (float) ($groupPrice['discount_amount'] ?? 0);
+        $booking['applied_offer_title'] = (string) ($groupPrice['applied_offer_title'] ?? '');
     }
 
     if (!$payment) {
@@ -267,6 +271,9 @@ function build_invoice_data_for_booking(PDO $pdo, int $bookingId, array $payment
         'check_in_date' => (string) ($booking['check_in_date'] ?? ''),
         'check_out_date' => (string) ($booking['check_out_date'] ?? ''),
         'amount_paid' => $amountPaid,
+        'subtotal_amount' => (float) ($booking['subtotal_amount'] ?? $amountPaid),
+        'discount_amount' => (float) ($booking['discount_amount'] ?? 0),
+        'applied_offer_title' => (string) ($booking['applied_offer_title'] ?? ''),
         'currency' => $currency,
         'payment_method' => $paymentMethod,
         'payment_date' => $paymentDate,
@@ -320,6 +327,9 @@ function create_invoice_pdf_binary(array $invoice): string
     $nights = max(1, (int) ($invoice['nights'] ?? 1));
     $currency = (string) ($invoice['currency'] ?? 'LKR');
     $amountPaid = (float) ($invoice['amount_paid'] ?? 0);
+    $subtotalAmount = (float) ($invoice['subtotal_amount'] ?? $amountPaid);
+    $discountAmount = (float) ($invoice['discount_amount'] ?? 0);
+    $offerTitle = (string) ($invoice['applied_offer_title'] ?? '');
     $paymentMethod = (string) ($invoice['payment_method'] ?? 'PayHere');
     $transactionId = (string) ($invoice['transaction_id'] ?? '-');
     $paymentDate = pdf_datetime_display((string) ($invoice['payment_date'] ?? ''));
@@ -391,8 +401,12 @@ function create_invoice_pdf_binary(array $invoice): string
     pdf_add_rect($content, 38, 226, 252, 151, $line, null, 0.7);
     pdf_add_text($content, 52, 350, 'CHARGES SUMMARY', 12, 'F2', $navy);
     pdf_add_text($content, 52, 318, 'Room Charges (' . $nights . ' ' . ($nights === 1 ? 'Night' : 'Nights') . ')', 9, 'F1', $navy);
-    pdf_add_right_text($content, 276, 318, pdf_money($amountPaid, $currency), 9, 'F2', $navy);
-    pdf_add_line($content, 52, 288, 276, 288, $line, 0.5);
+    pdf_add_right_text($content, 276, 318, pdf_money($subtotalAmount, $currency), 9, 'F2', $navy);
+    if ($discountAmount > 0) {
+        pdf_add_text($content, 52, 295, $offerTitle !== '' ? $offerTitle : 'Automatic Offer', 8, 'F1', $green);
+        pdf_add_right_text($content, 276, 295, '-' . pdf_money($discountAmount, $currency), 8, 'F2', $green);
+    }
+    pdf_add_line($content, 52, 280, 276, 280, $line, 0.5);
     pdf_add_text($content, 52, 251, 'Total Amount', 10, 'F2', $navy);
     pdf_add_right_text($content, 276, 248, pdf_money($amountPaid, $currency), 16, 'F2', $gold);
 

@@ -61,6 +61,12 @@ function offer_ensure_schema(PDO $pdo): void
     offer_add_column_if_missing($pdo, 'start_date', "DATE NULL");
     offer_add_column_if_missing($pdo, 'end_date', "DATE NULL");
     offer_add_column_if_missing($pdo, 'sort_order', "INT NOT NULL DEFAULT 0");
+    offer_add_column_if_missing($pdo, 'booking_scope', "VARCHAR(20) NOT NULL DEFAULT 'both'");
+    offer_add_column_if_missing($pdo, 'minimum_nights', "INT UNSIGNED NOT NULL DEFAULT 1");
+    offer_add_column_if_missing($pdo, 'minimum_rooms', "INT UNSIGNED NOT NULL DEFAULT 1");
+    offer_add_column_if_missing($pdo, 'minimum_guests', "INT UNSIGNED NOT NULL DEFAULT 1");
+    offer_add_column_if_missing($pdo, 'priority', "INT NOT NULL DEFAULT 0");
+    offer_add_column_if_missing($pdo, 'automatic_apply', "TINYINT(1) NOT NULL DEFAULT 1");
 }
 
 function offer_bootstrap(bool $requireAuth = true): PDO
@@ -102,7 +108,7 @@ function offer_valid_discount_type(string $type): string
 function offer_format_discount_label(string $discountType, float $discountValue): string
 {
     $cleanValue = fmod($discountValue, 1.0) === 0.0 ? (string) (int) $discountValue : rtrim(rtrim(number_format($discountValue, 2, '.', ''), '0'), '.');
-    return $discountType === 'percentage' ? $cleanValue . '% Off' : '$' . $cleanValue . ' Off';
+    return $discountType === 'percentage' ? $cleanValue . '% Off' : 'LKR ' . $cleanValue . ' Off';
 }
 
 function offer_upload_image(string $fieldName = 'image'): ?string
@@ -137,6 +143,54 @@ function offer_upload_image(string $fieldName = 'image'): ?string
         offer_json(['success' => false, 'message' => $exception->getMessage()], 422);
     }
     return 'uploads/offers/' . $result['filename'];
+}
+
+function offer_public_image_url(?string $path): string
+{
+    $path = trim((string) $path);
+
+    if ($path === '') {
+        return '';
+    }
+
+    if (preg_match('#^(?:https?:)?//#i', $path) || str_starts_with($path, 'data:') || str_starts_with($path, 'blob:')) {
+        return $path;
+    }
+
+    // Offer files are stored relative to the API root (api/uploads/offers),
+    // not relative to the current /api/offers endpoint directory.
+    $apiBase = '';
+    if (defined('API_BASE_URL') && trim((string) API_BASE_URL) !== '') {
+        $apiBase = trim((string) API_BASE_URL);
+    }
+
+    if ($apiBase === '') {
+        $scheme = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') ? 'https' : 'http';
+        $host = (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
+        $scriptName = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? '/api/offers/list.php'));
+        $apiDirectory = dirname(dirname($scriptName));
+        $apiBase = $scheme . '://' . $host . ($apiDirectory === '/' ? '' : $apiDirectory);
+    }
+
+    $normalizedPath = ltrim(str_replace('\\', '/', $path), '/');
+    if (str_starts_with($normalizedPath, 'api/')) {
+        $normalizedPath = substr($normalizedPath, 4);
+    }
+
+    return rtrim($apiBase, '/') . '/' . $normalizedPath;
+}
+
+function offer_storable_image_path(?string $path): string
+{
+    $path = offer_clean($path, 500);
+
+    // blob: and data: values are browser-only previews. Persisting either in
+    // MySQL creates an image that is guaranteed to break after page reload.
+    if ($path === '' || str_starts_with($path, 'blob:') || str_starts_with($path, 'data:')) {
+        return '';
+    }
+
+    return $path;
 }
 
 function offer_parse_details(mixed $details): array
@@ -180,11 +234,18 @@ function offer_normalize(array $row): array
         'discount_label' => $discountLabel,
         'validity_label' => (string) ($row['validity_label'] ?? ''),
         'image_path' => (string) ($row['image_path'] ?? ''),
+        'image_url' => offer_public_image_url((string) ($row['image_path'] ?? '')),
         'details' => $details,
         'status' => offer_valid_status((string) ($row['status'] ?? 'active')),
         'start_date' => $row['start_date'] ?? '',
         'end_date' => $row['end_date'] ?? '',
         'sort_order' => (int) ($row['sort_order'] ?? 0),
+        'booking_scope' => in_array(($row['booking_scope'] ?? 'both'), ['single', 'multi', 'both'], true) ? $row['booking_scope'] : 'both',
+        'minimum_nights' => max(1, (int) ($row['minimum_nights'] ?? 1)),
+        'minimum_rooms' => max(1, (int) ($row['minimum_rooms'] ?? 1)),
+        'minimum_guests' => max(1, (int) ($row['minimum_guests'] ?? 1)),
+        'priority' => (int) ($row['priority'] ?? 0),
+        'automatic_apply' => (int) ($row['automatic_apply'] ?? 1) === 1,
         'created_at' => $row['created_at'] ?? '',
         'updated_at' => $row['updated_at'] ?? '',
     ];

@@ -12,6 +12,7 @@ require_once __DIR__ . '/bookings/booking-expiry-helper.php';
 require_once __DIR__ . '/bookings/booking-audit-helper.php';
 require_once __DIR__ . '/calendar/ics-helper.php';
 require_once __DIR__ . '/security/public-token-helper.php';
+require_once __DIR__ . '/offers/offer-pricing-helper.php';
 
 apply_cors_headers();
 
@@ -101,7 +102,8 @@ if ($guests > 20) {
     json_response(false, 'Please enter a valid number of guests.', 422);
 }
 
-$amount = calculate_booking_amount($roomName, $checkInDate, $checkOutDate);
+$subtotalAmount = calculate_booking_amount($roomName, $checkInDate, $checkOutDate);
+$amount = $subtotalAmount;
 
 if ($amount <= 0) {
     json_response(false, 'Unable to calculate booking amount for the selected room.', 422);
@@ -112,6 +114,10 @@ $bookingCommitted = false;
 
 try {
     $pdo = get_db_connection();
+    offer_ensure_booking_snapshot_schema($pdo);
+    $nights = max(1, (int) $checkIn->diff($checkOut)->days);
+    $offerPrice = offer_best_price($pdo, $subtotalAmount, $checkInDate, $nights, 1, $guests);
+    $amount = $offerPrice['total'];
     expire_pending_bookings($pdo, null, true);
 
     // Initialize the ICS tables before starting the booking transaction.
@@ -178,6 +184,11 @@ try {
         'status' => 'Pending',
         'payment_status' => 'Payment Pending',
         'amount' => $amount,
+        'subtotal_amount' => $offerPrice['subtotal'],
+        'discount_amount' => $offerPrice['discount'],
+        'applied_offer_id' => $offerPrice['offer_id'],
+        'applied_offer_title' => $offerPrice['offer_title'],
+        'offer_snapshot_json' => $offerPrice['snapshot'],
         'currency' => PAYMENT_CURRENCY,
         'ip_address' => get_client_ip(),
         'user_agent' => mb_substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255),

@@ -10,6 +10,7 @@ require_once __DIR__ . '/bookings/booking-audit-helper.php';
 require_once __DIR__ . '/bookings/multi-room-helper.php';
 require_once __DIR__ . '/calendar/ics-helper.php';
 require_once __DIR__ . '/security/public-token-helper.php';
+require_once __DIR__ . '/offers/offer-pricing-helper.php';
 
 apply_cors_headers();
 
@@ -77,6 +78,7 @@ $totalAmount = 0.0;
 $currency = PAYMENT_CURRENCY;
 try {
     $pdo = get_db_connection();
+    offer_ensure_booking_snapshot_schema($pdo);
     expire_pending_bookings($pdo, null, false);
 
     // MySQL DDL implicitly commits an active transaction. The ICS helper runs
@@ -141,13 +143,32 @@ try {
     }
     unset($selectedRoom);
 
+    $subtotalAmount = round($totalAmount, 2);
+    $offerPrice = offer_best_price($pdo, $subtotalAmount, $checkInDate, $nights, count($selectedRooms), $totalGuests);
+    $totalAmount = $offerPrice['total'];
+    $remainingDiscount = $offerPrice['discount'];
+    foreach ($selectedRooms as $index => &$selectedRoom) {
+        $roomDiscount = $index === count($selectedRooms) - 1
+            ? $remainingDiscount
+            : round($offerPrice['discount'] * ($selectedRoom['room_total'] / max(0.01, $subtotalAmount)), 2);
+        $roomDiscount = min($roomDiscount, $selectedRoom['room_total']);
+        $selectedRoom['room_subtotal'] = $selectedRoom['room_total'];
+        $selectedRoom['room_discount'] = $roomDiscount;
+        $selectedRoom['room_total'] = round($selectedRoom['room_total'] - $roomDiscount, 2);
+        $remainingDiscount = round($remainingDiscount - $roomDiscount, 2);
+    }
+    unset($selectedRoom);
+
     $groupStmt = $pdo->prepare(
-        'INSERT INTO booking_groups (total_guests, total_rooms, total_amount, currency, created_at, updated_at)
-         VALUES (:total_guests, :total_rooms, :total_amount, :currency, NOW(), NOW())'
+        'INSERT INTO booking_groups (total_guests, total_rooms, subtotal_amount, discount_amount, applied_offer_id, applied_offer_title, offer_snapshot_json, total_amount, currency, created_at, updated_at)
+         VALUES (:total_guests, :total_rooms, :subtotal_amount, :discount_amount, :applied_offer_id, :applied_offer_title, :offer_snapshot_json, :total_amount, :currency, NOW(), NOW())'
     );
     $groupStmt->execute([
         ':total_guests' => $totalGuests,
         ':total_rooms' => count($selectedRooms),
+        ':subtotal_amount' => $offerPrice['subtotal'], ':discount_amount' => $offerPrice['discount'],
+        ':applied_offer_id' => $offerPrice['offer_id'], ':applied_offer_title' => $offerPrice['offer_title'],
+        ':offer_snapshot_json' => $offerPrice['snapshot'],
         ':total_amount' => $totalAmount,
         ':currency' => $currency,
     ]);
@@ -161,11 +182,13 @@ try {
                 (booking_group_id, is_group_primary, full_name, email, phone,
                  is_booking_for_other, staying_guest_name, staying_guest_email, staying_guest_phone, staying_guest_note,
                  room_name, check_in_date, check_out_date, guests, message, status, payment_status,
+                 subtotal_amount, discount_amount, applied_offer_id, applied_offer_title, offer_snapshot_json,
                  amount, currency, email_status, ip_address, user_agent, created_at, updated_at)
              VALUES
                 (:booking_group_id, :is_group_primary, :full_name, :email, :phone,
                  0, NULL, NULL, NULL, NULL,
                  :room_name, :check_in_date, :check_out_date, :guests, :message, \'Pending\', \'Payment Pending\',
+                 :subtotal_amount, :discount_amount, :applied_offer_id, :applied_offer_title, :offer_snapshot_json,
                  :amount, :currency, \'Pending\', :ip_address, :user_agent, NOW(), NOW())'
         );
         $bookingStmt->execute([
@@ -180,6 +203,9 @@ try {
             ':guests' => $selectedRoom['allocated_guests'],
             ':message' => $message,
             ':amount' => $selectedRoom['room_total'],
+            ':subtotal_amount' => $selectedRoom['room_subtotal'], ':discount_amount' => $selectedRoom['room_discount'],
+            ':applied_offer_id' => $offerPrice['offer_id'], ':applied_offer_title' => $offerPrice['offer_title'],
+            ':offer_snapshot_json' => $offerPrice['snapshot'],
             ':currency' => $currency,
             ':ip_address' => get_client_ip(),
             ':user_agent' => mb_substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255),

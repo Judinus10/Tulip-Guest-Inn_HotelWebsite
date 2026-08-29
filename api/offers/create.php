@@ -15,6 +15,12 @@ try {
     $endDate = offer_clean($_POST['end_date'] ?? '', 10);
     $status = offer_valid_status((string) ($_POST['status'] ?? 'active'));
     $sortOrder = (int) ($_POST['sort_order'] ?? 0);
+    $bookingScope = in_array(($_POST['booking_scope'] ?? 'both'), ['single', 'multi', 'both'], true) ? $_POST['booking_scope'] : 'both';
+    $minimumNights = max(1, (int) ($_POST['minimum_nights'] ?? 1));
+    $minimumRooms = max(1, (int) ($_POST['minimum_rooms'] ?? 1));
+    $minimumGuests = max(1, (int) ($_POST['minimum_guests'] ?? 1));
+    $priority = (int) ($_POST['priority'] ?? 0);
+    $automaticApply = filter_var($_POST['automatic_apply'] ?? true, FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
 
     if ($title === '' || $description === '') {
         offer_json(['success' => false, 'message' => 'Title and description are required.'], 400);
@@ -26,15 +32,15 @@ try {
 
     offer_validate_dates($startDate, $endDate);
 
-    $imagePath = offer_upload_image('image') ?? offer_clean($_POST['image_path'] ?? '', 500);
+    $imagePath = offer_upload_image('image') ?? offer_storable_image_path($_POST['image_path'] ?? '');
     $discountLabel = offer_format_discount_label($discountType, $discountValue);
     $details = json_encode(offer_parse_details($_POST['details'] ?? []), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
     $stmt = $pdo->prepare(
         'INSERT INTO offers
-        (title, subtitle, description, package_category, discount_type, discount_value, discount_label, validity_label, image_path, details, status, start_date, end_date, sort_order)
+        (title, subtitle, description, package_category, discount_type, discount_value, discount_label, validity_label, image_path, details, status, start_date, end_date, sort_order, booking_scope, minimum_nights, minimum_rooms, minimum_guests, priority, automatic_apply)
         VALUES
-        (:title, :subtitle, :description, :package_category, :discount_type, :discount_value, :discount_label, :validity_label, :image_path, :details, :status, :start_date, :end_date, :sort_order)'
+        (:title, :subtitle, :description, :package_category, :discount_type, :discount_value, :discount_label, :validity_label, :image_path, :details, :status, :start_date, :end_date, :sort_order, :booking_scope, :minimum_nights, :minimum_rooms, :minimum_guests, :priority, :automatic_apply)'
     );
 
     $stmt->execute([
@@ -52,6 +58,8 @@ try {
         ':start_date' => $startDate !== '' ? $startDate : null,
         ':end_date' => $endDate !== '' ? $endDate : null,
         ':sort_order' => $sortOrder,
+        ':booking_scope'=>$bookingScope, ':minimum_nights'=>$minimumNights, ':minimum_rooms'=>$minimumRooms,
+        ':minimum_guests'=>$minimumGuests, ':priority'=>$priority, ':automatic_apply'=>$automaticApply,
     ]);
 
     $offer = offer_find($pdo, (int) $pdo->lastInsertId());

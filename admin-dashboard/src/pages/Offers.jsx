@@ -37,6 +37,12 @@ const emptyForm = {
   image_path: '',
   image_preview: '',
   image_file_name: '',
+  booking_scope: 'both',
+  minimum_nights: 1,
+  minimum_rooms: 1,
+  minimum_guests: 1,
+  priority: 0,
+  automatic_apply: true,
 }
 
 const statusVariant = {
@@ -74,7 +80,7 @@ function formatDateTime(value) {
 
 function formatDiscount(offer) {
   if (offer.discount_type === 'percentage') return `${Number(offer.discount_value || 0)}%`
-  return `$${Number(offer.discount_value || 0).toLocaleString()}`
+  return `LKR ${Number(offer.discount_value || 0).toLocaleString()}`
 }
 
 function Toast({ message, onClose }) {
@@ -217,11 +223,9 @@ function OfferFormModal({ mode, offer, onClose, onSubmit }) {
     event.preventDefault()
     if (!validate()) return
 
-    const { image_file, ...safePayload } = form
-
     onSubmit({
-      ...safePayload,
-      discount_value: Number(safePayload.discount_value),
+      ...form,
+      discount_value: Number(form.discount_value),
     })
   }
 
@@ -315,7 +319,42 @@ function OfferFormModal({ mode, offer, onClose, onSubmit }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="start_date">Start date</Label>
+            <Label htmlFor="booking_scope">Applies to</Label>
+            <select id="booking_scope" value={form.booking_scope} onChange={(event) => updateField('booking_scope', event.target.value)} className="h-11 w-full rounded-xl border border-border bg-white px-4 text-sm">
+              <option value="both">Single and multiple rooms</option>
+              <option value="single">Single-room bookings only</option>
+              <option value="multi">Multiple-room bookings only</option>
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="minimum_nights">Minimum nights</Label>
+            <Input id="minimum_nights" type="number" min="1" value={form.minimum_nights} onChange={(event) => updateField('minimum_nights', Math.max(1, Number(event.target.value)))} />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="minimum_rooms">Minimum rooms</Label>
+            <Input id="minimum_rooms" type="number" min="1" value={form.minimum_rooms} onChange={(event) => updateField('minimum_rooms', Math.max(1, Number(event.target.value)))} />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="minimum_guests">Minimum guests</Label>
+            <Input id="minimum_guests" type="number" min="1" value={form.minimum_guests} onChange={(event) => updateField('minimum_guests', Math.max(1, Number(event.target.value)))} />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="priority">Priority</Label>
+            <Input id="priority" type="number" value={form.priority} onChange={(event) => updateField('priority', Number(event.target.value))} />
+            <p className="text-xs text-text-secondary">Used only when two offers save the same amount.</p>
+          </div>
+
+          <label className="flex items-center gap-3 rounded-xl border border-border px-4 py-3">
+            <input type="checkbox" checked={Boolean(form.automatic_apply)} onChange={(event) => updateField('automatic_apply', event.target.checked)} />
+            <span className="text-sm font-medium">Apply automatically when eligible</span>
+          </label>
+
+          <div className="space-y-2">
+            <Label htmlFor="start_date">Valid check-in from</Label>
             <Input id="start_date" type="date" value={form.start_date} onChange={(event) => updateField('start_date', event.target.value)} />
             {errors.start_date ? <p className="text-xs font-medium text-red-600">{errors.start_date}</p> : null}
           </div>

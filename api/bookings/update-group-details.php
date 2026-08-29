@@ -10,6 +10,7 @@ require_once __DIR__ . '/../calendar/ics-helper.php';
 require_once __DIR__ . '/booking-audit-helper.php';
 require_once __DIR__ . '/booking-expiry-helper.php';
 require_once __DIR__ . '/multi-room-helper.php';
+require_once __DIR__ . '/../offers/offer-pricing-helper.php';
 
 apply_cors_headers();
 require_admin_auth();
@@ -50,6 +51,7 @@ if ($allocations === []) json_response(false, 'The booking must contain at least
 
 try {
     $pdo = get_db_connection();
+    offer_ensure_booking_snapshot_schema($pdo);
     ensure_booking_audit_table($pdo);
     expire_pending_bookings($pdo, null, false);
     if (ics_enabled()) ensure_ics_schema($pdo);
@@ -118,6 +120,19 @@ try {
         $newTotal += round((float) $room['base_price'] * $nights, 2);
         $totalGuests += $guests;
     }
+    $subtotalAmount = round($newTotal, 2);
+    $offerPrice = offer_best_price($pdo, $subtotalAmount, $checkInDate, $nights, count($allocations), $totalGuests);
+    $newTotal = $offerPrice['total'];
+    $roomPricing = [];
+    $remainingDiscount = $offerPrice['discount'];
+    $pricingIndex = 0;
+    foreach ($allocations as $roomId => $guests) {
+        $roomSubtotal = round((float) $selectedById[$roomId]['base_price'] * $nights, 2);
+        $roomDiscount = $pricingIndex === count($allocations) - 1 ? $remainingDiscount : round($offerPrice['discount'] * ($roomSubtotal / max(.01, $subtotalAmount)), 2);
+        $roomPricing[$roomId] = ['subtotal'=>$roomSubtotal, 'discount'=>$roomDiscount, 'total'=>round($roomSubtotal-$roomDiscount, 2)];
+        $remainingDiscount = round($remainingDiscount-$roomDiscount, 2);
+        $pricingIndex++;
+    }
 
     $existingByRoomId = [];
     $existingById = [];
@@ -157,24 +172,29 @@ try {
     $updateStmt = $pdo->prepare(
         'UPDATE bookings SET is_group_primary=:is_primary, full_name=:full_name, email=:email, phone=:phone,
          room_name=:room_name, check_in_date=:check_in, check_out_date=:check_out, guests=:guests,
-         message=:message, amount=:amount, currency=:currency, updated_at=NOW() WHERE id=:id'
+         message=:message, subtotal_amount=:subtotal, discount_amount=:discount, applied_offer_id=:offer_id,
+         applied_offer_title=:offer_title, offer_snapshot_json=:offer_snapshot, amount=:amount, currency=:currency, updated_at=NOW() WHERE id=:id'
     );
     $insertStmt = $pdo->prepare(
         "INSERT INTO bookings
         (booking_group_id, is_group_primary, full_name, email, phone, is_booking_for_other,
          staying_guest_name, staying_guest_email, staying_guest_phone, staying_guest_note,
          room_name, check_in_date, check_out_date, guests, message, status, payment_status,
+         subtotal_amount, discount_amount, applied_offer_id, applied_offer_title, offer_snapshot_json,
          amount, currency, email_status, ip_address, user_agent, created_at, updated_at)
         VALUES (:group_id, 0, :full_name, :email, :phone, 0, NULL, NULL, NULL, NULL,
          :room_name, :check_in, :check_out, :guests, :message, :status, :payment_status,
+         :subtotal, :discount, :offer_id, :offer_title, :offer_snapshot,
          :amount, :currency, 'Pending', :ip_address, :user_agent, NOW(), NOW())"
     );
     foreach ($allocations as $roomId => $guests) {
         $room = $selectedById[$roomId];
-        $amount = round((float) $room['base_price'] * $nights, 2);
+        $amount = $roomPricing[$roomId]['total'];
+        $priceParams = [':subtotal'=>$roomPricing[$roomId]['subtotal'], ':discount'=>$roomPricing[$roomId]['discount'],
+            ':offer_id'=>$offerPrice['offer_id'], ':offer_title'=>$offerPrice['offer_title'], ':offer_snapshot'=>$offerPrice['snapshot']];
         $bookingId = (int) ($assignments[$roomId] ?? 0);
         if ($bookingId > 0) {
-            $updateStmt->execute([
+            $updateStmt->execute($priceParams + [
                 ':is_primary' => $bookingId === $primaryBookingId ? 1 : 0,
                 ':full_name' => $fullName, ':email' => $email, ':phone' => $phone,
                 ':room_name' => $room['room_name'], ':check_in' => $checkInDate, ':check_out' => $checkOutDate,
@@ -182,7 +202,7 @@ try {
                 ':amount' => $amount, ':currency' => $room['currency'] ?: ($primary['currency'] ?? 'LKR'), ':id' => $bookingId,
             ]);
         } else {
-            $insertStmt->execute([
+            $insertStmt->execute($priceParams + [
                 ':group_id' => $groupId, ':full_name' => $fullName, ':email' => $email, ':phone' => $phone,
                 ':room_name' => $room['room_name'], ':check_in' => $checkInDate, ':check_out' => $checkOutDate,
                 ':guests' => $guests, ':message' => $message !== '' ? $message : null,
@@ -202,8 +222,12 @@ try {
             ->execute([...$removeIds, $groupId]);
     }
 
-    $pdo->prepare('UPDATE booking_groups SET primary_booking_id=:primary_id, total_guests=:guests, total_rooms=:rooms, total_amount=:amount, updated_at=NOW() WHERE id=:id')
-        ->execute([':primary_id' => $primaryBookingId, ':guests' => $totalGuests, ':rooms' => count($allocations), ':amount' => $newTotal, ':id' => $groupId]);
+    $pdo->prepare('UPDATE booking_groups SET primary_booking_id=:primary_id, total_guests=:guests, total_rooms=:rooms,
+        subtotal_amount=:subtotal, discount_amount=:discount, applied_offer_id=:offer_id, applied_offer_title=:offer_title,
+        offer_snapshot_json=:offer_snapshot, total_amount=:amount, updated_at=NOW() WHERE id=:id')
+        ->execute([':primary_id'=>$primaryBookingId, ':guests'=>$totalGuests, ':rooms'=>count($allocations), ':subtotal'=>$offerPrice['subtotal'],
+            ':discount'=>$offerPrice['discount'], ':offer_id'=>$offerPrice['offer_id'], ':offer_title'=>$offerPrice['offer_title'],
+            ':offer_snapshot'=>$offerPrice['snapshot'], ':amount'=>$newTotal, ':id'=>$groupId]);
 
     $paymentStmt = $pdo->prepare('SELECT * FROM payments WHERE booking_id=:id ORDER BY id DESC LIMIT 1 FOR UPDATE');
     $paymentStmt->execute([':id' => $primaryBookingId]);

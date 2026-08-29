@@ -9,6 +9,7 @@ require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../calendar/ics-helper.php';
 require_once __DIR__ . '/../mail/email-helper.php';
 require_once __DIR__ . '/booking-audit-helper.php';
+require_once __DIR__ . '/../offers/offer-pricing-helper.php';
 
 apply_cors_headers();
 require_admin_auth();
@@ -74,6 +75,7 @@ if ($guests > 20) {
 
 try {
     $pdo = get_db_connection();
+    offer_ensure_booking_snapshot_schema($pdo);
     ensure_booking_audit_table($pdo);
     // The ICS helper may create/upgrade its tables the first time it runs.
     // MySQL DDL implicitly commits an active transaction, so initialise the
@@ -140,7 +142,9 @@ try {
     }
 
     $nights = max(1, (int) $checkIn->diff($checkOut)->days);
-    $amount = round((float) ($room['base_price'] ?? 0) * $nights, 2);
+    $subtotalAmount = round((float) ($room['base_price'] ?? 0) * $nights, 2);
+    $offerPrice = offer_best_price($pdo, $subtotalAmount, $checkInDate, $nights, 1, $guests);
+    $amount = $offerPrice['total'];
     if ($amount <= 0) {
         $pdo->rollBack();
         json_response(false, 'The room price is missing, so the booking total cannot be recalculated. Update the room price first.', 422);
@@ -164,7 +168,9 @@ try {
             staying_guest_note = :staying_guest_note,
             room_name = :room_name, check_in_date = :check_in_date,
             check_out_date = :check_out_date, guests = :guests,
-            message = :message, amount = :amount, currency = :currency,
+            message = :message, subtotal_amount=:subtotal_amount, discount_amount=:discount_amount,
+            applied_offer_id=:applied_offer_id, applied_offer_title=:applied_offer_title, offer_snapshot_json=:offer_snapshot_json,
+            amount = :amount, currency = :currency,
             updated_at = NOW()
          WHERE id = :id'
     );
@@ -183,6 +189,9 @@ try {
         ':guests' => $guests,
         ':message' => $message !== '' ? $message : null,
         ':amount' => $amount,
+        ':subtotal_amount'=>$offerPrice['subtotal'], ':discount_amount'=>$offerPrice['discount'],
+        ':applied_offer_id'=>$offerPrice['offer_id'], ':applied_offer_title'=>$offerPrice['offer_title'],
+        ':offer_snapshot_json'=>$offerPrice['snapshot'],
         ':currency' => $currency,
         ':id' => $id,
     ]);
