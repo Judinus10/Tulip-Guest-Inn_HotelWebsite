@@ -1023,3 +1023,245 @@ ALTER TABLE booking_groups
 
 UPDATE bookings SET subtotal_amount = amount WHERE subtotal_amount IS NULL;
 UPDATE booking_groups SET subtotal_amount = total_amount WHERE subtotal_amount IS NULL;
+
+START TRANSACTION;
+
+DELETE FROM experience_items;
+
+INSERT INTO experience_items
+(
+    title,
+    category,
+    location,
+    distance,
+    duration,
+    description,
+    image_path,
+    status,
+    sort_order
+)
+VALUES
+(
+    'Point Pedro Beach',
+    'Beach',
+    'Point Pedro',
+    '1.5 km from Tulip Guest Inn',
+    '10 minutes',
+    'Relax by the coastline and enjoy the sea breeze near Point Pedro town.',
+    NULL,
+    'active',
+    1
+),
+(
+    'Moorkkam Beach',
+    'Beach',
+    'Point Pedro',
+    '2.1 km from Tulip Guest Inn',
+    '10 minutes',
+    'A peaceful local beach suitable for relaxing, coastal walks and sunset views.',
+    NULL,
+    'active',
+    2
+),
+(
+    'Vallipuram Alvar Temple',
+    'Religious',
+    'Vallipuram',
+    '2.4 km from Tulip Guest Inn',
+    '10 minutes',
+    'A historically significant Hindu temple dedicated to Lord Vishnu.',
+    NULL,
+    'active',
+    3
+),
+(
+    'Theru Moodi Madam',
+    'Heritage',
+    'Point Pedro',
+    '3.8 km from Tulip Guest Inn',
+    '10 minutes',
+    'A recognised cultural and historic landmark in the Point Pedro area.',
+    NULL,
+    'active',
+    4
+),
+(
+    'Point Pedro Lighthouse',
+    'Landmark',
+    'Point Pedro',
+    '4.8 km from Tulip Guest Inn',
+    '15 minutes',
+    'A notable coastal lighthouse and one of the best-known landmarks in Point Pedro.',
+    NULL,
+    'active',
+    5
+),
+(
+    'Sakkotai Cape - Northernmost Point',
+    'Landmark',
+    'Sakkotai',
+    '4.8 km from Tulip Guest Inn',
+    '15 minutes',
+    'Visit the northernmost point of Sri Lanka and enjoy panoramic coastal scenery.',
+    NULL,
+    'active',
+    6
+),
+(
+    'Point Pedro View Point',
+    'Nature',
+    'Point Pedro',
+    '4.8 km from Tulip Guest Inn',
+    '15 minutes',
+    'A scenic coastal viewpoint offering open views of the northern shoreline.',
+    NULL,
+    'active',
+    7
+),
+(
+    'Northernmost Post Box',
+    'Landmark',
+    'Sakkotai',
+    '4.9 km from Tulip Guest Inn',
+    '15 minutes',
+    'A distinctive landmark situated near the northernmost point of Sri Lanka.',
+    NULL,
+    'active',
+    8
+),
+(
+    'Manalkadu Dutch Church Ruins',
+    'Heritage',
+    'Manalkadu',
+    '6.3 km from Tulip Guest Inn',
+    '20 minutes',
+    'Historic Dutch church ruins surrounded by the unique Manalkadu landscape.',
+    NULL,
+    'active',
+    9
+),
+(
+    'Manalkadu Sand Dunes',
+    'Nature',
+    'Manalkadu',
+    '6.5 km from Tulip Guest Inn',
+    '20 minutes',
+    'Explore beautiful natural sand dunes and a distinctive coastal environment.',
+    NULL,
+    'active',
+    10
+),
+(
+    'Manalkadu Beach',
+    'Beach',
+    'Manalkadu',
+    '7.1 km from Tulip Guest Inn',
+    '20 minutes',
+    'A quiet beach surrounded by sand dunes and natural coastal scenery.',
+    NULL,
+    'active',
+    11
+),
+(
+    'Selva Sannithi Murugan Temple',
+    'Religious',
+    'Thondaimanaru',
+    '10 km from Tulip Guest Inn',
+    '25 minutes',
+    'A famous Murugan temple and an important spiritual destination in Northern Sri Lanka.',
+    NULL,
+    'active',
+    12
+),
+(
+    'Nilavarai Natural Well',
+    'Nature',
+    'Nilavarai',
+    '15.2 km from Tulip Guest Inn',
+    '30 minutes',
+    'A mysterious natural freshwater well and a well-known attraction in the Jaffna Peninsula.',
+    NULL,
+    'active',
+    13
+),
+(
+    'Kankesanthurai Beach',
+    'Beach',
+    'Kankesanthurai',
+    '20.7 km from Tulip Guest Inn',
+    '40 minutes',
+    'A popular northern beach featuring clear water and attractive coastal views.',
+    NULL,
+    'active',
+    14
+),
+(
+    'Keerimalai Sacred Water Spring',
+    'Nature',
+    'Keerimalai',
+    '28 km from Tulip Guest Inn',
+    '50 minutes',
+    'A historic seaside freshwater spring traditionally believed to have healing properties.',
+    NULL,
+    'active',
+    15
+),
+(
+    'Naguleswaram Temple',
+    'Religious',
+    'Keerimalai',
+    '28.5 km from Tulip Guest Inn',
+    '50 minutes',
+    'An ancient Hindu temple and one of the historically important shrines of Northern Sri Lanka.',
+    NULL,
+    'active',
+    16
+),
+(
+    'Nallur Kandaswamy Temple',
+    'Religious',
+    'Nallur',
+    '31 km from Tulip Guest Inn',
+    '55 minutes',
+    'One of Sri Lanka’s most prominent Hindu temples, renowned for its architecture and annual festival.',
+    NULL,
+    'active',
+    17
+),
+(
+    'Jaffna Town',
+    'City',
+    'Jaffna',
+    '32 km from Tulip Guest Inn',
+    '55 minutes',
+    'Explore Jaffna city, its local markets, restaurants, cultural landmarks and shopping areas.',
+    NULL,
+    'active',
+    18
+),
+(
+    'Jaffna Fort',
+    'Heritage',
+    'Jaffna',
+    '34 km from Tulip Guest Inn',
+    '60 minutes',
+    'A major colonial-era fort offering historic architecture and views across Jaffna Lagoon.',
+    NULL,
+    'active',
+    19
+),
+(
+    'Casuarina Beach',
+    'Beach',
+    'Karainagar',
+    '38.8 km from Tulip Guest Inn',
+    '70 minutes',
+    'A famous beach known for shallow water, soft sand and a relaxing coastal atmosphere.',
+    NULL,
+    'active',
+    20
+);
+
+COMMIT;
+
+DROP TABLE IF EXISTS nearby_places;
