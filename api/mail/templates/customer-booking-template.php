@@ -151,6 +151,7 @@ function customer_booking_email_html(array $booking, string $state = 'confirmed'
     $guests = $guestCount > 0 ? $guestCount . ($guestCount === 1 ? ' Guest' : ' Guests') : '-';
     $roomType = trim((string) ($booking['room_name'] ?? $booking['room_type'] ?? '-'));
     $amount = format_money_amount((float) ($payment['amount'] ?? $booking['amount'] ?? 0));
+    $paymentStatus = status_label_for_email((string) ($payment['status'] ?? $booking['payment_status'] ?? ''));
     $phone = email_contact_phone();
     $email = email_contact_email();
     $websiteUrl = email_public_url();
@@ -249,6 +250,7 @@ function customer_booking_email_html(array $booking, string $state = 'confirmed'
         'Guests' => $guests,
         'Room Type' => $roomType,
         'Total Amount' => $amount,
+        'Payment Status' => $paymentStatus,
     ];
 
     $rows = '';
