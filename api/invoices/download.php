@@ -83,7 +83,7 @@ try {
     $isPaid = strcasecmp((string) ($booking['payment_status'] ?? ''), 'Paid') === 0;
     $documentNumber = $isPaid
         ? (string) ($invoice['invoice_number'] ?: generate_invoice_number($bookingId))
-        : 'BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT);
+        : (string) ($invoice['booking_no'] ?? ('BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT)));
     $invoiceNumber = preg_replace('/[^A-Za-z0-9_-]/', '', $documentNumber) ?: 'booking-confirmation';
     $pdf = create_invoice_pdf_binary($invoice);
 

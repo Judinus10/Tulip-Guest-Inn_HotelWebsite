@@ -223,6 +223,7 @@ function build_invoice_data_for_booking(PDO $pdo, int $bookingId, array $payment
     if (!$booking) return null;
 
     $bookingGroupId = (int) ($booking['booking_group_id'] ?? 0);
+    $bookingNo = 'BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT);
     if ($bookingGroupId > 0) {
         $groupStmt = $pdo->prepare("SELECT GROUP_CONCAT(room_name ORDER BY is_group_primary DESC, id ASC SEPARATOR ', ') AS room_names, SUM(guests) AS total_guests, COUNT(*) AS total_rooms FROM bookings WHERE booking_group_id = :group_id");
         $groupStmt->execute([':group_id' => $bookingGroupId]);
@@ -230,9 +231,13 @@ function build_invoice_data_for_booking(PDO $pdo, int $bookingId, array $payment
         $booking['room_name'] = (string) ($group['room_names'] ?? $booking['room_name']);
         $booking['guests'] = (int) ($group['total_guests'] ?? $booking['guests']);
         $booking['rooms'] = (int) ($group['total_rooms'] ?? 1);
-        $groupTotalStmt = $pdo->prepare('SELECT total_amount, subtotal_amount, discount_amount, applied_offer_title FROM booking_groups WHERE id = :group_id LIMIT 1');
+        $groupTotalStmt = $pdo->prepare('SELECT booking_no, total_amount, subtotal_amount, discount_amount, applied_offer_title FROM booking_groups WHERE id = :group_id LIMIT 1');
         $groupTotalStmt->execute([':group_id' => $bookingGroupId]);
         $groupPrice = $groupTotalStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $bookingNo = trim((string) ($groupPrice['booking_no'] ?? ''));
+        if ($bookingNo === '') {
+            $bookingNo = 'MB-' . str_pad((string) $bookingGroupId, 6, '0', STR_PAD_LEFT);
+        }
         $booking['amount'] = (float) ($groupPrice['total_amount'] ?? $booking['amount']);
         $booking['subtotal_amount'] = (float) ($groupPrice['subtotal_amount'] ?? $booking['amount']);
         $booking['discount_amount'] = (float) ($groupPrice['discount_amount'] ?? 0);
@@ -262,6 +267,7 @@ function build_invoice_data_for_booking(PDO $pdo, int $bookingId, array $payment
 
     return [
         'booking_id' => $bookingId,
+        'booking_no' => $bookingNo,
         'invoice_number' => (string) ($booking['invoice_number'] ?: generate_invoice_number($bookingId)),
         'customer_name' => (string) ($booking['full_name'] ?? 'Guest'),
         'customer_email' => (string) ($booking['email'] ?? '-'),
@@ -318,7 +324,10 @@ function create_invoice_pdf_binary(array $invoice): string
     $green = [0.22, 0.62, 0.28];
 
     $invoiceNumber = (string) ($invoice['invoice_number'] ?? '-');
-    $bookingCode = 'BK-' . str_pad((string) ((int) ($invoice['booking_id'] ?? 0)), 5, '0', STR_PAD_LEFT);
+    $bookingCode = trim((string) ($invoice['booking_no'] ?? ''));
+    if ($bookingCode === '') {
+        $bookingCode = 'BK-' . str_pad((string) ((int) ($invoice['booking_id'] ?? 0)), 5, '0', STR_PAD_LEFT);
+    }
     $customerName = (string) ($invoice['customer_name'] ?? 'Guest');
     $customerEmail = (string) ($invoice['customer_email'] ?? '-');
     $customerPhone = (string) ($invoice['customer_phone'] ?? '-');

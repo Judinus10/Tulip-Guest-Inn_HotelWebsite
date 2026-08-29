@@ -157,14 +157,16 @@ try {
         'discount_amount' => (float) ($record['discount_amount'] ?? 0),
         'applied_offer_title' => (string) ($record['applied_offer_title'] ?? ''),
     ];
+    $storedGroupBookingNo = '';
     if ($bookingGroupId > 0) {
         $groupPriceStmt = $pdo->prepare(
-            'SELECT subtotal_amount, discount_amount, applied_offer_title
+            'SELECT booking_no, subtotal_amount, discount_amount, applied_offer_title
              FROM booking_groups WHERE id = :id LIMIT 1'
         );
         $groupPriceStmt->execute([':id' => $bookingGroupId]);
         $groupPrice = $groupPriceStmt->fetch(PDO::FETCH_ASSOC);
         if ($groupPrice) {
+            $storedGroupBookingNo = trim((string) ($groupPrice['booking_no'] ?? ''));
             $priceSummary = [
                 'subtotal_amount' => (float) ($groupPrice['subtotal_amount'] ?? $record['paid_amount'] ?? 0),
                 'discount_amount' => (float) ($groupPrice['discount_amount'] ?? 0),
@@ -173,7 +175,7 @@ try {
         }
     }
     $groupBookingNo = $bookingGroupId > 0
-        ? 'MB-' . str_pad((string) $bookingGroupId, 6, '0', STR_PAD_LEFT)
+        ? ($storedGroupBookingNo !== '' ? $storedGroupBookingNo : 'MB-' . str_pad((string) $bookingGroupId, 6, '0', STR_PAD_LEFT))
         : 'BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT);
     $displayRoomName = $groupRooms
         ? implode(', ', array_map(static fn(array $room): string => (string) $room['room_name'], $groupRooms))
@@ -204,6 +206,7 @@ try {
     json_response(true, 'Payment status loaded.', 200, [
         'booking' => [
             'id' => $bookingId,
+            'booking_no' => $groupBookingNo,
             'full_name' => (string) ($record['full_name'] ?? ''),
             'email' => (string) ($record['email'] ?? ''),
             'phone' => (string) ($record['phone'] ?? ''),

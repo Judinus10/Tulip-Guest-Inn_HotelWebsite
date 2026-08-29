@@ -1,9 +1,25 @@
-Options -Indexes
+Options -Indexes -MultiViews
 LimitRequestBody 67108864
 
 <IfModule mod_rewrite.c>
-  RewriteEngine Off
+  RewriteEngine On
+
+  # Block hidden files and backend-only project/deployment material.
+  RewriteRule (^|/)\. - [F,L,NC]
+  RewriteRule ^(?:vendor|storage|dev|tool)(?:/|$) - [F,L,NC]
+  RewriteRule ^(?:config|db|helpers)\.php$ - [F,L,NC]
+  RewriteRule ^(?:test-email\.php|auth/bootstrap-admin\.php|composer\.(?:json|lock))$ - [F,L,NC]
+  RewriteRule (^|/)(?:_[^/]+|[^/]+-helper)\.php$ - [F,L,NC]
+  RewriteRule \.(?:env|ini|log|sql|bak|backup|dist|sh|yml|yaml|lock|md|map)$ - [F,L,NC]
+
+  # API folders are not browsable. Requests must target a real endpoint/file.
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [F,L]
 </IfModule>
+
+<FilesMatch "(^\.|^(?:config|db|helpers)\.php$|^_|-helper\.php$|\.(?:env|ini|log|sql|bak|backup|dist|sh|yml|yaml|lock|md|map)$)">
+  Require all denied
+</FilesMatch>
 
 <IfModule mod_headers.c>
   # payhere-redirect.php sends its own nonce-based CSP because its browser form
@@ -15,6 +31,8 @@ LimitRequestBody 67108864
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
   Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
   Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+  Header always set Cache-Control "no-store" "expr=%{CONTENT_TYPE} =~ m#^application/json#"
+  Header always unset X-Powered-By
 </IfModule>
 
 <IfModule mod_deflate.c>

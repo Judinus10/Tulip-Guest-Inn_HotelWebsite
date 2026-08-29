@@ -16,6 +16,11 @@ import Experience from '@/pages/Experience'
 import AdminPassword from '@/pages/AdminPassword'
 import MailSettings from '@/pages/MailSettings'
 
+function PublicWebsiteRedirect() {
+  window.location.replace(`${window.location.origin}/`)
+  return null
+}
+
 export default function App() {
   return (
     <Routes>
@@ -40,7 +45,7 @@ export default function App() {
         </Route>
       </Route>
 
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<PublicWebsiteRedirect />} />
     </Routes>
   )
 }

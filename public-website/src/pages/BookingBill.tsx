@@ -68,7 +68,8 @@ function getNights(checkIn?: string, checkOut?: string) {
   return Math.max(1, Math.round((end - start) / 86400000));
 }
 
-function bookingNumber(id?: number) {
+function bookingNumber(id?: number, canonicalBookingNumber?: string) {
+  if (canonicalBookingNumber?.trim()) return canonicalBookingNumber.trim();
   return `BK-${String(id || 0).padStart(5, '0')}`;
 }
 
@@ -207,16 +208,16 @@ export default function BookingBill() {
                     </h2>
                     <p className="mt-1 text-[11px] text-[#51645a]">
                       {isCashPayment
-                        ? 'Your booking is pending review. Payment will be collected at the property.'
+                        ? 'Your booking is pending review. You will receive a confirmation email shortly'
                         : isPaid
-                          ? 'Thank you for choosing Tulip Guest Inn. We look forward to welcoming you.'
+                          ? 'Thank you for choosing Tulip Guest Inn.You will receive a confirmation email shortly. We look forward to welcoming you.'
                           : 'This page refreshes automatically while PayHere confirms your payment.'}
                     </p>
                   </div>
                 </div>
                 <div className="text-left sm:text-right">
                   <p className="text-[10px] text-[#4d5c56]">Booking ID</p>
-                  <p className="mt-1 text-[12px] font-semibold text-[#14251f]">{bookingNumber(booking.id)}</p>
+                  <p className="mt-1 text-[12px] font-semibold text-[#14251f]">{bookingNumber(booking.id, booking.booking_no)}</p>
                 </div>
               </div>
 
