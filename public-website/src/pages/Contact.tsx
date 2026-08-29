@@ -137,6 +137,7 @@ export default function Contact() {
   });
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [settings, setSettings] = useState<ContactSettings>(fallbackContactSettings);
 
   useEffect(() => {
@@ -202,11 +203,39 @@ export default function Contact() {
   const dynamicOpeningHours = getOpeningHours(settings);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name } = e.target;
+    let { value } = e.target;
+
+    if (name === 'phone') value = value.replace(/\D/g, '').slice(0, 15);
+    if (name === 'name') value = value.replace(/[^\p{L}\s]/gu, '');
+
+    setForm((prev) => ({ ...prev, [name]: value }));
+    setFieldErrors((prev) => ({ ...prev, [name]: '' }));
+  };
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+    const name = form.name.trim();
+    const email = form.email.trim();
+    const phone = form.phone.trim();
+
+    if (!name) errors.name = 'Full name is required.';
+    else if (!/^[\p{L}]+(?:\s+[\p{L}]+)*$/u.test(name)) errors.name = 'Name can contain letters and spaces only.';
+
+    if (!email) errors.email = 'Email address is required.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) errors.email = 'Enter a valid email address.';
+
+    if (phone && !/^\d{7,15}$/.test(phone)) errors.phone = 'Phone number must contain 7 to 15 digits only.';
+    if (!form.message.trim()) errors.message = 'Message is required.';
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validateForm()) return;
+
     setIsSubmitting(true);
 
     try {
@@ -247,12 +276,12 @@ export default function Contact() {
                 {card.href ? (
                   <a
                     href={card.href}
-                    className={`font-serif text-lg font-light text-dark hover:text-gold transition-colors duration-200 block mb-1 ${card.multiline ? 'whitespace-pre-line' : ''}`}
+                    className={`font-serif text-lg font-light text-dark hover:text-gold transition-colors duration-200 block mb-1 ${'multiline' in card && card.multiline ? 'whitespace-pre-line' : ''}`}
                   >
                     {card.value}
                   </a>
                 ) : (
-                  <p className={`font-serif text-lg font-light text-dark mb-1 ${card.multiline ? 'whitespace-pre-line' : ''}`}>{card.value}</p>
+                  <p className={`font-serif text-lg font-light text-dark mb-1 ${'multiline' in card && card.multiline ? 'whitespace-pre-line' : ''}`}>{card.value}</p>
                 )}
                 {card.subValue && (
                   <p className="text-xs text-gray-400">{card.subValue}</p>
@@ -297,9 +326,13 @@ export default function Contact() {
                           value={form.name}
                           onChange={handleChange}
                           required
+                          autoComplete="name"
+                          aria-invalid={Boolean(fieldErrors.name)}
+                          aria-describedby={fieldErrors.name ? 'contact-name-error' : undefined}
                           placeholder="Your full name"
-                          className="w-full border border-border px-5 py-3.5 text-sm text-dark outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
+                          className={`w-full border px-5 py-3.5 text-sm text-dark outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400 ${fieldErrors.name ? 'border-red-500' : 'border-border'}`}
                         />
+                        {fieldErrors.name && <p id="contact-name-error" className="mt-1.5 text-xs text-red-600">{fieldErrors.name}</p>}
                       </div>
                       <div>
                         <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 font-medium mb-2">
@@ -311,9 +344,13 @@ export default function Contact() {
                           value={form.email}
                           onChange={handleChange}
                           required
+                          autoComplete="email"
+                          aria-invalid={Boolean(fieldErrors.email)}
+                          aria-describedby={fieldErrors.email ? 'contact-email-error' : undefined}
                           placeholder="your@email.com"
-                          className="w-full border border-border px-5 py-3.5 text-sm text-dark outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
+                          className={`w-full border px-5 py-3.5 text-sm text-dark outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400 ${fieldErrors.email ? 'border-red-500' : 'border-border'}`}
                         />
+                        {fieldErrors.email && <p id="contact-email-error" className="mt-1.5 text-xs text-red-600">{fieldErrors.email}</p>}
                       </div>
                     </div>
 
@@ -327,9 +364,16 @@ export default function Contact() {
                           name="phone"
                           value={form.phone}
                           onChange={handleChange}
-                          placeholder="+94 xxx xxx xxx"
-                          className="w-full border border-border px-5 py-3.5 text-sm text-dark outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
+                          inputMode="numeric"
+                          pattern="[0-9]{7,15}"
+                          maxLength={15}
+                          autoComplete="tel"
+                          aria-invalid={Boolean(fieldErrors.phone)}
+                          aria-describedby={fieldErrors.phone ? 'contact-phone-error' : undefined}
+                          placeholder="94771234567"
+                          className={`w-full border px-5 py-3.5 text-sm text-dark outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400 ${fieldErrors.phone ? 'border-red-500' : 'border-border'}`}
                         />
+                        {fieldErrors.phone && <p id="contact-phone-error" className="mt-1.5 text-xs text-red-600">{fieldErrors.phone}</p>}
                       </div>
                       <div>
                         <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 font-medium mb-2">
@@ -359,10 +403,13 @@ export default function Contact() {
                         value={form.message}
                         onChange={handleChange}
                         required
+                        aria-invalid={Boolean(fieldErrors.message)}
+                        aria-describedby={fieldErrors.message ? 'contact-message-error' : undefined}
                         rows={6}
                         placeholder="How can we help you?"
-                        className="w-full border border-border px-5 py-3.5 text-sm text-dark outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400 resize-none"
+                        className={`w-full border px-5 py-3.5 text-sm text-dark outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400 resize-none ${fieldErrors.message ? 'border-red-500' : 'border-border'}`}
                       />
+                      {fieldErrors.message && <p id="contact-message-error" className="mt-1.5 text-xs text-red-600">{fieldErrors.message}</p>}
                     </div>
 
                     <button type="submit" className="btn-primary" disabled={isSubmitting}>

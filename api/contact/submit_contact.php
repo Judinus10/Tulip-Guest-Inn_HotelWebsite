@@ -27,6 +27,14 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     json_response(false, 'Please provide a valid email address.', 422);
 }
 
+if (!preg_match('/^\p{L}+(?:\s+\p{L}+)*$/u', $name)) {
+    json_response(false, 'Name can contain letters and spaces only.', 422);
+}
+
+if ($phone !== '' && !preg_match('/^\d{7,15}$/', $phone)) {
+    json_response(false, 'Phone number must contain 7 to 15 digits only.', 422);
+}
+
 try {
     $pdo = get_db_connection();
 
