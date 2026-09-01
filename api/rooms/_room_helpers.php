@@ -6,17 +6,7 @@ require_once __DIR__ . '/../amenities/_amenity_helpers.php';
 
 function rooms_upload_url(string $relativePath): string
 {
-    $relativePath = ltrim($relativePath, '/');
-    $base = defined('API_BASE_URL') && API_BASE_URL !== '' ? rtrim(API_BASE_URL, '/') : '';
-
-    if ($base === '') {
-        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        $scriptDir = str_replace('\\', '/', dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/api/rooms/index.php')));
-        $base = $scheme . '://' . $host . rtrim($scriptDir, '/');
-    }
-
-    return $base . '/' . $relativePath;
+    return public_upload_url($relativePath, 'rooms');
 }
 
 

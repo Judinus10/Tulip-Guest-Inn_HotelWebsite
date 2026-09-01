@@ -271,6 +271,32 @@ function clean_string(mixed $value, int $maxLength = 1000): string
     return mb_substr($value, 0, $maxLength);
 }
 
+function public_api_base_url(): string
+{
+    foreach (['ASSET_BASE_URL', 'API_BASE_URL'] as $constantName) {
+        if (defined($constantName) && trim((string) constant($constantName)) !== '') {
+            return rtrim((string) constant($constantName), '/');
+        }
+    }
+    $scheme = is_https_request() ? 'https' : 'http';
+    $host = (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
+    $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? '/api/index.php'));
+    $position = strpos($script, '/api/');
+    $apiPath = $position === false ? '/api' : substr($script, 0, $position + 4);
+    return $scheme . '://' . $host . rtrim($apiPath, '/');
+}
+
+function public_upload_url(string $path, string $directory): string
+{
+    $path = trim($path);
+    if ($path === '') return '';
+    if (preg_match('#^https?://#i', $path)) {
+        $path = (string) parse_url($path, PHP_URL_PATH);
+    }
+    $filename = basename(str_replace('\\', '/', $path));
+    return public_api_base_url() . '/uploads/' . trim($directory, '/') . '/' . rawurlencode($filename);
+}
+
 function is_valid_date(string $date): bool
 {
     $parsed = DateTime::createFromFormat('Y-m-d', $date);

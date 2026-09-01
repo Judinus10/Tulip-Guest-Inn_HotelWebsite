@@ -28,7 +28,7 @@ function gallery_public_api_base(): string
 
 function gallery_upload_public_base(): string
 {
-    return gallery_public_api_base() . '/uploads/gallery';
+    return public_api_base_url() . '/uploads/gallery';
 }
 
 function gallery_upload_dir(): string
@@ -111,7 +111,7 @@ function gallery_image_url(string $path): string
 {
     $path = trim($path);
     if ($path === '') return '';
-    if (preg_match('/^https?:\/\//i', $path)) return $path;
+    if (preg_match('/^https?:\/\//i', $path)) $path = (string) parse_url($path, PHP_URL_PATH);
 
     $path = str_replace('\\', '/', $path);
     $path = ltrim($path, '/');
@@ -119,15 +119,15 @@ function gallery_image_url(string $path): string
     // New uploads store only the filename. Older rows may store uploads/gallery/file.jpg
     // or /api/uploads/gallery/file.jpg. Return one correct public URL in every case.
     if (preg_match('#(?:^|/)uploads/gallery/([^/]+)$#i', $path, $matches)) {
-        return gallery_upload_public_base() . '/' . rawurlencode($matches[1]);
+        return public_upload_url($matches[1], 'gallery');
     }
 
     if (str_contains($path, '/api/uploads/gallery/')) {
         $filename = basename($path);
-        return gallery_upload_public_base() . '/' . rawurlencode($filename);
+        return public_upload_url($filename, 'gallery');
     }
 
-    return gallery_upload_public_base() . '/' . rawurlencode(basename($path));
+    return public_upload_url($path, 'gallery');
 }
 
 function gallery_normalize_folder(array $row): array

@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input, Label } from '@/components/ui/input'
 import { useToastState } from '@/context/ToastContext'
+import { optimizeImage } from '@/utils/imageProcessing'
 import {
   createExperienceItem,
   deleteExperienceItem,
@@ -66,6 +67,7 @@ export default function Experience() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [processingImage, setProcessingImage] = useState(false)
   const [error, setError] = useState('')
   const [toast, setToast] = useToastState('')
   const [searchTerm, setSearchTerm] = useState('')
@@ -156,6 +158,22 @@ export default function Experience() {
         [field]: value,
       },
     }))
+  }
+
+  async function selectExperienceImage(event) {
+    const original = event.target.files?.[0]
+    event.target.value = ''
+    if (!original) return
+
+    setProcessingImage(true)
+    setError('')
+    try {
+      updateForm('image_file', await optimizeImage(original))
+    } catch (err) {
+      setError(err.message || 'Unable to optimize the selected image.')
+    } finally {
+      setProcessingImage(false)
+    }
   }
 
   async function saveItem(event) {
@@ -482,8 +500,8 @@ export default function Experience() {
                   <Label>Image</Label>
                   <Input
                     type="file"
-                    accept="image/*"
-                    onChange={(event) => updateForm('image_file', event.target.files?.[0] || null)}
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={selectExperienceImage}
                   />
                 </div>
               </div>
@@ -518,8 +536,8 @@ export default function Experience() {
                 <Button type="button" variant="outline" onClick={() => setModal(null)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={saving}>
-                  {saving ? 'Saving...' : 'Save Experience'}
+                <Button type="submit" disabled={saving || processingImage}>
+                  {processingImage ? 'Optimizing...' : saving ? 'Saving...' : 'Save Experience'}
                 </Button>
               </div>
             </form>

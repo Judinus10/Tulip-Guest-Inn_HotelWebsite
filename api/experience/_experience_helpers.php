@@ -92,7 +92,7 @@ function experience_image_url(?string $path): string
     // Also handle stored paths like /api/uploads/experience/file.jpg or uploads/experience/file.jpg.
     $path = basename($path);
 
-    return experience_public_base() . '/' . rawurlencode($path);
+    return public_upload_url($path, 'experience');
 }
 
 function experience_ensure_schema(PDO $pdo): void

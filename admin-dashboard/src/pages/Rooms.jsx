@@ -29,6 +29,7 @@ import { Dropdown } from '@/components/ui/dropdown'
 import { Input, Label, Textarea } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { createAmenity, createRoom, deleteAmenity, deleteRoomById, deleteRoomImage, listAmenities, listRooms, updateAmenity, updateRoom } from '@/services/roomsApi'
+import { optimizeRoomImages } from '@/utils/imageProcessing'
 
 const emptyForm = {
   room_name: '',
@@ -455,6 +456,8 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
   const [errors, setErrors] = useState({})
   const [selectedFiles, setSelectedFiles] = useState([])
   const [deletingImageId, setDeletingImageId] = useState(null)
+  const [isProcessingImages, setIsProcessingImages] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const isEdit = mode === 'edit'
 
@@ -477,6 +480,33 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
 
   function removeSelectedFile(_, index) {
     setSelectedFiles((current) => current.filter((__, fileIndex) => fileIndex !== index))
+  }
+
+  async function handleImageSelection(event) {
+    const input = event.currentTarget
+    const files = Array.from(input.files || [])
+
+    if (files.length === 0) {
+      setSelectedFiles([])
+      return
+    }
+
+    setIsProcessingImages(true)
+    setErrors((current) => ({ ...current, images: '' }))
+
+    try {
+      const optimizedFiles = await optimizeRoomImages(files)
+      setSelectedFiles(optimizedFiles)
+    } catch (error) {
+      setSelectedFiles([])
+      input.value = ''
+      setErrors((current) => ({
+        ...current,
+        images: error.message || 'Unable to prepare the selected images.',
+      }))
+    } finally {
+      setIsProcessingImages(false)
+    }
   }
 
   async function removeExistingImage(image) {
@@ -515,8 +545,10 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
     }
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
+
+    if (isProcessingImages || isSubmitting) return
 
     const nextErrors = {}
     if (!form.room_name.trim()) nextErrors.room_name = 'Room name is required.'
@@ -534,13 +566,18 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
 
-    onSubmit({
-      ...form,
-      price_per_night: Number(form.price_per_night),
-      capacity: Number(form.capacity),
-      room_size: Number(form.room_size),
-      images: selectedFiles,
-    })
+    setIsSubmitting(true)
+    try {
+      await onSubmit({
+        ...form,
+        price_per_night: Number(form.price_per_night),
+        capacity: Number(form.capacity),
+        room_size: Number(form.room_size),
+        images: selectedFiles,
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -644,10 +681,12 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
                   type="file"
                   multiple
                   accept="image/png,image/jpeg,image/webp"
-                  onChange={(e) => setSelectedFiles(Array.from(e.target.files || []))}
+                  onChange={handleImageSelection}
+                  disabled={isProcessingImages || isSubmitting}
                   className="border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
                 />
               </div>
+              {isProcessingImages && <p className="text-xs font-medium text-primary-600">Optimizing selected images…</p>}
               {isEdit && <p className="text-xs text-text-secondary">Upload new images only if you want to add more photos.</p>}
             </div>
 
@@ -735,8 +774,16 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
           )}
 
           <div className="mt-6 flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit">{isEdit ? 'Save Changes' : 'Add Room'}</Button>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isProcessingImages || isSubmitting}>Cancel</Button>
+            <Button type="submit" disabled={isProcessingImages || isSubmitting}>
+              {isProcessingImages
+                ? 'Optimizing Images…'
+                : isSubmitting
+                  ? 'Saving…'
+                  : isEdit
+                    ? 'Save Changes'
+                    : 'Add Room'}
+            </Button>
           </div>
         </form>
       </div>

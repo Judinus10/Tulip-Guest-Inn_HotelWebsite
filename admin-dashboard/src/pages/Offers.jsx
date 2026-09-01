@@ -23,6 +23,7 @@ import { Input, Label } from '@/components/ui/input'
 import { discountTypes, offerStatuses, packageCategories } from '@/data/offerData'
 import { createOffer, deleteOfferById, fetchOffers, updateOffer } from '@/services/offersApi'
 import { useToastState } from '@/context/ToastContext'
+import { optimizeImage } from '@/utils/imageProcessing'
 
 const emptyForm = {
   title: '',
@@ -146,6 +147,7 @@ function Modal({ title, description, children, onClose, size = 'max-w-2xl' }) {
 function OfferFormModal({ mode, offer, onClose, onSubmit }) {
   const [form, setForm] = useState(() => (offer ? { ...offer } : { ...emptyForm }))
   const [errors, setErrors] = useState({})
+  const [processingImage, setProcessingImage] = useState(false)
 
   const updateField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }))
@@ -164,7 +166,7 @@ function OfferFormModal({ mode, offer, onClose, onSubmit }) {
     }))
   }
 
-  const handleImageChange = (event) => {
+  const handleImageChange = async (event) => {
     const file = event.target.files?.[0]
     if (!file) return
 
@@ -174,15 +176,27 @@ function OfferFormModal({ mode, offer, onClose, onSubmit }) {
       return
     }
 
-    const preview = URL.createObjectURL(file)
+    setProcessingImage(true)
+    let optimized
+    try {
+      optimized = await optimizeImage(file)
+    } catch (error) {
+      setErrors((current) => ({ ...current, image: error.message || 'Unable to optimize this image.' }))
+      event.target.value = ''
+      setProcessingImage(false)
+      return
+    }
+
+    const preview = URL.createObjectURL(optimized)
     setForm((current) => ({
       ...current,
-      image_file: file,
+      image_file: optimized,
       image_file_name: file.name,
       image_path: preview,
       image_preview: preview,
     }))
     setErrors((current) => ({ ...current, image: '' }))
+    setProcessingImage(false)
   }
 
   const removeImage = () => {
@@ -394,7 +408,7 @@ function OfferFormModal({ mode, offer, onClose, onSubmit }) {
               <Upload className="h-7 w-7 text-blue-700" />
               <span className="mt-2 text-sm font-semibold text-text-primary">Upload package image</span>
               <span className="mt-1 text-xs text-text-secondary">PNG, JPG, JPEG or WebP. No URL input.</span>
-              <input id="package_image" type="file" accept="image/*" onChange={handleImageChange} className="sr-only" />
+              <input id="package_image" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageChange} className="sr-only" />
             </label>
             {errors.image ? <p className="text-xs font-medium text-red-600">{errors.image}</p> : null}
 
@@ -412,7 +426,7 @@ function OfferFormModal({ mode, offer, onClose, onSubmit }) {
                     <div className="mt-3 flex flex-wrap gap-2">
                       <label htmlFor="package_image_replace" className="inline-flex h-9 cursor-pointer items-center justify-center rounded-lg border border-border bg-white px-3 text-sm font-medium text-text-primary shadow-sm transition hover:bg-slate-50">
                         Change image
-                        <input id="package_image_replace" type="file" accept="image/*" onChange={handleImageChange} className="sr-only" />
+                        <input id="package_image_replace" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageChange} className="sr-only" />
                       </label>
                       <Button type="button" variant="outline" size="sm" onClick={removeImage}>
                         Remove image
@@ -429,7 +443,7 @@ function OfferFormModal({ mode, offer, onClose, onSubmit }) {
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit">{mode === 'edit' ? 'Save Changes' : 'Add Offer'}</Button>
+          <Button type="submit" disabled={processingImage}>{processingImage ? 'Optimizing...' : mode === 'edit' ? 'Save Changes' : 'Add Offer'}</Button>
         </div>
       </form>
     </Modal>

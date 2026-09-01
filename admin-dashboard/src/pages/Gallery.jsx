@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input, Label } from '@/components/ui/input'
 import { useToastState } from '@/context/ToastContext'
+import { optimizeImage, optimizeImages } from '@/utils/imageProcessing'
 import {
   createGalleryFolder,
   deleteGalleryFolder,
@@ -65,6 +66,7 @@ export default function Gallery() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [processingImages, setProcessingImages] = useState(false)
   const [error, setError] = useState('')
   const [toast, setToast] = useToastState('')
   const [folderModal, setFolderModal] = useState(null)
@@ -196,6 +198,45 @@ export default function Gallery() {
       setError(err.message || 'Unable to save image.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function selectGalleryImages(event) {
+    const originals = Array.from(event.target.files || [])
+    event.target.value = ''
+    if (!originals.length) return
+
+    setProcessingImages(true)
+    setError('')
+    try {
+      const optimized = await optimizeImages(originals, { maxFiles: 20 })
+      const nextImages = optimized.map((file, index) => ({
+        file,
+        title: generateTitleFromFileName(originals[index]?.name || file.name),
+        preview: URL.createObjectURL(file),
+      }))
+      setImageModal((prev) => ({ ...prev, images: [...prev.images, ...nextImages] }))
+    } catch (err) {
+      setError(err.message || 'Unable to optimize the selected images.')
+    } finally {
+      setProcessingImages(false)
+    }
+  }
+
+  async function selectGalleryReplacement(event) {
+    const original = event.target.files?.[0]
+    event.target.value = ''
+    if (!original) return
+
+    setProcessingImages(true)
+    setError('')
+    try {
+      const file = await optimizeImage(original)
+      setImageModal((prev) => ({ ...prev, image_file: file, image_file_name: original.name }))
+    } catch (err) {
+      setError(err.message || 'Unable to optimize the selected image.')
+    } finally {
+      setProcessingImages(false)
     }
   }
 
@@ -427,12 +468,7 @@ export default function Gallery() {
                     <Upload className="h-7 w-7 text-primary-600" />
                     <span className="mt-2 text-sm font-semibold">Choose image files</span>
                     <span className="mt-1 text-xs text-text-secondary">JPG, PNG, WEBP. Max 8MB each.</span>
-                    <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => {
-                      const files = Array.from(event.target.files || [])
-                      const nextImages = files.filter((file) => file.type.startsWith('image/')).map((file) => ({ file, title: generateTitleFromFileName(file.name), preview: URL.createObjectURL(file) }))
-                      setImageModal((prev) => ({ ...prev, images: [...prev.images, ...nextImages] }))
-                      event.target.value = ''
-                    }} />
+                    <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={selectGalleryImages} />
                   </label>
                   {imageModal.images.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{imageModal.images.map((image, index) => <div key={`${image.file.name}-${index}`} className="overflow-hidden rounded-xl border border-border"><img src={image.preview} alt={image.title} className="h-28 w-full object-cover" /><div className="p-3"><Input value={image.title} onChange={(e) => setImageModal((prev) => ({ ...prev, images: prev.images.map((item, itemIndex) => itemIndex === index ? { ...item, title: e.target.value } : item) }))} /></div></div>)}</div> : null}
                 </div>
@@ -441,12 +477,12 @@ export default function Gallery() {
                   <Label>Replace image optional</Label>
                   <div className="flex gap-3 rounded-xl border border-border bg-white p-3">
                     <img src={imageModal.image_file ? URL.createObjectURL(imageModal.image_file) : imageModal.image_path} alt="Selected gallery" className="h-24 w-32 rounded-lg object-cover" />
-                    <div className="flex-1"><p className="text-sm font-semibold">{imageModal.image_file_name || 'Existing image'}</p><Input className="mt-3" type="file" accept="image/*" onChange={(event) => setImageModal((prev) => ({ ...prev, image_file: event.target.files?.[0] || null, image_file_name: event.target.files?.[0]?.name || prev.image_file_name }))} /></div>
+                    <div className="flex-1"><p className="text-sm font-semibold">{imageModal.image_file_name || 'Existing image'}</p><Input className="mt-3" type="file" accept="image/jpeg,image/png,image/webp" onChange={selectGalleryReplacement} /></div>
                   </div>
                 </div>
               )}
 
-              <div className="flex justify-end gap-3 border-t border-border pt-5"><Button type="button" variant="outline" onClick={() => setImageModal(null)}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? 'Saving...' : imageModal.mode === 'add' ? 'Upload Images' : 'Save Changes'}</Button></div>
+              <div className="flex justify-end gap-3 border-t border-border pt-5"><Button type="button" variant="outline" onClick={() => setImageModal(null)}>Cancel</Button><Button type="submit" disabled={saving || processingImages}>{processingImages ? 'Optimizing...' : saving ? 'Saving...' : imageModal.mode === 'add' ? 'Upload Images' : 'Save Changes'}</Button></div>
             </form>
           </div>
         </div>
