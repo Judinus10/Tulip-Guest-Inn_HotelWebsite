@@ -221,7 +221,8 @@ export default function WebsiteSettings() {
           {[
             { id: 'contact', label: 'Contact & Social', icon: Globe2 },
             { id: 'hero', label: 'Hero Media', icon: Images },
-            { id: 'legal', label: 'Terms & Privacy', icon: FileText },
+            { id: 'terms', label: 'Terms & Conditions', icon: FileText },
+            { id: 'privacy', label: 'Privacy Policy', icon: FileText },
             { id: 'faqs', label: 'FAQs', icon: HelpCircle },
           ].map(({ id, label, icon: Icon }) => (
             <button key={id} type="button" role="tab" aria-selected={activeTab === id}
@@ -235,7 +236,8 @@ export default function WebsiteSettings() {
         </div>
       </div>
       {activeTab === 'hero' && <HeroContent embedded />}
-      {activeTab === 'legal' && <LegalContent />}
+      {activeTab === 'terms' && <LegalContent page="terms" />}
+      {activeTab === 'privacy' && <LegalContent page="privacy" />}
       {activeTab === 'faqs' && <WebsiteFaqs embedded />}
       <div hidden={activeTab !== 'contact'}>
       {loadError && (

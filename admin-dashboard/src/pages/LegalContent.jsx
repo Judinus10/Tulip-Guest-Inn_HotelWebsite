@@ -6,8 +6,8 @@ import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
 const url=buildApiUrl('/settings/legal-content.php')
 const empty={intro:'',sections:[]}
 const titles={terms:'Terms & Conditions',privacy:'Privacy Policy'}
-export default function LegalContent(){
- const [page,setPage]=useState('terms'),[content,setContent]=useState(empty),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState(''),[message,setMessage]=useState(''),[isCustom,setIsCustom]=useState(false)
+export default function LegalContent({ page = 'terms' }){
+ const [content,setContent]=useState(empty),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState(''),[message,setMessage]=useState(''),[isCustom,setIsCustom]=useState(false)
  useEffect(()=>{let active=true;setLoading(true);setError('');setMessage('');
   apiFetch(`${url}?page=${page}`).then(readJsonResponse).then(result=>{if(!active)return;setIsCustom(Boolean(result.data?.content));setContent(result.data?.content||empty)}).catch(e=>{if(active)setError(e.message||'Could not load content.')}).finally(()=>{if(active)setLoading(false)})
   return()=>{active=false}
@@ -17,8 +17,8 @@ export default function LegalContent(){
   const response=await apiFetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page,content})});await readJsonResponse(response);setIsCustom(true);setMessage(`${titles[page]} published successfully.`)
  }catch(e){setError(e.message||'Publishing failed.')}finally{setBusy(false)}}
  return <div className="space-y-6">
-  <SectionCard><div className="mb-5 flex items-start gap-3"><div className="rounded-xl bg-blue-50 p-3 text-blue-600"><FileText className="h-5 w-5"/></div><div><h2 className="text-lg font-semibold">Terms & Privacy</h2><p className="mt-1 text-sm text-text-secondary">Edit the legal pages shown on the public website.</p></div></div>
-   <div className="flex flex-wrap gap-2">{Object.entries(titles).map(([key,title])=><button key={key} onClick={()=>setPage(key)} className={`rounded-lg px-4 py-2 text-sm font-semibold ${page===key?'bg-blue-600 text-white':'border border-border bg-white text-text-secondary'}`}>{title}</button>)}</div>
+  <SectionCard><div className="mb-5 flex items-start gap-3"><div className="rounded-xl bg-blue-50 p-3 text-blue-600"><FileText className="h-5 w-5"/></div><div><h2 className="text-lg font-semibold">{titles[page]}</h2><p className="mt-1 text-sm text-text-secondary">Edit and publish this page independently. Changes appear on the corresponding public website page.</p></div></div>
+
   </SectionCard>
   {error&&<p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}{message&&<p role="status" className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-700">{message}</p>}
   {loading?<SectionCard>Loading content...</SectionCard>:<SectionCard><div className="mb-5"><h3 className="text-lg font-semibold">{titles[page]}</h3><p className="mt-1 text-sm text-text-secondary">{isCustom?'Published content loaded.':'The public website is using its existing default text. To replace it, enter the complete approved content below.'}</p></div>
