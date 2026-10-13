@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { requestJson } from '../services/apiClient';
-export type LegalContent={intro:string;sections:{title:string;body:string}[]};
+export type LegalContent={html?:string;intro?:string;sections?:{title:string;body:string}[]};
 export function useLegalContent(page:'terms'|'privacy') {
  const [content,setContent]=useState<LegalContent|null>(null);
  const [updated,setUpdated]=useState<string|null>(null);
