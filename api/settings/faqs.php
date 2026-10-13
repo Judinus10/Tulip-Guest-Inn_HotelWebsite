@@ -15,7 +15,12 @@ try{
  if($_SERVER['REQUEST_METHOD']!=='POST') json_response(false,'Method not allowed.',405);
  $input=read_request_data();$action=$input['action']??'draft';
  faq_init($pdo);
- if($action==='draft'){
+ if($action==='publish_now'){
+  $items=faq_validate($input['faqs']??null);
+  $json=json_encode($items,JSON_UNESCAPED_UNICODE);
+  $stmt=$pdo->prepare('UPDATE website_faqs SET published_json=?,draft_json=? WHERE id=1');
+  $stmt->execute([$json,$json]);
+ }elseif($action==='draft'){
   $items=faq_validate($input['faqs']??null);
   $stmt=$pdo->prepare('UPDATE website_faqs SET draft_json=? WHERE id=1');
   $stmt->execute([json_encode($items,JSON_UNESCAPED_UNICODE)]);

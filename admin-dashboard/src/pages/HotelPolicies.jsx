@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Save, Send, RotateCcw, ClipboardList, Loader2 } from 'lucide-react'
+import { ArrowLeft, Send, ClipboardList, Loader2 } from 'lucide-react'
 import { PageHeader, SectionCard } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
@@ -20,19 +20,18 @@ const fields = [
 export default function HotelPolicies({ embedded = false }) {
  const [draft,setDraft]=useState(null),[saved,setSaved]=useState(null)
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('')
- const dirty=JSON.stringify(draft)!==JSON.stringify(saved)
  async function refresh() {
   const response=await apiFetch(`${url}?admin=1`)
   const payload=await readJsonResponse(response)
-  setDraft(payload.data.draft);setSaved(payload.data.draft)
+  setDraft(payload.data.published);setSaved(payload.data.published)
  }
  useEffect(()=>{refresh().catch(e=>setError(e.message))},[])
  async function action(type) {
   setBusy(true);setError('');setMessage('')
   try {
-   const response=await apiFetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:type,policies:draft})})
+   const response=await apiFetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'publish_now',policies:draft})})
    await readJsonResponse(response);await refresh()
-   setMessage(type==='publish'?'Policies published.':type==='draft'?'Draft saved.':'Draft discarded.')
+   setMessage('Changes published successfully.')
   } catch(e){setError(e.message||'Could not save policies.')} finally{setBusy(false)}
  }
  return <div className="space-y-6">
@@ -43,7 +42,7 @@ export default function HotelPolicies({ embedded = false }) {
   {message&&<p role="status" className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-700">{message}</p>}
   {!draft?<SectionCard><span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin"/> Loading policies...</span></SectionCard>:<>
    <SectionCard>
-    <div className="mb-6 flex items-start gap-3"><div className="rounded-xl bg-blue-50 p-3 text-blue-600"><ClipboardList className="h-5 w-5"/></div><div><h2 className="text-lg font-semibold">Property Rules</h2><p className="mt-1 text-sm text-text-secondary">Changes remain private until you publish the saved draft.</p></div></div>
+    <div className="mb-6 flex items-start gap-3"><div className="rounded-xl bg-blue-50 p-3 text-blue-600"><ClipboardList className="h-5 w-5"/></div><div><h2 className="text-lg font-semibold">Property Rules</h2><p className="mt-1 text-sm text-text-secondary">Changes appear on the public website when you click Publish.</p></div></div>
     <div className="grid gap-5 md:grid-cols-2">
      {fields.map(([key,label,hint])=><label key={key} className={`block space-y-2 ${['cancellation','payments'].includes(key)?'md:col-span-2':''}`}>
       <span className="text-sm font-semibold text-text-primary">{label}</span>
@@ -53,11 +52,9 @@ export default function HotelPolicies({ embedded = false }) {
     </div>
    </SectionCard>
 
-   <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-white p-4"><p className="text-sm text-text-secondary">{dirty?'Unsaved edits — save before publishing.':'Draft is saved.'}</p><div className="flex flex-wrap gap-2">
-    <Button variant="outline" disabled={busy} onClick={()=>action('discard')}><RotateCcw className="h-4 w-4"/> Discard Draft</Button>
-    <Button variant="outline" disabled={busy||!dirty} onClick={()=>action('draft')}><Save className="h-4 w-4"/> Save Draft</Button>
-    <Button disabled={busy||dirty} onClick={()=>action('publish')}><Send className="h-4 w-4"/> Publish Draft</Button>
-   </div></div>
+   <div className="flex justify-end rounded-2xl border border-border bg-white p-4">
+    <Button disabled={busy} onClick={()=>action('publish_now')}><Send className="h-4 w-4"/> {busy?'Publishing...':'Publish'}</Button>
+   </div>
   </>}
  </div>
 }

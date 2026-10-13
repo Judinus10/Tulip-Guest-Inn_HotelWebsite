@@ -16,7 +16,12 @@ try {
  $input=read_request_data();
  $action=$input['action']??'draft';
  policy_init($pdo);
- if($action==='draft') {
+ if($action==='publish_now') {
+  $data=policy_normalize($input['policies']??null);
+  $json=json_encode($data,JSON_UNESCAPED_UNICODE);
+  $stmt=$pdo->prepare('UPDATE website_policies SET published_json=?,draft_json=? WHERE id=1');
+  $stmt->execute([$json,$json]);
+ } elseif($action==='draft') {
   $data=policy_normalize($input['policies']??null);
   $stmt=$pdo->prepare('UPDATE website_policies SET draft_json=? WHERE id=1');
   $stmt->execute([json_encode($data,JSON_UNESCAPED_UNICODE)]);

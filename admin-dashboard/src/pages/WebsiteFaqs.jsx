@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, ArrowDown, ArrowUp, Plus, Save, Send, RotateCcw, Trash2, HelpCircle } from 'lucide-react'
+import { ArrowLeft, ArrowDown, ArrowUp, Plus, Send, Trash2, HelpCircle } from 'lucide-react'
 import { PageHeader, SectionCard } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
@@ -10,11 +10,10 @@ const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b)
 export default function WebsiteFaqs({ embedded = false }) {
  const [draft,setDraft]=useState(null),[saved,setSaved]=useState(null)
  const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('')
- const dirty=!equal(draft,saved)
  async function refresh(){
   const response=await apiFetch(`${url}?admin=1`)
   const payload=await readJsonResponse(response)
-  setDraft(payload.data.draft);setSaved(payload.data.draft)
+  setDraft(payload.data.published);setSaved(payload.data.published)
  }
  useEffect(()=>{refresh().catch(e=>setError(e.message))},[])
  function edit(index,field,value){setDraft(old=>old.map((item,i)=>i===index?{...item,[field]:value}:item))}
@@ -22,9 +21,9 @@ export default function WebsiteFaqs({ embedded = false }) {
  async function action(kind){
   setBusy(true);setError('');setMessage('')
   try{
-   const response=await apiFetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:kind,faqs:draft})})
+   const response=await apiFetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'publish_now',faqs:draft})})
    await readJsonResponse(response);await refresh()
-   setMessage(kind==='publish'?'FAQs published successfully.':kind==='draft'?'FAQ draft saved.':'Draft discarded.')
+   setMessage('Changes published successfully.')
   }catch(e){setError(e.message||'Unable to save FAQs.')}finally{setBusy(false)}
  }
  return <div className="space-y-6">
@@ -36,7 +35,7 @@ export default function WebsiteFaqs({ embedded = false }) {
   {draft===null?<SectionCard>Loading FAQs...</SectionCard>:<>
    <SectionCard>
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-     <div className="flex items-center gap-3"><div className="rounded-xl bg-blue-50 p-3 text-blue-600"><HelpCircle className="h-5 w-5"/></div><div><h2 className="text-lg font-semibold">FAQ Entries</h2><p className="text-sm text-text-secondary">Up to 30 entries. Only published answers are public.</p></div></div>
+     <div className="flex items-center gap-3"><div className="rounded-xl bg-blue-50 p-3 text-blue-600"><HelpCircle className="h-5 w-5"/></div><div><h2 className="text-lg font-semibold">FAQ Entries</h2><p className="text-sm text-text-secondary">Up to 30 entries. Click Publish to update the public website.</p></div></div>
      <Button disabled={busy||draft.length>=30} onClick={()=>setDraft(old=>[...old,{question:'',answer:''}])}><Plus className="h-4 w-4"/> Add FAQ</Button>
     </div>
     <div className="space-y-4">{draft.length===0&&<div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-text-secondary">No FAQs yet. Add your first question.</div>}
@@ -52,11 +51,9 @@ export default function WebsiteFaqs({ embedded = false }) {
     </div>
    </SectionCard>
 
-   <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-white p-4"><p className="text-sm text-text-secondary">{dirty?'Unsaved edits. Save before publishing.':'Draft saved.'}</p><div className="flex flex-wrap gap-2">
-    <Button variant="outline" disabled={busy} onClick={()=>action('discard')}><RotateCcw className="h-4 w-4"/> Discard Draft</Button>
-    <Button variant="outline" disabled={busy||!dirty} onClick={()=>action('draft')}><Save className="h-4 w-4"/> Save Draft</Button>
-    <Button disabled={busy||dirty} onClick={()=>action('publish')}><Send className="h-4 w-4"/> Publish Draft</Button>
-   </div></div>
+   <div className="flex justify-end rounded-2xl border border-border bg-white p-4">
+    <Button disabled={busy} onClick={()=>action('publish_now')}><Send className="h-4 w-4"/> {busy?'Publishing...':'Publish'}</Button>
+   </div>
   </>}
  </div>
 }
