@@ -194,6 +194,8 @@ export default function About() {
         </div>
       </section>
 
+      <HotelFaqSection />
+
       <CTASection
         title="Come and Experience It Yourself"
         subtitle="Reserve your room at Tulip Guest Inn and discover why our guests keep coming back."
@@ -202,7 +204,6 @@ export default function About() {
         secondBtnLabel="Contact Us"
         secondBtnPath="/contact"
       />
-      <HotelFaqSection />
     </main>
   );
 }
