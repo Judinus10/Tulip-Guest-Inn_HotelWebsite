@@ -9,7 +9,7 @@ const base = buildApiUrl('/settings')
 const empty = { mode: 'images', images: [], video: '', poster: '' }
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
 
-export default function HeroContent() {
+export default function HeroContent({ embedded = false }) {
   const [draft, setDraft] = useState(empty)
   const [saved, setSaved] = useState(empty)
   const [published, setPublished] = useState(empty)
@@ -94,9 +94,9 @@ export default function HeroContent() {
   )
 
   return <div className="space-y-6">
-    <PageHeader title="Homepage Hero" description="Manage homepage background media without changing the website layout.">
+    {!embedded && (<PageHeader title="Homepage Hero" description="Manage homepage background media without changing the website layout.">
       <Link to="/website-settings" className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium text-text-secondary hover:bg-slate-50"><ArrowLeft className="h-4 w-4" /> Website Settings</Link>
-    </PageHeader>
+    </PageHeader>)}
 
     {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
     {message && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700"><CheckCircle2 className="h-4 w-4" />{message}</div>}

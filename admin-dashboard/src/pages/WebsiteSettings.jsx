@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import {
   AlertCircle,
   CheckCircle2,
@@ -17,12 +16,14 @@ import {
   Images,
   ClipboardList,
   HelpCircle,
-  ArrowUpRight,
   Trash2,
 } from 'lucide-react'
 import { PageHeader, SectionCard } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Input, Label, Textarea } from '@/components/ui/input'
+import HeroContent from '@/pages/HeroContent'
+import HotelPolicies from '@/pages/HotelPolicies'
+import WebsiteFaqs from '@/pages/WebsiteFaqs'
 import { fetchContactSettings, fetchPropertyContent, saveContactSettings, savePropertyContent } from '@/services/settingsApi'
 
 const defaultSettings = {
@@ -102,6 +103,7 @@ function FieldWithIcon({ icon: Icon, children, align = 'center' }) {
 }
 
 export default function WebsiteSettings() {
+  const [activeTab, setActiveTab] = useState('contact')
   const [settings, setSettings] = useState(defaultSettings)
   const [savedSettings, setSavedSettings] = useState(defaultSettings)
   const [propertyContent, setPropertyContent] = useState({ nearby_places: [] })
@@ -210,10 +212,32 @@ export default function WebsiteSettings() {
       <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: '', type: 'success' })} />
 
       <PageHeader
-        title="Website Contact Settings"
-        description="Update the contact details shown on the public home page and contact page. These values are saved in the database."
+        title="Website Settings"
+        description="Manage public contact information, homepage media, hotel policies and FAQs."
       />
 
+      <div className="mb-6 rounded-2xl border border-border bg-white p-2 shadow-sm shadow-slate-200/60">
+        <div role="tablist" aria-label="Website content settings" className="flex gap-1 overflow-x-auto">
+          {[
+            { id: 'contact', label: 'Contact & Social', icon: Globe2 },
+            { id: 'hero', label: 'Hero Media', icon: Images },
+            { id: 'policies', label: 'Hotel Policies', icon: ClipboardList },
+            { id: 'faqs', label: 'FAQs', icon: HelpCircle },
+          ].map(({ id, label, icon: Icon }) => (
+            <button key={id} type="button" role="tab" aria-selected={activeTab === id}
+              onClick={() => setActiveTab(id)}
+              className={`flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                activeTab === id ? 'bg-blue-600 text-white shadow-sm' : 'text-text-secondary hover:bg-slate-100 hover:text-text-primary'
+              }`}>
+              <Icon className="h-4 w-4" /> {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {activeTab === 'hero' && <HeroContent embedded />}
+      {activeTab === 'policies' && <HotelPolicies embedded />}
+      {activeTab === 'faqs' && <WebsiteFaqs embedded />}
+      <div hidden={activeTab !== 'contact'}>
       {loadError && (
         <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
           {loadError}
@@ -461,34 +485,6 @@ export default function WebsiteSettings() {
           </div>
         </form>
       )}
-      <div className="mt-6">
-        <FormSection icon={HelpCircle} title="Frequently Asked Questions" description="Manage answers shown on the public About page.">
-          <div className="flex flex-col gap-4 rounded-xl border border-border bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div><p className="text-sm font-semibold text-text-primary">Guest FAQs</p><p className="mt-1 text-sm text-text-secondary">Add, edit and reorder questions, preview changes and publish when ready.</p></div>
-            <Link to="/website-faqs" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-700">Manage FAQs <ArrowUpRight className="h-4 w-4" /></Link>
-          </div>
-        </FormSection>
-      </div>
-      <div className="mt-6">
-        <FormSection icon={ClipboardList} title="Hotel Policies" description="Manage check-in, check-out, cancellation, payment and property rules.">
-          <div className="flex flex-col gap-4 rounded-xl border border-border bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div><p className="text-sm font-semibold text-text-primary">Guest rules and booking conditions</p><p className="mt-1 text-sm text-text-secondary">Edit policies, preview changes and publish when approved.</p></div>
-            <Link to="/hotel-policies" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-700">Manage Policies <ArrowUpRight className="h-4 w-4" /></Link>
-          </div>
-        </FormSection>
-      </div>
-      <div className="mt-6">
-        <FormSection icon={Images} title="Homepage Hero Media" description="Manage the background images or video shown on your homepage.">
-          <div className="flex flex-col gap-4 rounded-xl border border-border bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-text-primary">Homepage background</p>
-              <p className="text-sm text-text-secondary">Up to 3 slideshow images or one background video, with draft preview and publishing.</p>
-            </div>
-            <Link to="/hero-content" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700">
-              Manage Hero Media <ArrowUpRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </FormSection>
       </div>
     </div>
   )

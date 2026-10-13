@@ -17,7 +17,7 @@ const fields = [
   ['smoking','Smoking','Smoking policy'],
   ['payments','Payment methods','Clarify payment options for direct bookings'],
 ]
-export default function HotelPolicies() {
+export default function HotelPolicies({ embedded = false }) {
  const [draft,setDraft]=useState(null),[saved,setSaved]=useState(null),[published,setPublished]=useState(null)
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('')
  const [view,setView]=useState('draft')
@@ -37,9 +37,9 @@ export default function HotelPolicies() {
   } catch(e){setError(e.message||'Could not save policies.')} finally{setBusy(false)}
  }
  return <div className="space-y-6">
-  <PageHeader title="Hotel Policies" description="Manage property rules shown on the About page and during booking.">
+  {!embedded && (<PageHeader title="Hotel Policies" description="Manage property rules shown on the About page and during booking.">
    <Link to="/website-settings" className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium"><ArrowLeft className="h-4 w-4"/> Website Settings</Link>
-  </PageHeader>
+  </PageHeader>)}
   {error&&<p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}
   {message&&<p role="status" className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-700">{message}</p>}
   {!draft?<SectionCard><span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin"/> Loading policies...</span></SectionCard>:<>

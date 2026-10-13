@@ -28,9 +28,9 @@ export default function WebsiteFaqs(){
   }catch(e){setError(e.message||'Unable to save FAQs.')}finally{setBusy(false)}
  }
  return <div className="space-y-6">
-  <PageHeader title="Frequently Asked Questions" description="Manage guest questions and answers for the About page.">
+  {!embedded && (<PageHeader title="Frequently Asked Questions" description="Manage guest questions and answers for the About page.">
    <Link to="/website-settings" className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm"><ArrowLeft className="h-4 w-4"/> Website Settings</Link>
-  </PageHeader>
+  </PageHeader>)}
   {error&&<p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}
   {message&&<p role="status" className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-700">{message}</p>}
   {draft===null?<SectionCard>Loading FAQs...</SectionCard>:<>
