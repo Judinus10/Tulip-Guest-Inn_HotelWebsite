@@ -73,11 +73,12 @@ export default function PrivacyPolicy() {
                 <div className="space-y-3">
                   {section.paragraphs.map((paragraph) => (
                     <p key={paragraph} className="text-sm text-gray-600 leading-relaxed">{paragraph}</p>
-                  ))}            </>}
+                  ))}
 
                 </div>
               </section>
             ))}
+            </>}
             <section>
               <h2 className="font-serif text-2xl font-light text-dark mb-3">Contact Us</h2>
               <p className="text-sm text-gray-600 leading-relaxed">
