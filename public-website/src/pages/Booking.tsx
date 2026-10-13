@@ -1,4 +1,3 @@
-import HotelPolicySection from '../components/ui/HotelPolicySection';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Calendar, Users, Home, Check, Phone, Mail } from 'lucide-react';
@@ -631,7 +630,6 @@ export default function Booking() {
                     </div>
                   </div>
 
-                  <HotelPolicySection compact />
 
                   {/* Why Book Direct */}
                   <div className="bg-deep-green p-7">

@@ -1,4 +1,3 @@
-import HotelPolicySection from '../components/ui/HotelPolicySection';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Calendar, Home, Minus, Plus, Users } from 'lucide-react';

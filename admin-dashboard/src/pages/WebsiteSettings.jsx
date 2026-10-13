@@ -14,7 +14,7 @@ import {
   RotateCcw,
   Save,
   Images,
-  ClipboardList,
+  FileText,
   HelpCircle,
   Trash2,
 } from 'lucide-react'
@@ -22,7 +22,7 @@ import { PageHeader, SectionCard } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Input, Label, Textarea } from '@/components/ui/input'
 import HeroContent from '@/pages/HeroContent'
-import HotelPolicies from '@/pages/HotelPolicies'
+import LegalContent from '@/pages/LegalContent'
 import WebsiteFaqs from '@/pages/WebsiteFaqs'
 import { fetchContactSettings, fetchPropertyContent, saveContactSettings, savePropertyContent } from '@/services/settingsApi'
 
@@ -213,7 +213,7 @@ export default function WebsiteSettings() {
 
       <PageHeader
         title="Website Settings"
-        description="Manage public contact information, homepage media, hotel policies and FAQs."
+        description="Manage public contact information, homepage media, legal pages and FAQs."
       />
 
       <div className="mb-6 rounded-2xl border border-border bg-white p-2 shadow-sm shadow-slate-200/60">
@@ -221,7 +221,7 @@ export default function WebsiteSettings() {
           {[
             { id: 'contact', label: 'Contact & Social', icon: Globe2 },
             { id: 'hero', label: 'Hero Media', icon: Images },
-            { id: 'policies', label: 'Hotel Policies', icon: ClipboardList },
+            { id: 'legal', label: 'Terms & Privacy', icon: FileText },
             { id: 'faqs', label: 'FAQs', icon: HelpCircle },
           ].map(({ id, label, icon: Icon }) => (
             <button key={id} type="button" role="tab" aria-selected={activeTab === id}
@@ -235,7 +235,7 @@ export default function WebsiteSettings() {
         </div>
       </div>
       {activeTab === 'hero' && <HeroContent embedded />}
-      {activeTab === 'policies' && <HotelPolicies embedded />}
+      {activeTab === 'legal' && <LegalContent />}
       {activeTab === 'faqs' && <WebsiteFaqs embedded />}
       <div hidden={activeTab !== 'contact'}>
       {loadError && (

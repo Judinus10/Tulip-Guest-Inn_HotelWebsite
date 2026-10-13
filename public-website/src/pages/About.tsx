@@ -2,7 +2,6 @@ import HotelFaqSection from '../components/ui/HotelFaqSection';
 import { Link } from 'react-router-dom';
 import { Heart, Eye, Star, Shield } from 'lucide-react';
 import PageHero from '../components/ui/PageHero';
-import HotelPolicySection from '../components/ui/HotelPolicySection';
 import SectionTitle from '../components/ui/SectionTitle';
 import CTASection from '../components/ui/CTASection';
 import AnimatedSection from '../components/ui/AnimatedSection';
@@ -203,7 +202,6 @@ export default function About() {
         secondBtnLabel="Contact Us"
         secondBtnPath="/contact"
       />
-      <HotelPolicySection />
       <HotelFaqSection />
     </main>
   );

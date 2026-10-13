@@ -1,3 +1,4 @@
+import { useLegalContent } from '../hooks/useLegalContent';
 import { Link } from 'react-router-dom';
 import PageHero from '../components/ui/PageHero';
 import bannerBooking from '../assets/images/banners/banner-booking.jpg';
@@ -38,6 +39,7 @@ const sections = [
 ];
 
 export default function TermsAndConditions() {
+  const { content, updated } = useLegalContent('terms');
   return (
     <main className="bg-background">
       <PageHero
@@ -48,9 +50,13 @@ export default function TermsAndConditions() {
       />
       <section className="section-padding">
         <div className="container-custom max-w-4xl">
-          <p className="text-sm text-gray-500 mb-10">Last updated: 20 August 2026</p>
+          <p className="text-sm text-gray-500 mb-10">Last updated: {updated ? new Date(updated.replace(' ', 'T')).toLocaleDateString() : '20 August 2026'}</p>
 
           <div className="bg-white border border-border p-7 md:p-10 space-y-9">
+            {content ? <>
+              <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{content.intro}</p>
+              {content.sections.map((section,index)=><section key={index}><h2 className="font-serif text-2xl font-light text-dark mb-3">{section.title}</h2><p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{section.body}</p></section>)}
+            </> : <>
             <p className="text-sm text-gray-600 leading-relaxed">
               These terms apply when you use the Tulip Guest Inn website, send an enquiry or make a room booking.
             </p>
@@ -60,6 +66,7 @@ export default function TermsAndConditions() {
                 <p className="text-sm text-gray-600 leading-relaxed">{section.text}</p>
               </section>
             ))}
+            </>}
             <section>
               <h2 className="font-serif text-2xl font-light text-dark mb-3">Contact</h2>
               <p className="text-sm text-gray-600 leading-relaxed">

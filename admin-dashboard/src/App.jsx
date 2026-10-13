@@ -11,7 +11,7 @@ import Gallery from '@/pages/Gallery'
 import Offers from '@/pages/Offers'
 import Messages from '@/pages/Messages'
 import WebsiteSettings from '@/pages/WebsiteSettings'
-import HotelPolicies from '@/pages/HotelPolicies'
+import LegalContent from '@/pages/LegalContent'
 import WebsiteFaqs from '@/pages/WebsiteFaqs'
 import HeroContent from '@/pages/HeroContent'
 import Notifications from '@/pages/Notifications'
@@ -41,7 +41,7 @@ export default function App() {
           <Route path="/offers" element={<Offers />} />
           <Route path="/messages" element={<Messages />} />
           <Route path="/website-settings" element={<WebsiteSettings />} />
-          <Route path="/hotel-policies" element={<HotelPolicies />} />
+          <Route path="/hotel-policies" element={<Navigate to="/website-settings" replace />} />
           <Route path="/website-faqs" element={<WebsiteFaqs />} />
           <Route path="/hero-content" element={<HeroContent />} />
           <Route path="/notifications" element={<Notifications />} />
