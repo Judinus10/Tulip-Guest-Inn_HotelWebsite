@@ -8,13 +8,13 @@ import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
 const url=buildApiUrl('/settings/faqs.php')
 const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b)
 export default function WebsiteFaqs({ embedded = false }) {
- const [draft,setDraft]=useState(null),[saved,setSaved]=useState(null),[published,setPublished]=useState([])
- const [preview,setPreview]=useState('draft'),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('')
+ const [draft,setDraft]=useState(null),[saved,setSaved]=useState(null)
+ const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('')
  const dirty=!equal(draft,saved)
  async function refresh(){
   const response=await apiFetch(`${url}?admin=1`)
   const payload=await readJsonResponse(response)
-  setDraft(payload.data.draft);setSaved(payload.data.draft);setPublished(payload.data.published)
+  setDraft(payload.data.draft);setSaved(payload.data.draft)
  }
  useEffect(()=>{refresh().catch(e=>setError(e.message))},[])
  function edit(index,field,value){setDraft(old=>old.map((item,i)=>i===index?{...item,[field]:value}:item))}
@@ -51,10 +51,7 @@ export default function WebsiteFaqs({ embedded = false }) {
      </div>)}
     </div>
    </SectionCard>
-   <SectionCard>
-    <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-semibold">FAQ Preview</h2><div className="flex rounded-lg border p-1">{['draft','published'].map(kind=><button key={kind} onClick={()=>setPreview(kind)} className={`rounded-md px-3 py-1.5 text-sm capitalize ${preview===kind?'bg-blue-50 font-semibold text-blue-700':''}`}>{kind}</button>)}</div></div>
-    <div className="space-y-3">{(preview==='draft'?draft:published).map((item,index)=><div key={index} className="rounded-xl border border-border p-4"><p className="font-semibold">{item.question||'Untitled question'}</p><p className="mt-2 whitespace-pre-wrap text-sm text-text-secondary">{item.answer||'No answer yet'}</p></div>)}</div>
-   </SectionCard>
+
    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-white p-4"><p className="text-sm text-text-secondary">{dirty?'Unsaved edits. Save before publishing.':'Draft saved.'}</p><div className="flex flex-wrap gap-2">
     <Button variant="outline" disabled={busy} onClick={()=>action('discard')}><RotateCcw className="h-4 w-4"/> Discard Draft</Button>
     <Button variant="outline" disabled={busy||!dirty} onClick={()=>action('draft')}><Save className="h-4 w-4"/> Save Draft</Button>
