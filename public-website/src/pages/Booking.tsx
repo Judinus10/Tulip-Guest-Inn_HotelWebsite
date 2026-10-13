@@ -1,3 +1,4 @@
+import HotelPolicySection from '../components/ui/HotelPolicySection';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Calendar, Users, Home, Check, Phone, Mail } from 'lucide-react';
@@ -630,6 +631,8 @@ export default function Booking() {
                     </div>
                   </div>
 
+                  <HotelPolicySection compact />
+
                   {/* Why Book Direct */}
                   <div className="bg-deep-green p-7">
                     <p className="text-[9px] tracking-[0.25em] uppercase text-gold font-medium mb-4">
@@ -639,7 +642,6 @@ export default function Booking() {
                       {[
                         'Best rate guaranteed',
                         'No booking fees',
-                        'Free cancellation',
                         'Personalised service',
                         'Secure online payment',
                       ].map((b) => (

@@ -15,6 +15,7 @@ import {
   RotateCcw,
   Save,
   Images,
+  ClipboardList,
   ArrowUpRight,
   Trash2,
 } from 'lucide-react'
@@ -459,6 +460,14 @@ export default function WebsiteSettings() {
           </div>
         </form>
       )}
+      <div className="mt-6">
+        <FormSection icon={ClipboardList} title="Hotel Policies" description="Manage check-in, check-out, cancellation, payment and property rules.">
+          <div className="flex flex-col gap-4 rounded-xl border border-border bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div><p className="text-sm font-semibold text-text-primary">Guest rules and booking conditions</p><p className="mt-1 text-sm text-text-secondary">Edit policies, preview changes and publish when approved.</p></div>
+            <Link to="/hotel-policies" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-700">Manage Policies <ArrowUpRight className="h-4 w-4" /></Link>
+          </div>
+        </FormSection>
+      </div>
       <div className="mt-6">
         <FormSection icon={Images} title="Homepage Hero Media" description="Manage the background images or video shown on your homepage.">
           <div className="flex flex-col gap-4 rounded-xl border border-border bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
