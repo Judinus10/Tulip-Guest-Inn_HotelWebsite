@@ -6,6 +6,8 @@ require_admin_auth();
 try {
     $pdo = get_db_connection();
     ensure_rooms_schema($pdo);
+    ensure_room_video_column($pdo);
+    ensure_room_ical_column($pdo);
     ensure_room_images_table($pdo);
     ensure_amenity_tables($pdo);
     $data = room_input_data();
@@ -36,7 +38,16 @@ try {
         ':sort_order' => max(0, (int) ($data['sort_order'] ?? 0)),
     ]);
     replace_room_amenities($pdo, $id, $amenityIds);
+    save_room_ical_url($pdo, $id, (string) ($data['booking_ical_url'] ?? ''));
     save_room_images($pdo, $id, $_FILES['images'] ?? []);
+    if (!empty($data['remove_video'])) {
+        $old = $pdo->prepare('SELECT video_path FROM rooms WHERE id = :id');
+        $old->execute([':id' => $id]);
+        $oldPath = $old->fetchColumn();
+        $pdo->prepare('UPDATE rooms SET video_path = NULL WHERE id = :id')->execute([':id' => $id]);
+        delete_room_video_file($oldPath);
+    }
+    save_room_video($pdo, $id, $_FILES['video'] ?? []);
     $images = fetch_room_images($pdo, [$id]);
     $stmt = $pdo->prepare('SELECT * FROM rooms WHERE id = :id LIMIT 1');
     $stmt->execute([':id' => $id]);
@@ -44,6 +55,8 @@ try {
     $assignments = fetch_room_amenity_assignments($pdo, [$id]);
     $normalized = normalize_room($room, $images[$id] ?? [], $assignments[$id] ?? [], list_amenities($pdo));
     json_response(true, 'Room updated.', 200, ['data' => $normalized, 'room' => $normalized]);
+} catch (InvalidArgumentException $e) {
+    json_response(false, $e->getMessage(), 422);
 } catch (Throwable $e) {
     json_response(false, 'Unable to update room.', 500, ['error' => APP_ENV === 'local' ? $e->getMessage() : null]);
 }

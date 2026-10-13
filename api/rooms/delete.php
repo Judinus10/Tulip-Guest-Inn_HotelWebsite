@@ -6,6 +6,10 @@ require_admin_auth();
 try {
     $pdo = get_db_connection();
     ensure_room_images_table($pdo);
+    ensure_room_video_column($pdo);
+    $videoStmt = $pdo->prepare('SELECT video_path FROM rooms WHERE id = :id');
+    $videoStmt->execute([':id' => (int) (read_request_data()['id'] ?? $_GET['id'] ?? 0)]);
+    $videoPath = $videoStmt->fetchColumn();
     $data = read_request_data();
     $id = (int) ($data['id'] ?? $_GET['id'] ?? 0);
     if ($id <= 0) json_response(false, 'Room id is required.', 422);
@@ -17,6 +21,7 @@ try {
     }
     $delete = $pdo->prepare('DELETE FROM rooms WHERE id = :id');
     $delete->execute([':id' => $id]);
+    if ($delete->rowCount() > 0) delete_room_video_file($videoPath);
     json_response(true, 'Room deleted.');
 } catch (Throwable $e) {
     json_response(false, 'Unable to delete room.', 500, ['error' => APP_ENV === 'local' ? $e->getMessage() : null]);

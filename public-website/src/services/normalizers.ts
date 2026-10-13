@@ -78,6 +78,7 @@ export function normalizeRoom(room: BackendRoom, index = 0): Room {
     size,
     image: mainImage,
     images,
+    videoUrl: asString(room.video_url),
     amenities: asStringArray(room.amenities),
     amenityCatalog,
     showUnavailableAmenities: Boolean(room.show_unavailable_amenities),

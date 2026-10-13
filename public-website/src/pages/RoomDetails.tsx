@@ -342,6 +342,16 @@ export default function RoomDetails() {
         </div>
       </section>
 
+      {room.videoUrl && (
+        <section className="mx-auto max-w-6xl px-6 py-10" aria-label="Room video tour">
+          <h2 className="mb-5 text-2xl font-semibold">Room video tour</h2>
+          <video key={room.videoUrl} src={room.videoUrl} controls preload="metadata" playsInline
+            poster={room.images[0]} className="aspect-video w-full rounded-lg bg-black object-contain">
+            Your browser does not support video playback.
+          </video>
+        </section>
+      )}
+
       {/* Room Info */}
       <section className="section-padding bg-background">
         <div className="container-custom">

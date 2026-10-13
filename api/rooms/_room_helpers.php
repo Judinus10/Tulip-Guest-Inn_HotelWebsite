@@ -31,6 +31,31 @@ function ensure_rooms_schema(PDO $pdo): void
     }
 }
 
+function ensure_room_ical_column(PDO $pdo): void
+{
+    $stmt = $pdo->query("SHOW COLUMNS FROM rooms LIKE 'booking_ical_url'");
+    if (!$stmt->fetch()) {
+        $pdo->exec("ALTER TABLE rooms ADD COLUMN booking_ical_url VARCHAR(1024) NULL");
+    }
+}
+
+function save_room_ical_url(PDO $pdo, int $roomId, string $url): void
+{
+    $url = trim($url);
+    if ($url !== '') {
+        $parts = parse_url($url);
+        $host = strtolower((string) ($parts['host'] ?? ''));
+        if (!$parts || ($parts['scheme'] ?? '') !== 'https' || !($host === 'ical.booking.com' || $host === 'admin.booking.com')) {
+            throw new InvalidArgumentException('Enter a valid Booking.com iCal export URL.');
+        }
+        $check = $pdo->prepare('SELECT id FROM rooms WHERE booking_ical_url = :url AND id <> :id LIMIT 1');
+        $check->execute([':url' => $url, ':id' => $roomId]);
+        if ($check->fetchColumn()) throw new InvalidArgumentException('This iCal URL is already assigned to another room.');
+    }
+    $stmt = $pdo->prepare('UPDATE rooms SET booking_ical_url = :url WHERE id = :id');
+    $stmt->execute([':url' => $url !== '' ? $url : null, ':id' => $roomId]);
+}
+
 function normalize_room_category(mixed $value): string
 {
     $category = strtolower(trim((string) $value));
@@ -53,6 +78,44 @@ function ensure_room_images_table(PDO $pdo): void
         KEY idx_room_images_room (room_id),
         CONSTRAINT fk_room_images_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+}
+
+function ensure_room_video_column(PDO $pdo): void
+{
+    $stmt = $pdo->query("SHOW COLUMNS FROM rooms LIKE 'video_path'");
+    if (!$stmt->fetch()) $pdo->exec("ALTER TABLE rooms ADD COLUMN video_path VARCHAR(255) NULL DEFAULT NULL");
+}
+
+function save_room_video(PDO $pdo, int $roomId, array $file): void
+{
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) return;
+    if (($file['error'] ?? null) !== UPLOAD_ERR_OK) throw new RuntimeException('Video upload failed. Check PHP upload limits.');
+    $size = (int) ($file['size'] ?? 0);
+    if ($size < 1 || $size > 50 * 1024 * 1024) throw new RuntimeException('Video must be 50 MB or smaller.');
+    $tmp = (string) ($file['tmp_name'] ?? '');
+    if (!is_uploaded_file($tmp)) throw new RuntimeException('Invalid video upload.');
+    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($tmp);
+    $extensions = ['video/mp4' => 'mp4', 'video/webm' => 'webm'];
+    if (!isset($extensions[$mime])) throw new RuntimeException('Only MP4 and WebM videos are supported.');
+    $directory = __DIR__ . '/../uploads/rooms';
+    if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) throw new RuntimeException('Unable to create video directory.');
+    $filename = 'room-video-' . $roomId . '-' . bin2hex(random_bytes(12)) . '.' . $extensions[$mime];
+    $destination = $directory . '/' . $filename;
+    if (!move_uploaded_file($tmp, $destination)) throw new RuntimeException('Unable to store video.');
+    $stmt = $pdo->prepare('SELECT video_path FROM rooms WHERE id = :id');
+    $stmt->execute([':id' => $roomId]);
+    $old = $stmt->fetchColumn();
+    try {
+        $pdo->prepare('UPDATE rooms SET video_path = :path WHERE id = :id')->execute([':path' => 'uploads/rooms/' . $filename, ':id' => $roomId]);
+    } catch (Throwable $e) { @unlink($destination); throw $e; }
+    delete_room_video_file($old);
+}
+
+function delete_room_video_file(mixed $path): void
+{
+    if (!is_string($path) || !preg_match('~^uploads/rooms/room-video-[a-zA-Z0-9-]+\.(mp4|webm)$~', $path)) return;
+    $file = __DIR__ . '/../' . $path;
+    if (is_file($file)) @unlink($file);
 }
 
 function slugify_room(string $text): string
@@ -176,6 +239,8 @@ function normalize_room(array $room, array $images = [], array $amenityRecords =
         'show_unavailable_amenities' => !empty($room['show_unavailable_amenities']),
         'status' => (string) ($room['status'] ?? 'Available'),
         'sort_order' => (int) ($room['sort_order'] ?? 0),
+        'booking_ical_url' => (string) ($room['booking_ical_url'] ?? ''),
+        'video_url' => !empty($room['video_path']) ? rooms_upload_url($room['video_path']) : null,
         'images' => $imageUrls,
         'main_image' => $imageUrls[0] ?? $fallbackImage,
         'image' => $images[0] ?? null,
@@ -188,6 +253,8 @@ function normalize_room(array $room, array $images = [], array $amenityRecords =
 function get_room_payload(PDO $pdo, bool $publicOnly = false): array
 {
     ensure_rooms_schema($pdo);
+    ensure_room_video_column($pdo);
+    ensure_room_ical_column($pdo);
     ensure_room_images_table($pdo);
     ensure_amenity_tables($pdo);
     $sql = 'SELECT * FROM rooms';

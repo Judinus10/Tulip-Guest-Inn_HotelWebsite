@@ -13,6 +13,7 @@ export interface Room {
   size: number;
   image: string;
   images: string[];
+  videoUrl?: string;
   amenities: string[];
   amenityCatalog?: Array<{ id: number; amenity_name: string; selected: boolean }>;
   showUnavailableAmenities?: boolean;

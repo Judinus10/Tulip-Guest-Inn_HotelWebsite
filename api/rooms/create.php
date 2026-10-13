@@ -6,6 +6,8 @@ require_admin_auth();
 try {
     $pdo = get_db_connection();
     ensure_rooms_schema($pdo);
+    ensure_room_video_column($pdo);
+    ensure_room_ical_column($pdo);
     ensure_room_images_table($pdo);
     ensure_amenity_tables($pdo);
     $data = room_input_data();
@@ -35,10 +37,14 @@ try {
     ]);
     $roomId = (int) $pdo->lastInsertId();
     replace_room_amenities($pdo, $roomId, $amenityIds);
+    save_room_ical_url($pdo, $roomId, (string) ($data['booking_ical_url'] ?? ''));
     save_room_images($pdo, $roomId, $_FILES['images'] ?? []);
+    save_room_video($pdo, $roomId, $_FILES['video'] ?? []);
     $rooms = get_room_payload($pdo, false);
     $room = array_values(array_filter($rooms, static fn($item) => (int) $item['id'] === $roomId))[0] ?? null;
     json_response(true, 'Room created.', 201, ['data' => $room, 'room' => $room]);
+} catch (InvalidArgumentException $e) {
+    json_response(false, $e->getMessage(), 422);
 } catch (Throwable $e) {
     json_response(false, 'Unable to create room.', 500, ['error' => APP_ENV === 'local' ? $e->getMessage() : null]);
 }

@@ -11,6 +11,7 @@ import {
   Eye,
   GlassWater,
   ImagePlus,
+  Video,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -33,6 +34,7 @@ import { optimizeRoomImages } from '@/utils/imageProcessing'
 
 const emptyForm = {
   room_name: '',
+  booking_ical_url: '',
   room_type: 'Ground Floor',
   room_category: 'standard',
   price_per_night: '',
@@ -455,6 +457,8 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
   const [form, setForm] = useState(() => room || emptyForm)
   const [errors, setErrors] = useState({})
   const [selectedFiles, setSelectedFiles] = useState([])
+  const [selectedVideo, setSelectedVideo] = useState(null)
+  const [removeVideo, setRemoveVideo] = useState(false)
   const [deletingImageId, setDeletingImageId] = useState(null)
   const [isProcessingImages, setIsProcessingImages] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -551,6 +555,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
     if (isProcessingImages || isSubmitting) return
 
     const nextErrors = {}
+    if (form.booking_ical_url?.trim() && !/^https:\/\/(ical|admin)\.booking\.com\//i.test(form.booking_ical_url.trim())) nextErrors.booking_ical_url = 'Enter a Booking.com iCal URL.'
     if (!form.room_name.trim()) nextErrors.room_name = 'Room name is required.'
     if (!form.room_type.trim()) nextErrors.room_type = 'Room type is required.'
     if (!form.room_category.trim()) nextErrors.room_category = 'Room category is required.'
@@ -574,6 +579,8 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
         capacity: Number(form.capacity),
         room_size: Number(form.room_size),
         images: selectedFiles,
+        video: selectedVideo,
+        remove_video: removeVideo,
       })
     } finally {
       setIsSubmitting(false)
@@ -688,6 +695,43 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
               </div>
               {isProcessingImages && <p className="text-xs font-medium text-primary-600">Optimizing selected images…</p>}
               {isEdit && <p className="text-xs text-text-secondary">Upload new images only if you want to add more photos.</p>}
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="booking_ical_url">Booking.com iCal import URL (optional)</Label>
+              <Input id="booking_ical_url" type="url" value={form.booking_ical_url || ''}
+                placeholder="https://ical.booking.com/v1/export?t=..."
+                onChange={(event) => updateField('booking_ical_url', event.target.value)} disabled={isSubmitting} />
+              {errors.booking_ical_url && <p className="text-xs text-red-600">{errors.booking_ical_url}</p>}
+              <p className="text-xs text-text-secondary">Ask the hotel owner which calendar belongs to this physical room. Reservations are imported by the scheduled sync job.</p>
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="room_video">Room video (optional, one per room)</Label>
+              <div className="flex items-center gap-3 rounded-lg border border-dashed border-border bg-slate-50 px-3 py-2">
+                <Video className="h-5 w-5 text-primary-600" />
+                <Input id="room_video" type="file" accept="video/mp4,video/webm" disabled={isSubmitting}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] || null
+                    if (file && (file.size > 50 * 1024 * 1024 || !['video/mp4', 'video/webm'].includes(file.type))) {
+                      setErrors((current) => ({ ...current, video: 'Choose an MP4 or WebM video up to 50 MB.' }))
+                      event.target.value = ''
+                      setSelectedVideo(null)
+                      return
+                    }
+                    setErrors((current) => ({ ...current, video: '' }))
+                    setSelectedVideo(file)
+                  }} />
+              </div>
+              {errors.video && <p className="text-xs text-red-600">{errors.video}</p>}
+              {selectedVideo && <p className="text-xs text-text-secondary">Selected: {selectedVideo.name} (replaces existing video)</p>}
+              {isEdit && room?.video_url && !removeVideo && !selectedVideo && (
+                <div className="space-y-2">
+                  <video src={room.video_url} controls preload="metadata" className="max-h-48 w-full rounded-lg bg-black" />
+                  <button type="button" className="text-sm font-medium text-red-600" onClick={() => setRemoveVideo(true)}>Remove existing video</button>
+                </div>
+              )}
+              {removeVideo && <p className="text-xs text-text-secondary">Existing video will be removed when saved. <button type="button" className="underline" onClick={() => setRemoveVideo(false)}>Undo</button></p>}
             </div>
 
             <div className="space-y-2 md:col-span-2">
@@ -997,6 +1041,7 @@ export default function Rooms() {
     const payload = new FormData()
     if (formMode === 'edit') payload.append('id', selectedRoom.id)
     payload.append('room_name', form.room_name)
+    payload.append('booking_ical_url', form.booking_ical_url || '')
     payload.append('description', form.description)
     payload.append('max_guests', form.capacity)
     payload.append('capacity', form.capacity)
@@ -1014,6 +1059,8 @@ export default function Rooms() {
     payload.append('sort_order', form.sort_order || 0)
 
     ;(form.images || []).forEach((file) => payload.append('images[]', file))
+    if (form.video) payload.append('video', form.video)
+    if (form.remove_video) payload.append('remove_video', '1')
 
     try {
       if (formMode === 'edit') {

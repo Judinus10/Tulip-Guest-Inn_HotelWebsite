@@ -19,23 +19,16 @@ function ics_timezone(): DateTimeZone
 
 function ics_connections(): array
 {
-    if (!ics_enabled()) {
-        return [];
-    }
-
-    $raw = jebal_env_value('ICS_ROOM_MAPPINGS_JSON', '[]');
-    $rows = is_array($raw) ? $raw : json_decode((string) $raw, true);
-    if (!is_array($rows)) {
-        return [];
-    }
-
-    return array_values(array_filter($rows, static function ($row): bool {
-        return is_array($row)
-            && !empty($row['enabled'])
-            && (int) ($row['room_id'] ?? 0) > 0
-            && trim((string) ($row['import_url'] ?? '')) !== ''
-            && trim((string) ($row['export_token'] ?? '')) !== '';
-    }));
+    if (!ics_enabled()) return [];
+    $pdo = get_db_connection();
+    $column = $pdo->query("SHOW COLUMNS FROM rooms LIKE 'booking_ical_url'")->fetch();
+    if (!$column) return [];
+    $rows = $pdo->query("SELECT id AS room_id, booking_ical_url AS import_url FROM rooms WHERE booking_ical_url IS NOT NULL AND booking_ical_url <> ''")->fetchAll(PDO::FETCH_ASSOC);
+    return array_map(static fn(array $row): array => [
+        'room_id' => (int) $row['room_id'],
+        'import_url' => (string) $row['import_url'],
+        'enabled' => true,
+    ], $rows);
 }
 
 function ensure_ics_schema(PDO $pdo): void

@@ -15,7 +15,7 @@ if (!ics_enabled()) {
 
 $connections = ics_connections();
 if ($connections === []) {
-    fwrite(STDERR, "No enabled room mappings found in ICS_ROOM_MAPPINGS_JSON.\n");
+    fwrite(STDERR, "No Booking.com iCal links configured in the Rooms admin form.\n");
     exit(1);
 }
 
