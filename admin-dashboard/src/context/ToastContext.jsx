@@ -20,7 +20,7 @@ function normalizeToast(value) {
   const type = value.type || (value.title?.toLowerCase().includes('error') ? 'error' : 'success')
   const message = value.message || value.title
   if (!message) return null
-  return { ...value, type, message }
+  return { ...value, type, message: type === 'error' ? getUserFriendlyError({ message }) : message }
 }
 
 export function ToastProvider({ children }) {

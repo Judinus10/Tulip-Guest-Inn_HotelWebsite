@@ -14,6 +14,21 @@ type ToastApi = {
 };
 
 const ToastContext = createContext<ToastApi | null>(null);
+
+export function friendlyPublicError(message: string): string {
+  const raw = String(message || '').trim();
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return 'You appear to be offline. Check your connection and try again.';
+  }
+  if (/sqlstate|stack trace|fatal error|unexpected token|<[^>]*>|[/\\]var[/\\]www|xampp|\.php on line/i.test(raw)) {
+    return 'The server could not complete the request. Please try again shortly.';
+  }
+  if (/failed to fetch|networkerror|network request failed|load failed/i.test(raw)) {
+    return 'Unable to connect to the server. Check your connection and try again.';
+  }
+  if (/aborterror|timed out|timeout/i.test(raw)) return 'The request timed out. Please try again.';
+  return raw || 'Something went wrong. Please try again.';
+}
 const designs = {
   success: { icon: CheckCircle2, accent: 'border-emerald-500', iconClass: 'text-emerald-600', title: 'Success' },
   error: { icon: AlertCircle, accent: 'border-red-500', iconClass: 'text-red-600', title: 'Something needs attention' },
@@ -38,10 +53,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     const toast: ToastInput = typeof input === 'string' ? { message: input, ...options } : input;
     if (!toast.message) return null;
     const type: ToastType = toast.type && toast.type in designs ? toast.type : 'info';
+    const safeMessage = type === 'error' ? friendlyPublicError(toast.message) : toast.message;
     const id = nextId.current++;
     setToasts((current) => {
-      if (current.some((item) => item.type === type && item.message === toast.message)) return current;
-      return [...current.slice(-3), { id, type, title: toast.title, message: toast.message }];
+      if (current.some((item) => item.type === type && item.message === safeMessage)) return current;
+      return [...current.slice(-3), { id, type, title: toast.title, message: safeMessage }];
     });
     const duration = toast.duration ?? durations[type];
     if (duration > 0) timers.current.set(id, window.setTimeout(() => dismiss(id), duration));

@@ -53,19 +53,10 @@ if ($totalGuests < 2 || $totalGuests > 20 || count($requestedRooms) < 2) {
     json_response(false, 'A multi-room booking requires at least two rooms and a valid guest count.', 422);
 }
 
-$allocations = [];
-$allocationTotal = 0;
-foreach ($requestedRooms as $requestedRoom) {
-    $roomId = (int) ($requestedRoom['room_id'] ?? 0);
-    $guests = (int) ($requestedRoom['guests'] ?? 0);
-    if ($roomId < 1 || $guests < 1 || isset($allocations[$roomId])) {
-        json_response(false, 'Invalid room allocation.', 422);
-    }
-    $allocations[$roomId] = $guests;
-    $allocationTotal += $guests;
-}
-if ($allocationTotal !== $totalGuests) {
-    json_response(false, 'Allocated guests must equal the total guest count.', 422);
+try {
+    $allocations = multi_room_validate_allocations($requestedRooms, $totalGuests);
+} catch (InvalidArgumentException $validationError) {
+    json_response(false, $validationError->getMessage(), 422);
 }
 
 $pdo = null;
@@ -90,74 +81,15 @@ try {
 
     $pdo->beginTransaction();
 
-    $roomIds = array_keys($allocations);
-    $placeholders = implode(',', array_fill(0, count($roomIds), '?'));
-    $roomStmt = $pdo->prepare(
-        "SELECT id, room_name, max_guests, base_price, currency, status
-         FROM rooms
-         WHERE id IN ({$placeholders})
-         ORDER BY sort_order ASC, id ASC
-         FOR UPDATE"
-    );
-    $roomStmt->execute($roomIds);
-    $selectedRooms = $roomStmt->fetchAll() ?: [];
-
-    if (count($selectedRooms) !== count($roomIds)) {
-        throw new RuntimeException('One or more assigned rooms no longer exist.');
-    }
-
+    $selectedRooms = multi_room_lock_selected_rooms($pdo, $allocations);
     $nights = max(1, (int) ((new DateTimeImmutable($checkInDate))->diff(new DateTimeImmutable($checkOutDate))->days));
-    $totalAmount = 0.0;
-    $currency = PAYMENT_CURRENCY;
-
-    foreach ($selectedRooms as &$selectedRoom) {
-        $roomId = (int) $selectedRoom['id'];
-        $roomGuests = $allocations[$roomId] ?? 0;
-        if (($selectedRoom['status'] ?? '') !== 'Available' || $roomGuests > (int) ($selectedRoom['max_guests'] ?? 0)) {
-            throw new RuntimeException('An assigned room cannot accommodate the selected guests.');
-        }
-
-        $conflict = $pdo->prepare(
-            "SELECT id FROM bookings
-             WHERE room_name = :room_name
-               " . active_booking_conflict_sql() . "
-               AND :requested_check_in < check_out_date
-               AND :requested_check_out > check_in_date
-             LIMIT 1
-             FOR UPDATE"
-        );
-        $conflict->execute([
-            ':room_name' => $selectedRoom['room_name'],
-            ':hold_cutoff' => booking_hold_cutoff_datetime(),
-            ':requested_check_in' => $checkInDate,
-            ':requested_check_out' => $checkOutDate,
-        ]);
-        if ($conflict->fetch() || ics_room_conflict($pdo, $roomId, $checkInDate, $checkOutDate)) {
-            throw new RuntimeException('One of the assigned rooms is no longer available. Please search again.');
-        }
-
-        $selectedRoom['allocated_guests'] = $roomGuests;
-        $selectedRoom['room_total'] = round((float) $selectedRoom['base_price'] * $nights, 2);
-        $totalAmount += $selectedRoom['room_total'];
-        $currency = (string) ($selectedRoom['currency'] ?: $currency);
-    }
-    unset($selectedRoom);
-
+    [$selectedRooms, $totalAmount, $currency] = multi_room_prepare_rooms(
+        $pdo, $selectedRooms, $allocations, $checkInDate, $checkOutDate, $nights
+    );
     $subtotalAmount = round($totalAmount, 2);
     $offerPrice = offer_best_price($pdo, $subtotalAmount, $checkInDate, $nights, count($selectedRooms), $totalGuests);
     $totalAmount = $offerPrice['total'];
-    $remainingDiscount = $offerPrice['discount'];
-    foreach ($selectedRooms as $index => &$selectedRoom) {
-        $roomDiscount = $index === count($selectedRooms) - 1
-            ? $remainingDiscount
-            : round($offerPrice['discount'] * ($selectedRoom['room_total'] / max(0.01, $subtotalAmount)), 2);
-        $roomDiscount = min($roomDiscount, $selectedRoom['room_total']);
-        $selectedRoom['room_subtotal'] = $selectedRoom['room_total'];
-        $selectedRoom['room_discount'] = $roomDiscount;
-        $selectedRoom['room_total'] = round($selectedRoom['room_total'] - $roomDiscount, 2);
-        $remainingDiscount = round($remainingDiscount - $roomDiscount, 2);
-    }
-    unset($selectedRoom);
+    $selectedRooms = multi_room_apply_discount($selectedRooms, $offerPrice, $subtotalAmount);
 
     $groupStmt = $pdo->prepare(
         'INSERT INTO booking_groups (total_guests, total_rooms, subtotal_amount, discount_amount, applied_offer_id, applied_offer_title, offer_snapshot_json, total_amount, currency, created_at, updated_at)

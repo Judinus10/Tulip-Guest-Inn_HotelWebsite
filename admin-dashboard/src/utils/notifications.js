@@ -4,7 +4,7 @@ const unsafeTechnicalMessage = /(sqlstate|fatal error|stack trace|unexpected tok
 
 export function getUserFriendlyError(error, fallback = 'Something went wrong. Please try again.') {
   const status = Number(error?.status || error?.response?.status || 0)
-  const rawMessage = String(error?.message || '').trim()
+  const rawMessage = String(error?.response?.data?.message || error?.data?.message || error?.message || '').trim()
 
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     return 'You appear to be offline. Check your internet connection and try again.'
@@ -13,9 +13,9 @@ export function getUserFriendlyError(error, fallback = 'Something went wrong. Pl
   if (status === 401) return 'Your session has expired. Please sign in again.'
   if (status === 403) return 'You do not have permission to perform this action.'
   if (status === 404) return 'The requested record could not be found.'
-  if (status === 409) return rawMessage || 'This change conflicts with the latest saved data. Refresh and try again.'
+  if (status === 409) return (rawMessage && !unsafeTechnicalMessage.test(rawMessage) ? rawMessage : '') || 'This change conflicts with the latest saved data. Refresh and try again.'
   if (status === 413) return 'The selected file is too large. Choose a smaller file and try again.'
-  if (status === 422) return rawMessage || 'Please check the entered details and try again.'
+  if (status === 422) return (rawMessage && !unsafeTechnicalMessage.test(rawMessage) ? rawMessage : '') || 'Please check the entered details and try again.'
   if (status === 429) return 'Too many requests were sent. Please wait a moment and try again.'
   if (status >= 500) return 'The server could not complete the request. Please try again shortly.'
   if (error instanceof TypeError && /fetch|network|load/i.test(rawMessage)) {
