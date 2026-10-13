@@ -1,3 +1,4 @@
+import HotelFaqSection from '../components/ui/HotelFaqSection';
 import { Link } from 'react-router-dom';
 import { Heart, Eye, Star, Shield } from 'lucide-react';
 import PageHero from '../components/ui/PageHero';
@@ -203,6 +204,7 @@ export default function About() {
         secondBtnPath="/contact"
       />
       <HotelPolicySection />
+      <HotelFaqSection />
     </main>
   );
 }
