@@ -1,47 +1,52 @@
-import { useEffect, useRef } from 'react'
-import { Bold, Italic, List, ListOrdered, Undo2, Redo2, RemoveFormatting } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Bold, Italic, Underline, List, ListOrdered, Undo2, Redo2, RemoveFormatting, AlignLeft, AlignCenter } from 'lucide-react'
 
 export default function LegalRichTextEditor({ value, onChange }) {
  const ref = useRef(null)
+ const selectionRef = useRef(null)
+ const [active, setActive] = useState({})
  useEffect(() => {
-  if (ref.current && ref.current.innerHTML !== (value || '')) ref.current.innerHTML = value || ''
+  if (ref.current && ref.current.innerHTML !== (value || '') && !ref.current.contains(document.activeElement)) ref.current.innerHTML = value || ''
  }, [value])
  const sync = () => onChange(ref.current?.innerHTML || '')
- const run = (command, arg) => {
-  ref.current?.focus()
-  document.execCommand(command, false, arg)
-  sync()
+ const rememberSelection = () => {
+  const selection = window.getSelection()
+  if (selection?.rangeCount && ref.current?.contains(selection.anchorNode)) selectionRef.current = selection.getRangeAt(0).cloneRange()
+  if (ref.current?.contains(selection?.anchorNode)) setActive({bold:document.queryCommandState('bold'),italic:document.queryCommandState('italic'),underline:document.queryCommandState('underline')})
  }
- const button = (name, Icon, command, arg) => (
-  <button key={name} type="button" title={name} aria-label={name}
-   onMouseDown={e=>e.preventDefault()} onClick={()=>run(command,arg)}
-   className="rounded-lg p-2 text-text-primary hover:bg-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">
-   <Icon className="h-4 w-4"/>
+ const run = (command, arg) => {
+  const editor = ref.current
+  if (!editor) return
+  editor.focus()
+  const range = selectionRef.current
+  if (range && editor.contains(range.commonAncestorContainer)) {
+   const selection = window.getSelection()
+   selection.removeAllRanges(); selection.addRange(range)
+  }
+  document.execCommand(command, false, arg)
+  rememberSelection(); sync()
+ }
+ const btn = (name, Icon, command, arg, selected=false) => (
+  <button key={name} type="button" title={name} aria-label={name} aria-pressed={selected}
+   onMouseDown={e => e.preventDefault()} onClick={() => run(command,arg)}
+   className={`inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm hover:bg-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500 ${selected?'bg-blue-100 text-blue-700':'text-slate-700'}`}>
+   {Icon && <Icon className="h-4 w-4"/>}{name==='Heading'||name==='Text' ? name : null}
   </button>
  )
- return <div className="overflow-hidden rounded-xl border border-border bg-white">
-  <div className="flex flex-wrap items-center gap-1 border-b border-border bg-slate-50 p-2">
-   <select aria-label="Text style" defaultValue="p" onChange={e=>run('formatBlock',e.target.value)}
-    className="rounded-lg border border-border bg-white px-2 py-2 text-sm">
-    <option value="p">Normal Text</option><option value="h2">Heading</option>
-   </select>
-   {button('Bold',Bold,'bold')}{button('Italic',Italic,'italic')}
+ return <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+  <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 bg-slate-50 p-2" onMouseDown={e=>{if(e.target.closest('button'))e.preventDefault()}}>
+   {btn('Heading',null,'formatBlock','H2')}{btn('Text',null,'formatBlock','P')}
    <span className="mx-1 h-6 w-px bg-slate-200"/>
-   {button('Bulleted list',List,'insertUnorderedList')}
-   {button('Numbered list',ListOrdered,'insertOrderedList')}
+   {btn('Bold',Bold,'bold',undefined,active.bold)}{btn('Italic',Italic,'italic',undefined,active.italic)}{btn('Underline',Underline,'underline',undefined,active.underline)}
    <span className="mx-1 h-6 w-px bg-slate-200"/>
-   {button('Undo',Undo2,'undo')}{button('Redo',Redo2,'redo')}
-   {button('Clear formatting',RemoveFormatting,'removeFormat')}
+   {btn('Bullets',List,'insertUnorderedList')}{btn('Numbers',ListOrdered,'insertOrderedList')}
+   {btn('Align left',AlignLeft,'justifyLeft')}{btn('Align center',AlignCenter,'justifyCenter')}
+   <span className="mx-1 h-6 w-px bg-slate-200"/>
+   {btn('Undo',Undo2,'undo')}{btn('Redo',Redo2,'redo')}{btn('Clear formatting',RemoveFormatting,'removeFormat')}
   </div>
-  <div ref={ref} contentEditable suppressContentEditableWarning role="textbox" aria-label="Legal page content"
-   aria-multiline="true" onInput={sync} onBlur={sync}
-   onPaste={e=>{
-    e.preventDefault()
-    const text=e.clipboardData.getData('text/plain')
-    document.execCommand('insertText',false,text)
-    sync()
-   }}
-   className="legal-editor min-h-[400px] max-h-[65vh] overflow-y-auto px-6 py-5 text-sm leading-7 text-text-primary outline-none focus:ring-2 focus:ring-inset focus:ring-blue-200
-    [&_h2]:my-4 [&_h2]:text-xl [&_h2]:font-semibold [&_p]:my-2 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6"/>
+  <div ref={ref} contentEditable suppressContentEditableWarning role="textbox" aria-label="Legal page content" aria-multiline="true"
+   onInput={sync} onKeyUp={rememberSelection} onMouseUp={rememberSelection} onBlur={rememberSelection}
+   onPaste={e=>{e.preventDefault();document.execCommand('insertText',false,e.clipboardData.getData('text/plain'));sync()}}
+   className="min-h-[440px] max-h-[70vh] overflow-y-auto px-6 py-5 text-base leading-7 text-slate-700 outline-none focus:ring-2 focus:ring-inset focus:ring-blue-200 [&_h2]:my-6 [&_h2]:font-serif [&_h2]:text-2xl [&_h2]:font-normal [&_h2]:leading-snug [&_p]:my-3 [&_div]:my-3 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-7 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-7" />
  </div>
 }

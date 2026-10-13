@@ -10,8 +10,8 @@ const titles={terms:'Terms & Conditions',privacy:'Privacy Policy'}
 const escapeHtml=text=>String(text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
 function legacyHtml(content) {
  if(!content)return ''
- return `<p>${escapeHtml(content.intro).replace(/\\n/g,'<br>')}</p>`+
-  (content.sections||[]).map(s=>`<h2>${escapeHtml(s.title)}</h2><p>${escapeHtml(s.body).replace(/\\n/g,'<br>')}</p>`).join('')
+ return `<p>${escapeHtml(content.intro).replace(/\n/g,'<br>')}</p>`+
+  (content.sections||[]).map(s=>`<h2>${escapeHtml(s.title)}</h2><p>${escapeHtml(s.body).replace(/\n/g,'<br>')}</p>`).join('')
 }
 export default function LegalContent({page='terms'}){
  const [html,setHtml]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true)

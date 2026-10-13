@@ -15,7 +15,7 @@ function legal_sanitize_html(string $html): string {
  libxml_clear_errors();libxml_use_internal_errors($previous);
  $root=$doc->getElementById('legal-root');
  if(!$root)throw new InvalidArgumentException('Invalid document.');
- $allowed=['p','h2','strong','b','em','i','ul','ol','li','br'];
+ $allowed=['p','h2','strong','b','em','i','u','ul','ol','li','br'];
  $sanitize=function(DOMNode $node)use(&$sanitize,$allowed,$doc):void{
   for($child=$node->firstChild;$child;){
    $next=$child->nextSibling;
@@ -30,7 +30,10 @@ function legal_sanitize_html(string $html): string {
      while($child->firstChild)$node->insertBefore($child->firstChild,$child);
      $node->removeChild($child);
     }else{
+     $align=strtolower((string)$child->getAttribute('style'));
+     $keepCenter=preg_match('/(?:^|;)\s*text-align\s*:\s*center\s*(?:;|$)/i',$align) && in_array($tag,['p','h2'],true);
      while($child->attributes->length)$child->removeAttributeNode($child->attributes->item(0));
+     if($keepCenter)$child->setAttribute('style','text-align:center');
      $sanitize($child);
     }
    }elseif(!($child instanceof DOMText)){
