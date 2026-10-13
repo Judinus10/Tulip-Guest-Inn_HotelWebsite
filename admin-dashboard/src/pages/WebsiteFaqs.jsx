@@ -7,7 +7,7 @@ import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
 
 const url=buildApiUrl('/settings/faqs.php')
 const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b)
-export default function WebsiteFaqs(){
+export default function WebsiteFaqs({ embedded = false }) {
  const [draft,setDraft]=useState(null),[saved,setSaved]=useState(null),[published,setPublished]=useState([])
  const [preview,setPreview]=useState('draft'),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('')
  const dirty=!equal(draft,saved)
