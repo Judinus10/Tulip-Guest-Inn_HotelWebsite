@@ -703,7 +703,6 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
                 placeholder="https://ical.booking.com/v1/export?t=..."
                 onChange={(event) => updateField('booking_ical_url', event.target.value)} disabled={isSubmitting} />
               {errors.booking_ical_url && <p className="text-xs text-red-600">{errors.booking_ical_url}</p>}
-              <p className="text-xs text-text-secondary">Ask the hotel owner which calendar belongs to this physical room. Reservations are imported by the scheduled sync job.</p>
             </div>
 
             <div className="space-y-2 md:col-span-2">
