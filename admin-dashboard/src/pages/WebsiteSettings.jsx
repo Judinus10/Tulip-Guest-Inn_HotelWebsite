@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   AlertCircle,
   CheckCircle2,
@@ -13,6 +14,8 @@ import {
   Plus,
   RotateCcw,
   Save,
+  Images,
+  ArrowUpRight,
   Trash2,
 } from 'lucide-react'
 import { PageHeader, SectionCard } from '@/components/ui/page-header'
@@ -456,6 +459,19 @@ export default function WebsiteSettings() {
           </div>
         </form>
       )}
+      <div className="mt-6">
+        <FormSection icon={Images} title="Homepage Hero Media" description="Manage the background images or video shown on your homepage.">
+          <div className="flex flex-col gap-4 rounded-xl border border-border bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-text-primary">Homepage background</p>
+              <p className="text-sm text-text-secondary">Up to 3 slideshow images or one background video, with draft preview and publishing.</p>
+            </div>
+            <Link to="/hero-content" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700">
+              Manage Hero Media <ArrowUpRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </FormSection>
+      </div>
     </div>
   )
 }

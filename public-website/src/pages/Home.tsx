@@ -1,3 +1,4 @@
+import { requestJson } from '../services/apiClient';
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -114,6 +115,15 @@ function pickRandomGalleryPreview(
 
 export default function Home() {
   const [heroIndex, setHeroIndex] = useState(0);
+  const [publishedHero, setPublishedHero] = useState<{mode:'images'|'video';images:string[];video:string;poster:string}|null>(null);
+  useEffect(() => {
+    let active = true;
+    requestJson<{mode:'images'|'video';images:string[];video:string;poster:string}>('/settings/hero-content.php')
+      .then(data => { if(active) setPublishedHero(data); }).catch(() => {});
+    return () => { active=false; };
+  }, []);
+  const videoHero = publishedHero?.mode === 'video' && Boolean(publishedHero.video);
+
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [homeRooms, setHomeRooms] = useState(rooms);
   const [homeGalleryImages, setHomeGalleryImages] = useState(galleryImages);
@@ -135,14 +145,15 @@ export default function Home() {
     return groups;
   }, [previewImages]);
   const featuredRooms = homeRooms.filter((r) => r.featured).slice(0, 3);
-  const activeHeroImages = heroImages;
+  const activeHeroImages = publishedHero?.mode === "images" && publishedHero.images?.length ? publishedHero.images : heroImages;
 
   useEffect(() => {
+    if (videoHero) return;
     const interval = setInterval(() => {
       setHeroIndex((prev) => (prev + 1) % activeHeroImages.length);
     }, 7000);
     return () => clearInterval(interval);
-  }, [activeHeroImages.length]);
+  }, [activeHeroImages.length, videoHero]);
 
   useEffect(() => {
     let isMounted = true;
@@ -214,7 +225,12 @@ export default function Home() {
     <main>
       {/* ── HERO ─────────────────────────────────────────── */}
       <section className="relative h-screen min-h-[600px] flex items-center justify-center overflow-hidden">
-        {activeHeroImages.map((src, i) => (
+        {videoHero ? (
+          <video src={publishedHero!.video} poster={publishedHero!.poster || heroImages[0]}
+            autoPlay muted loop playsInline preload="metadata"
+            className="absolute inset-0 h-full w-full object-cover"
+            aria-label="Tulip Guest Inn property video" />
+        ) : activeHeroImages.map((src, i) => (
           <motion.div
             key={`${src}-${i}`}
             className="absolute inset-0"
@@ -305,7 +321,7 @@ export default function Home() {
 
         {/* Hero Dots */}
         <div className="absolute bottom-8 right-8 flex gap-2">
-          {activeHeroImages.map((_, i) => (
+          {!videoHero && activeHeroImages.map((_, i) => (
             <button
               key={i}
               onClick={() => setHeroIndex(i)}

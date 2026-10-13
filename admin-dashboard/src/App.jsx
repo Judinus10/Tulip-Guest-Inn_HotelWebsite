@@ -11,6 +11,7 @@ import Gallery from '@/pages/Gallery'
 import Offers from '@/pages/Offers'
 import Messages from '@/pages/Messages'
 import WebsiteSettings from '@/pages/WebsiteSettings'
+import HeroContent from '@/pages/HeroContent'
 import Notifications from '@/pages/Notifications'
 import Experience from '@/pages/Experience'
 import AdminPassword from '@/pages/AdminPassword'
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="/offers" element={<Offers />} />
           <Route path="/messages" element={<Messages />} />
           <Route path="/website-settings" element={<WebsiteSettings />} />
+          <Route path="/hero-content" element={<HeroContent />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/experience" element={<Experience />} />
           <Route path="/admin-password" element={<AdminPassword />} />
