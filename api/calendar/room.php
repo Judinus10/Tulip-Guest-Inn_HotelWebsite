@@ -10,15 +10,18 @@ if (!$roomId || $token === '') {
     exit;
 }
 
+// Export links are separate from import URLs. Preserve existing legacy export
+// tokens until a dedicated database-backed export-token feature is introduced.
+$legacyRaw = jebal_env_value('ICS_ROOM_MAPPINGS_JSON', '[]');
+$legacyMappings = is_array($legacyRaw) ? $legacyRaw : json_decode((string)$legacyRaw, true);
 $mapping = null;
-foreach (ics_connections() as $candidate) {
-    if ((int) $candidate['room_id'] === (int) $roomId) {
+foreach (is_array($legacyMappings) ? $legacyMappings : [] as $candidate) {
+    if (is_array($candidate) && (int)($candidate['room_id'] ?? 0) === (int)$roomId) {
         $mapping = $candidate;
         break;
     }
 }
-
-if (!$mapping || !hash_equals((string) $mapping['export_token'], $token)) {
+if (!$mapping || empty($mapping['export_token']) || !hash_equals((string)$mapping['export_token'], $token)) {
     http_response_code(404);
     exit;
 }

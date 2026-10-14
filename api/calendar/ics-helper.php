@@ -42,25 +42,23 @@ function ics_timezone(): DateTimeZone
     }
 }
 
-function ics_connections(): array
+/** Read Booking.com import URLs configured in Admin > Rooms > Edit Room. */
+function ics_connections(?PDO $pdo = null): array
 {
-    if (!ics_enabled()) {
-        return [];
+    if (!ics_enabled()) return [];
+    $pdo ??= get_db_connection();
+    // Older databases may not yet have the column until the Rooms API is used.
+    $column = $pdo->query("SHOW COLUMNS FROM rooms LIKE 'booking_ical_url'");
+    if (!$column->fetch()) return [];
+    $rows = $pdo->query("SELECT id, booking_ical_url FROM rooms WHERE booking_ical_url IS NOT NULL AND TRIM(booking_ical_url) <> '' ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
+    $connections = [];
+    foreach ($rows as $row) {
+        $url = trim((string)$row['booking_ical_url']);
+        if (validate_ics_url($url) || (ics_test_mode_enabled() && str_starts_with($url, 'test://'))) {
+            $connections[] = ['room_id' => (int)$row['id'], 'import_url' => $url, 'enabled' => true];
+        }
     }
-
-    $raw = jebal_env_value('ICS_ROOM_MAPPINGS_JSON', '[]');
-    $rows = is_array($raw) ? $raw : json_decode((string) $raw, true);
-    if (!is_array($rows)) {
-        return [];
-    }
-
-    return array_values(array_filter($rows, static function ($row): bool {
-        return is_array($row)
-            && !empty($row['enabled'])
-            && (int) ($row['room_id'] ?? 0) > 0
-            && trim((string) ($row['import_url'] ?? '')) !== ''
-            && trim((string) ($row['export_token'] ?? '')) !== '';
-    }));
+    return $connections;
 }
 
 function ensure_ics_schema(PDO $pdo): void

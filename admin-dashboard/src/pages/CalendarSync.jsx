@@ -45,7 +45,8 @@ export default function CalendarSync() {
         <div className="flex justify-between"><span className="text-text-secondary">Last completed sync</span><span className="font-medium">{data.last_sync || 'Not yet synced'}</span></div>
         {data.failed_rooms > 0 && <div className="flex items-center gap-2 text-amber-700"><AlertTriangle className="h-4 w-4" />{data.failed_rooms} room(s) reported sync failures</div>}
       </div>
-      {!data.legacy_enabled && <div className="mt-6 rounded-xl bg-amber-50 p-4 text-sm text-amber-800">ICS_SYNC_ENABLED is off in the server configuration. Enable it and configure room mappings before using this switch.</div>}
+      {!data.legacy_enabled && <div className="mt-6 rounded-xl bg-amber-50 p-4 text-sm text-amber-800">ICS_SYNC_ENABLED is off in the server configuration. Enable it before using this switch. Room calendar URLs are managed in Rooms → Edit Room.</div>}
+      {!data.configured_rooms && <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">No Booking.com calendars found. Open Rooms → Edit Room and save a Booking.com iCal URL for at least one room.</div>}
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-6"><span className="flex items-center gap-2 text-xs text-text-secondary">{data.enabled ? <CheckCircle2 className="h-4 w-4" /> : <PauseCircle className="h-4 w-4" />}{data.enabled ? 'Scheduled imports permitted' : 'New imports paused; existing reservations remain blocked'}</span><Button type="button" disabled={!data.enabled || busy || !data.configured_rooms} onClick={() => act('sync')}><RefreshCw className={`mr-2 h-4 w-4 ${busy ? 'animate-spin' : ''}`} />Sync Now</Button></div>
     </section>}
   </div>

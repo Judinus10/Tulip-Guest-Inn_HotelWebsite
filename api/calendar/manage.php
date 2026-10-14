@@ -13,7 +13,7 @@ try {
     if ($method === 'GET') {
         $enabled = ics_master_sync_enabled($pdo);
         $legacy = ics_enabled();
-        $connections = ics_connections();
+        $connections = ics_connections($pdo);
         $status = [];
         ensure_ics_schema($pdo);
         $status = $pdo->query("SELECT COUNT(*) AS total, MAX(last_sync_completed_at) AS last_sync, SUM(CASE WHEN last_sync_status = 'failed' THEN 1 ELSE 0 END) AS failures FROM external_calendar_sync_status")->fetch(PDO::FETCH_ASSOC);
@@ -27,7 +27,7 @@ try {
     $action = (string)($data['action'] ?? '');
     if ($action === 'toggle') {
         if (!is_bool($data['enabled'] ?? null)) json_response(false, 'Invalid enabled value.', 422);
-        if ($data['enabled'] && (!ics_enabled() || !ics_connections())) json_response(false, 'Configure ICS_SYNC_ENABLED and room mappings before enabling sync.', 422);
+        if ($data['enabled'] && (!ics_enabled() || !ics_connections($pdo))) json_response(false, 'Enable ICS_SYNC_ENABLED and configure at least one Booking.com iCal URL under Rooms → Edit Room.', 422);
         $stmt = $pdo->prepare('UPDATE hotel_calendar_sync_settings SET sync_enabled = ? WHERE id = 1');
         $stmt->execute([(int)$data['enabled']]);
         json_response(true, $data['enabled'] ? 'Calendar synchronization enabled.' : 'Calendar synchronization paused.', 200, ['data' => ['enabled' => (bool)$data['enabled']]]);

@@ -5,8 +5,8 @@ require_once __DIR__ . '/ics-helper.php';
 function ics_run_all(PDO $pdo): array
 {
     if (!ics_master_sync_enabled($pdo)) throw new RuntimeException('Calendar synchronization is paused.');
-    $connections = ics_connections();
-    if (!$connections) throw new RuntimeException('No configured room calendars. Check ICS_ROOM_MAPPINGS_JSON and ICS_SYNC_ENABLED.');
+    $connections = ics_connections($pdo);
+    if (!$connections) throw new RuntimeException('No configured room calendars. Add Booking.com iCal URLs in Rooms → Edit Room.');
     $lock = fopen(sys_get_temp_dir() . '/tulip-booking-com-ics.lock', 'c');
     if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) {
         if (is_resource($lock)) fclose($lock);
