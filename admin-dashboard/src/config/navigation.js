@@ -51,6 +51,7 @@ export const navigation = [
     items: [
       { name: 'Website Settings', href: '/website-settings', icon: Globe },
       { name: 'Mail Integrations', href: '/mail-settings', icon: Mail },
+      { name: 'Payment Management', href: '/payment-management', icon: CreditCard },
       { name: 'Admin Password', href: '/admin-password', icon: KeyRound },
     ],
   },
@@ -69,6 +70,7 @@ export const pageTitles = {
   '/website-settings': 'Website Settings',
   '/admin-password': 'Admin Password',
   '/mail-settings': 'Mail & Business Integrations',
+  '/payment-management': 'Payment Management',
   '/notifications': 'Notifications',
 }
 
@@ -85,5 +87,6 @@ export const pageDescriptions = {
   '/website-settings': 'Manage public website contact information and social links.',
   '/admin-password': 'Change the dashboard administrator password.',
   '/mail-settings': 'Manage mail providers, sender accounts, routing and business links.',
+  '/payment-management': 'Manage booking payment options and PayHere credentials.',
   '/notifications': 'View booking, payment, and system notifications.',
 }

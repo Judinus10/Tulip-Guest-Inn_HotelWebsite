@@ -11,13 +11,11 @@ import Gallery from '@/pages/Gallery'
 import Offers from '@/pages/Offers'
 import Messages from '@/pages/Messages'
 import WebsiteSettings from '@/pages/WebsiteSettings'
-import LegalContent from '@/pages/LegalContent'
-import WebsiteFaqs from '@/pages/WebsiteFaqs'
-import HeroContent from '@/pages/HeroContent'
 import Notifications from '@/pages/Notifications'
 import Experience from '@/pages/Experience'
 import AdminPassword from '@/pages/AdminPassword'
 import MailSettings from '@/pages/MailSettings'
+import PaymentManagement from '@/pages/PaymentManagement'
 
 function PublicWebsiteRedirect() {
   window.location.replace(`${window.location.origin}/`)
@@ -41,13 +39,11 @@ export default function App() {
           <Route path="/offers" element={<Offers />} />
           <Route path="/messages" element={<Messages />} />
           <Route path="/website-settings" element={<WebsiteSettings />} />
-          <Route path="/hotel-policies" element={<Navigate to="/website-settings" replace />} />
-          <Route path="/website-faqs" element={<WebsiteFaqs />} />
-          <Route path="/hero-content" element={<HeroContent />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/experience" element={<Experience />} />
           <Route path="/admin-password" element={<AdminPassword />} />
           <Route path="/mail-settings" element={<MailSettings />} />
+          <Route path="/payment-management" element={<PaymentManagement />} />
         </Route>
       </Route>
 
