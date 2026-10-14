@@ -10,3 +10,4 @@ public-website/src/services/galleryApi.js
 /vendor/
 /uploads/
 mail/assets/
+.env copy
