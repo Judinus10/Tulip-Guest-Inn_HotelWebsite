@@ -8,13 +8,8 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../payment-settings/_helpers.php';
 require_once __DIR__ . '/../security/public-token-helper.php';
-
-if (!ONLINE_PAYMENT_ENABLED) {
-    http_response_code(503);
-    header('Content-Type: text/plain; charset=utf-8');
-    exit('Online payment is temporarily unavailable.');
-}
 
 function redirect_error(string $message, int $statusCode = 400): void
 {
@@ -66,7 +61,7 @@ try {
         'amount' => $amount,
     ]);
     if (!$validToken && legacy_public_tokens_allowed()) {
-        $legacy = hash_hmac('sha256', $orderId . '|' . $bookingId . '|' . $amount, PAYHERE_MERCHANT_SECRET);
+        $legacy = hash_hmac('sha256', $orderId . '|' . $bookingId . '|' . $amount, payment_runtime()['merchant_secret']);
         $validToken = hash_equals($legacy, $token);
     }
     if (!$validToken) {
@@ -82,7 +77,7 @@ try {
         redirect_error('Checkout payload is missing.', 500);
     }
 
-    $payhereUrl = (strtolower((string) jebal_env_value('PAYHERE_MODE', 'sandbox')) === 'live')
+    $payhereUrl = (payment_runtime()['environment'] === 'live')
     ? 'https://www.payhere.lk/pay/checkout'
     : 'https://sandbox.payhere.lk/pay/checkout';
 

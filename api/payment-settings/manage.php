@@ -23,6 +23,14 @@ try {
     if (strlen($merchant) > 100 || strlen($secret) > 512) json_response(false, 'Invalid credential length.', 422);
     $pdo->beginTransaction();
     $stmt = $pdo->query('SELECT * FROM hotel_payment_settings WHERE id = 1 FOR UPDATE'); $existing = $stmt->fetch();
+    // Avoid invalidating callbacks for in-flight PayHere orders during credential rotation.
+    if ($environment !== $existing['environment'] || $merchant !== $existing['merchant_id'] || $secret !== '') {
+        $pending = $pdo->query("SELECT COUNT(*) FROM payments WHERE status = 'Payment Pending' AND order_id LIKE 'ONLINE-%'")->fetchColumn();
+        if ((int)$pending > 0 && !empty($existing['encrypted_secret'])) {
+            $pdo->rollBack();
+            json_response(false, 'PayHere credentials cannot be changed while online payments are pending. Complete or resolve those payments first.', 409);
+        }
+    }
     // Never carry a secret across environments or merchant IDs.
     $changedIdentity = $environment !== $existing['environment'] || $merchant !== $existing['merchant_id'];
     $encrypted = $changedIdentity ? null : $existing['encrypted_secret'];

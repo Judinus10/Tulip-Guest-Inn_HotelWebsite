@@ -47,7 +47,7 @@ export default function PaymentManagement() {
       const response = await apiFetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...settings, merchant_secret: secret, admin_password: password }) })
       const result = await readJsonResponse(response)
       setSettings({ ...initial, ...result.data }); setSecret(''); setPassword('')
-      setMessage('Payment settings saved successfully. Public checkout integration is still required before these options affect customer bookings.')
+      setMessage('Payment settings saved. New public bookings will use the selected payment methods.')
     } catch (e) { setError(e.message || 'Unable to save payment settings.') }
     finally { setSaving(false) }
   }
@@ -57,7 +57,7 @@ export default function PaymentManagement() {
 
     <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-      <p><strong>Integration pending.</strong> These settings can be saved, but they will not control public bookings until checkout and payment endpoints are connected.</p>
+      <p><strong>Payment configuration.</strong> Changes apply to new bookings after saving. Complete a sandbox transaction before enabling live payments.</p>
     </div>
     {error && <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
     {message && <div role="status" className="flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><CheckCircle2 className="h-4 w-4 shrink-0" />{message}</div>}

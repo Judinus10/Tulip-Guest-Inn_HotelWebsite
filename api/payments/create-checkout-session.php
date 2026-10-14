@@ -8,6 +8,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../payment-settings/_helpers.php';
 require_once __DIR__ . '/../bookings/booking-expiry-helper.php';
 require_once __DIR__ . '/../calendar/ics-helper.php';
 require_once __DIR__ . '/../bookings/booking-audit-helper.php';
@@ -21,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(false, 'Only POST requests are allowed.', 405);
 }
 
-if (!ONLINE_PAYMENT_ENABLED) {
+if (!payment_runtime()['payhere_enabled']) {
     json_response(false, 'Online payment is not available at the moment. Please use Pay on Arrival.', 200, [
         'severity' => 'warning',
         'error_code' => 'ONLINE_PAYMENT_DISABLED',
@@ -120,7 +121,7 @@ if ($bookingId < 1) {
     json_response(false, 'Valid booking ID is required to start payment.', 422);
 }
 
-if (PAYHERE_MERCHANT_ID === '' || PAYHERE_MERCHANT_SECRET === '' || PAYHERE_MERCHANT_ID === 'YOUR_PAYHERE_MERCHANT_ID' || PAYHERE_MERCHANT_SECRET === 'YOUR_PAYHERE_MERCHANT_SECRET') {
+if (payment_runtime()['merchant_id'] === '' || payment_runtime()['merchant_secret'] === '') {
     json_response(false, 'PayHere credentials are not configured on the backend.', 500);
 }
 
@@ -231,7 +232,7 @@ try {
     $notifyUrl = (API_BASE_URL !== '' ? API_BASE_URL : '') . '/payments/payhere-notify.php';
 
     $checkoutPayload = [
-        'merchant_id' => PAYHERE_MERCHANT_ID,
+        'merchant_id' => payment_runtime()['merchant_id'],
         'return_url' => $returnUrl,
         'cancel_url' => $cancelUrl,
         'notify_url' => $notifyUrl,
@@ -251,11 +252,11 @@ try {
     ];
 
     $checkoutPayload['hash'] = strtoupper(md5(
-        PAYHERE_MERCHANT_ID .
+        payment_runtime()['merchant_id'] .
         $orderId .
         $amountFormatted .
         $currency .
-        strtoupper(md5(PAYHERE_MERCHANT_SECRET))
+        strtoupper(md5(payment_runtime()['merchant_secret']))
     ));
 
     $insertPayment = $pdo->prepare(

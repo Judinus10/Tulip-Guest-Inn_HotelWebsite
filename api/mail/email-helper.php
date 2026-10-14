@@ -1000,7 +1000,7 @@ function booking_bill_public_base_url(): string
 
 function latest_booking_bill_url(PDO $pdo, int $bookingId): string
 {
-    if ($bookingId < 1 || !defined('PAYHERE_MERCHANT_SECRET') || PAYHERE_MERCHANT_SECRET === '') {
+    if ($bookingId < 1) {
         return '';
     }
 

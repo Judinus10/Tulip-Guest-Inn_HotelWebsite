@@ -28,6 +28,7 @@ export type CheckoutSession = {
 
 export type PublicFeatures = {
   online_payment_enabled: boolean;
+  pay_on_arrival_enabled: boolean;
   calendar_sync_enabled: boolean;
 };
 

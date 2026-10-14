@@ -12,16 +12,11 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../payment-settings/_helpers.php';
 require_once __DIR__ . '/../bookings/booking-expiry-helper.php';
 require_once __DIR__ . '/../bookings/booking-audit-helper.php';
 require_once __DIR__ . '/../invoices/invoice-helper.php';
 require_once __DIR__ . '/../mail/email-helper.php';
-
-if (!ONLINE_PAYMENT_ENABLED) {
-    http_response_code(503);
-    header('Content-Type: text/plain; charset=utf-8');
-    exit('Online payment is temporarily unavailable');
-}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -70,14 +65,14 @@ if ($merchantId === '' || $orderId === '' || $payhereAmountRaw === '' || $payher
     notify_text_response(400, 'Missing required PayHere fields');
 }
 
-if (PAYHERE_MERCHANT_ID === '' || PAYHERE_MERCHANT_SECRET === '') {
+if (payment_runtime()['merchant_id'] === '' || payment_runtime()['merchant_secret'] === '') {
     error_log('PayHere notify rejected: backend PayHere credentials are missing.');
     notify_text_response(500, 'Payment gateway is not configured');
 }
 
-$localHash = generate_payhere_notify_hash($merchantId, $orderId, $payhereAmount, $payhereCurrency, $statusCode, PAYHERE_MERCHANT_SECRET);
+$localHash = generate_payhere_notify_hash($merchantId, $orderId, $payhereAmount, $payhereCurrency, $statusCode, payment_runtime()['merchant_secret']);
 
-if (!hash_equals((string) PAYHERE_MERCHANT_ID, $merchantId) || !hash_equals($localHash, $md5sig)) {
+if (!hash_equals((string) payment_runtime()['merchant_id'], $merchantId) || !hash_equals($localHash, $md5sig)) {
     error_log('PayHere notify rejected: invalid merchant/signature for order ' . $orderId);
     notify_text_response(403, 'Invalid PayHere signature');
 }

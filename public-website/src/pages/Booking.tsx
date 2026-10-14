@@ -72,6 +72,7 @@ export default function Booking() {
   const [submitError, setSubmitError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [onlinePaymentEnabled, setOnlinePaymentEnabled] = useState(false);
+  const [arrivalEnabled, setArrivalEnabled] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -79,17 +80,17 @@ export default function Booking() {
       .then((features) => {
         if (!mounted) return;
         setOnlinePaymentEnabled(Boolean(features.online_payment_enabled));
-        if (!features.online_payment_enabled) {
-          setForm((current) => ({ ...current, paymentMethod: 'Cash' }));
-        }
+        setArrivalEnabled(Boolean(features.pay_on_arrival_enabled));
+        setForm((current) => ({ ...current, paymentMethod: features.pay_on_arrival_enabled ? 'Cash' : 'PayHere' }));
       })
       .catch(() => {
-        if (mounted) setOnlinePaymentEnabled(false);
+        if (mounted) { setOnlinePaymentEnabled(false); setArrivalEnabled(false); }
       });
     return () => { mounted = false; };
   }, []);
 
   const selectPaymentMethod = (method: 'Cash' | 'PayHere') => {
+    if (method === 'Cash' && !arrivalEnabled) { toast.warning('Pay on Arrival is unavailable.'); return; }
     if (method === 'PayHere' && !onlinePaymentEnabled) {
       setForm((current) => ({ ...current, paymentMethod: 'Cash' }));
       toast.warning('Online payment is not available at the moment. Please use Pay on Arrival.');
@@ -195,6 +196,7 @@ export default function Booking() {
       return;
     }
 
+    if (form.paymentMethod === 'Cash' && !arrivalEnabled) { toast.warning('Pay on Arrival is unavailable.'); return; }
     if (form.paymentMethod === 'PayHere' && !onlinePaymentEnabled) {
       selectPaymentMethod('PayHere');
       return;
@@ -385,7 +387,7 @@ export default function Booking() {
                   <div className="bg-white border border-border p-8">
                     <h3 className="font-serif text-2xl font-light text-dark mb-5">Payment Method</h3>
                     <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm text-dark">
-                      <label className="flex cursor-pointer items-center gap-3">
+                      {arrivalEnabled && <label className="flex cursor-pointer items-center gap-3">
                         <input
                           type="radio"
                           name="paymentMethod"
@@ -395,8 +397,8 @@ export default function Booking() {
                           className="h-4 w-4 accent-gold"
                         />
                         <span>Pay on Arrival</span>
-                      </label>
-                      <label className="flex cursor-pointer items-center gap-3">
+                      </label>}
+                      {onlinePaymentEnabled && <label className="flex cursor-pointer items-center gap-3">
                         <input
                           type="radio"
                           name="paymentMethod"
@@ -406,8 +408,9 @@ export default function Booking() {
                           className="h-4 w-4 accent-gold"
                         />
                         <span>Pay Online</span>
-                      </label>
+                      </label>}
                     </div>
+                    {!arrivalEnabled && !onlinePaymentEnabled && <p className="mt-3 text-sm text-red-600">Booking is temporarily unavailable. Please contact the property.</p>}
                     <p className="mt-3 text-[10px] leading-relaxed text-gray-400">
                       {form.paymentMethod === 'Cash'
                         ? 'Booking request submitted successfully. A confirmation email will be sent to your email address shortly'
@@ -568,7 +571,7 @@ export default function Booking() {
                   </div>
                 )}
 
-                <button type="submit" className="btn-primary w-full justify-center py-4 text-xs" disabled={isSubmitting}>
+                <button type="submit" className="btn-primary w-full justify-center py-4 text-xs" disabled={(!arrivalEnabled && !onlinePaymentEnabled) || isSubmitting}>
                   {isSubmitting
                     ? form.paymentMethod === 'Cash' ? 'Submitting Booking...' : 'Preparing Payment...'
                     : form.paymentMethod === 'Cash' ? 'Submit Booking' : 'Continue to Payment'}
@@ -630,7 +633,6 @@ export default function Booking() {
                     </div>
                   </div>
 
-
                   {/* Why Book Direct */}
                   <div className="bg-deep-green p-7">
                     <p className="text-[9px] tracking-[0.25em] uppercase text-gold font-medium mb-4">
@@ -640,6 +642,7 @@ export default function Booking() {
                       {[
                         'Best rate guaranteed',
                         'No booking fees',
+                        'Free cancellation',
                         'Personalised service',
                         'Secure online payment',
                       ].map((b) => (

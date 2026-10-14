@@ -9,6 +9,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../payment-settings/_helpers.php';
 require_once __DIR__ . '/../security/public-token-helper.php';
 require_once __DIR__ . '/invoice-helper.php';
 
@@ -33,7 +34,7 @@ if ($bookingId < 1) {
 
 function invoice_download_token(int $bookingId): string
 {
-    return hash_hmac('sha256', (string) $bookingId, PAYHERE_MERCHANT_SECRET);
+    return hash_hmac('sha256', (string) $bookingId, payment_runtime()['merchant_secret']);
 }
 
 $hasGuestToken = $token !== '' && verify_public_token($token, 'invoice-download', ['booking_id' => $bookingId]);

@@ -227,10 +227,6 @@ if (APP_ENV === 'production') {
         'DB_PASS' => DB_PASS,
         'PUBLIC_TOKEN_SECRET' => PUBLIC_TOKEN_SECRET,
     ];
-    if (ONLINE_PAYMENT_ENABLED) {
-        $requiredProductionValues['PAYHERE_MERCHANT_ID'] = PAYHERE_MERCHANT_ID;
-        $requiredProductionValues['PAYHERE_MERCHANT_SECRET'] = PAYHERE_MERCHANT_SECRET;
-    }
     foreach ($requiredProductionValues as $key => $value) {
         if (trim((string) $value) === '') {
             http_response_code(500);

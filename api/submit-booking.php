@@ -7,6 +7,7 @@ declare(strict_types=1);
 ob_start();
 
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/payment-settings/_helpers.php';
 require_once __DIR__ . '/mail/email-helper.php';
 require_once __DIR__ . '/bookings/booking-expiry-helper.php';
 require_once __DIR__ . '/bookings/booking-audit-helper.php';
@@ -40,13 +41,16 @@ $paymentMethod = strtolower(clean_string($data['payment_method'] ?? 'Cash', 30))
 $isOnlinePayment = in_array($paymentMethod, ['payhere', 'online', 'pay online'], true);
 $isCashPayment = in_array($paymentMethod, ['cash', 'pay on arrival'], true);
 
+if ($isCashPayment && !payment_runtime()['pay_on_arrival']) {
+    json_response(false, 'Pay on Arrival is currently unavailable. Please choose an available payment method.', 422, ['error_code' => 'PAY_ON_ARRIVAL_DISABLED']);
+}
 if (!$isCashPayment && !$isOnlinePayment) {
     json_response(false, 'Please select a valid payment method.', 422, ['error_code' => 'INVALID_PAYMENT_METHOD']);
 }
 
 // Keep the PayHere flow intact for future use, but do not create a booking when
 // online payment is intentionally disabled in the environment.
-if ($isOnlinePayment && !ONLINE_PAYMENT_ENABLED) {
+if ($isOnlinePayment && !payment_runtime()['payhere_enabled']) {
     json_response(false, 'Online payment is not available at the moment. Please use Pay on Arrival.', 200, [
         'severity' => 'warning',
         'error_code' => 'ONLINE_PAYMENT_DISABLED',

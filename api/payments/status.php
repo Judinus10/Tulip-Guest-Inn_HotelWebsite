@@ -7,6 +7,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../payment-settings/_helpers.php';
 require_once __DIR__ . '/../invoices/invoice-helper.php';
 require_once __DIR__ . '/../bookings/booking-expiry-helper.php';
 require_once __DIR__ . '/../bookings/booking-audit-helper.php';
@@ -137,7 +138,7 @@ try {
         'amount' => $amountForToken,
     ]);
     if (!$validToken && legacy_public_tokens_allowed()) {
-        $legacyToken = hash_hmac('sha256', $orderId . '|' . $bookingId . '|' . $amountForToken, PAYHERE_MERCHANT_SECRET);
+        $legacyToken = hash_hmac('sha256', $orderId . '|' . $bookingId . '|' . $amountForToken, payment_runtime()['merchant_secret']);
         $validToken = hash_equals($legacyToken, $token);
     }
     if (!$validToken) {
