@@ -8,6 +8,31 @@ function ics_enabled(): bool
     return filter_var(jebal_env_value('ICS_SYNC_ENABLED', false), FILTER_VALIDATE_BOOLEAN);
 }
 
+/** Master switch controls new imports only. Existing imported reservations stay active. */
+function ics_master_sync_enabled(?PDO $pdo = null): bool
+{
+    if (!ics_enabled()) return false;
+    try {
+        $pdo ??= get_db_connection();
+        ics_master_settings_table($pdo);
+        $stmt = $pdo->query('SELECT sync_enabled FROM hotel_calendar_sync_settings WHERE id = 1');
+        return (bool) $stmt->fetchColumn();
+    } catch (Throwable $e) {
+        error_log('Calendar master settings unavailable: ' . $e->getMessage());
+        return false; // Fail closed: never run imports if configuration cannot be read.
+    }
+}
+
+function ics_master_settings_table(PDO $pdo): void
+{
+    $pdo->exec("CREATE TABLE IF NOT EXISTS hotel_calendar_sync_settings (
+        id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+        sync_enabled TINYINT(1) NOT NULL DEFAULT 0,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $pdo->exec('INSERT IGNORE INTO hotel_calendar_sync_settings (id, sync_enabled) VALUES (1, 0)');
+}
+
 function ics_timezone(): DateTimeZone
 {
     try {
@@ -19,16 +44,23 @@ function ics_timezone(): DateTimeZone
 
 function ics_connections(): array
 {
-    if (!ics_enabled()) return [];
-    $pdo = get_db_connection();
-    $column = $pdo->query("SHOW COLUMNS FROM rooms LIKE 'booking_ical_url'")->fetch();
-    if (!$column) return [];
-    $rows = $pdo->query("SELECT id AS room_id, booking_ical_url AS import_url FROM rooms WHERE booking_ical_url IS NOT NULL AND booking_ical_url <> ''")->fetchAll(PDO::FETCH_ASSOC);
-    return array_map(static fn(array $row): array => [
-        'room_id' => (int) $row['room_id'],
-        'import_url' => (string) $row['import_url'],
-        'enabled' => true,
-    ], $rows);
+    if (!ics_enabled()) {
+        return [];
+    }
+
+    $raw = jebal_env_value('ICS_ROOM_MAPPINGS_JSON', '[]');
+    $rows = is_array($raw) ? $raw : json_decode((string) $raw, true);
+    if (!is_array($rows)) {
+        return [];
+    }
+
+    return array_values(array_filter($rows, static function ($row): bool {
+        return is_array($row)
+            && !empty($row['enabled'])
+            && (int) ($row['room_id'] ?? 0) > 0
+            && trim((string) ($row['import_url'] ?? '')) !== ''
+            && trim((string) ($row['export_token'] ?? '')) !== '';
+    }));
 }
 
 function ensure_ics_schema(PDO $pdo): void
@@ -254,7 +286,7 @@ function fetch_ics(string $url): string
 
 function sync_ics_room(PDO $pdo, array $map): array
 {
-    if (!ics_enabled()) {
+    if (!ics_master_sync_enabled($pdo)) {
         return [
             'room_id' => (int) ($map['room_id'] ?? 0),
             'success' => false,

@@ -3,6 +3,7 @@ import {
   BedDouble,
   CalendarCheck,
   CalendarDays,
+  RefreshCw,
   CreditCard,
   Images,
   Tag,
@@ -52,6 +53,7 @@ export const navigation = [
       { name: 'Website Settings', href: '/website-settings', icon: Globe },
       { name: 'Mail Integrations', href: '/mail-settings', icon: Mail },
       { name: 'Payment Management', href: '/payment-management', icon: CreditCard },
+      { name: 'Calendar Sync', href: '/calendar-sync', icon: RefreshCw },
       { name: 'Admin Password', href: '/admin-password', icon: KeyRound },
     ],
   },
@@ -71,6 +73,7 @@ export const pageTitles = {
   '/admin-password': 'Admin Password',
   '/mail-settings': 'Mail & Business Integrations',
   '/payment-management': 'Payment Management',
+  '/calendar-sync': 'Calendar Sync',
   '/notifications': 'Notifications',
 }
 
@@ -88,5 +91,6 @@ export const pageDescriptions = {
   '/admin-password': 'Change the dashboard administrator password.',
   '/mail-settings': 'Manage mail providers, sender accounts, routing and business links.',
   '/payment-management': 'Manage booking payment options and PayHere credentials.',
+  '/calendar-sync': 'Enable, pause, and manually run Booking.com synchronization for all rooms.',
   '/notifications': 'View booking, payment, and system notifications.',
 }

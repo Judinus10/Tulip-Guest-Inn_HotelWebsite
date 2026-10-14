@@ -16,6 +16,7 @@ import Experience from '@/pages/Experience'
 import AdminPassword from '@/pages/AdminPassword'
 import MailSettings from '@/pages/MailSettings'
 import PaymentManagement from '@/pages/PaymentManagement'
+import CalendarSync from '@/pages/CalendarSync'
 
 function PublicWebsiteRedirect() {
   window.location.replace(`${window.location.origin}/`)
@@ -44,6 +45,7 @@ export default function App() {
           <Route path="/admin-password" element={<AdminPassword />} />
           <Route path="/mail-settings" element={<MailSettings />} />
           <Route path="/payment-management" element={<PaymentManagement />} />
+          <Route path="/calendar-sync" element={<CalendarSync />} />
         </Route>
       </Route>
 
