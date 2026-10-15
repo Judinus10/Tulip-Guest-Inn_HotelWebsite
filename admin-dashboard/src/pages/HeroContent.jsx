@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react'
+import defaultHero01 from '@/assets/hero-default/home-hero-01.jpg'
+import defaultHero02 from '@/assets/hero-default/home-hero-02.jpg'
+import defaultHero03 from '@/assets/hero-default/home-hero-03.jpg'
 import { ArrowDown, ArrowLeft, ArrowUp, CheckCircle2, Film, ImagePlus, Images, Loader2, Save, Trash2, UploadCloud, Eye, RotateCcw, Send } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { PageHeader, SectionCard } from '@/components/ui/page-header'
@@ -6,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
 
 const base = buildApiUrl('/settings')
+const defaultHeroImages = [defaultHero01, defaultHero02, defaultHero03]
 const empty = { mode: 'images', images: [], video: '', poster: '' }
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
 
@@ -18,6 +22,11 @@ export default function HeroContent({ embedded = false }) {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [preview, setPreview] = useState('draft')
+  const [fallbackIndex, setFallbackIndex] = useState(0)
+  useEffect(() => {
+    const timer = window.setInterval(() => setFallbackIndex(i => (i + 1) % defaultHeroImages.length), 5200)
+    return () => window.clearInterval(timer)
+  }, [])
   const dirty = !same(draft, saved)
 
   async function refresh() {
@@ -86,6 +95,7 @@ export default function HeroContent({ embedded = false }) {
   }
 
   const shown = preview === 'draft' ? draft : published
+  const usingDefaultImages = !(shown.mode === 'video' && shown.video) && !shown.images?.length
   const mediaPicker = (kind, label, poster = false, replaceIndex = -1) => (
     <label className={`inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium text-text-primary transition hover:border-blue-300 hover:bg-blue-50 ${busy ? 'pointer-events-none opacity-50' : ''}`}>
       <UploadCloud className="h-4 w-4" /> {label}
@@ -145,6 +155,13 @@ export default function HeroContent({ embedded = false }) {
               {mediaPicker('image', 'Choose Image')}
             </div>}
           </div>
+          {draft.images.length === 0 && <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+            <p className="text-sm font-semibold text-text-primary">Current public website slideshow (default)</p>
+            <p className="mt-1 text-xs text-text-secondary">These three images are bundled with the public website and are shown until you publish replacement images. Upload your new images above to create a draft; the defaults remain live until publishing.</p>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {defaultHeroImages.map((url, index) => <div key={url} className="overflow-hidden rounded-lg border border-border bg-white"><img src={url} alt={`Current website hero image ${index + 1}`} className="h-32 w-full object-cover" /><div className="px-3 py-2 text-xs font-medium text-text-secondary">Default image {index + 1}</div></div>)}
+            </div>
+          </div>}
           <p className="text-xs text-text-secondary">The original homepage slideshow remains the fallback until you publish replacement images.</p>
         </div> : <div className="grid gap-5 lg:grid-cols-2">
           <div className="space-y-3">
@@ -171,7 +188,7 @@ export default function HeroContent({ embedded = false }) {
           </div>
         </div>
         <div className="relative h-64 overflow-hidden rounded-xl bg-slate-900 sm:h-80">
-          {shown.mode === 'video' && shown.video ? <video key={shown.video} src={shown.video} poster={shown.poster || undefined} muted loop autoPlay playsInline preload="metadata" className="absolute inset-0 h-full w-full object-cover" /> : shown.images?.[0] ? <img src={shown.images[0]} alt="Homepage hero preview" className="absolute inset-0 h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-sm text-white/80">Default homepage hero images will be used.</div>}
+          {shown.mode === 'video' && shown.video ? <video key={shown.video} src={shown.video} poster={shown.poster || undefined} muted loop autoPlay playsInline preload="metadata" className="absolute inset-0 h-full w-full object-cover" /> : shown.images?.[0] ? <img src={shown.images[0]} alt="Homepage hero preview" className="absolute inset-0 h-full w-full object-cover" /> : <img src={defaultHeroImages[fallbackIndex]} alt="Current public website homepage hero" className="absolute inset-0 h-full w-full object-cover" />}
           <div className="pointer-events-none absolute inset-0 bg-black/35" />
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-4 text-center text-white">
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-amber-200">Point Pedro · Northern Sri Lanka</p>
@@ -179,7 +196,7 @@ export default function HeroContent({ embedded = false }) {
             <p className="mt-2 font-serif text-2xl italic text-amber-200 sm:text-4xl">Point Pedro</p>
           </div>
         </div>
-        <p className="mt-3 text-xs text-text-secondary">Preview approximates the homepage hero. The public website's existing typography and buttons are unchanged.</p>
+        <p className="mt-3 text-xs text-text-secondary">{usingDefaultImages ? "Showing the three original public website hero images (rotating preview). " : ""}Preview approximates the homepage hero. The public website's existing typography and buttons are unchanged.</p>
       </SectionCard>
 
       <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm shadow-slate-200/60 sm:flex-row sm:items-center sm:justify-between">
