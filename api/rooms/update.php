@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/_room_helpers.php';
+require_once __DIR__ . '/../calendar/url-guard.php';
 apply_cors_headers();
 require_admin_auth();
 try {
@@ -21,9 +22,9 @@ try {
         if (!$parts || strtolower((string) ($parts['scheme'] ?? '')) !== 'https' || !in_array($host, ['ical.booking.com', 'admin.booking.com'], true)) {
             json_response(false, 'Enter a valid Booking.com iCal export URL.', 422);
         }
-        $duplicate = $pdo->prepare('SELECT id FROM rooms WHERE booking_ical_url = :url AND id <> :id LIMIT 1');
-        $duplicate->execute([':url' => $calendarUrl, ':id' => $id]);
-        if ($duplicate->fetchColumn()) json_response(false, 'This iCal URL is already assigned to another room.', 422);
+        if (tulip_ics_duplicate_room($pdo, $calendarUrl, $id) !== null) {
+            json_response(false, 'This Booking.com calendar URL is already assigned to another room.', 422);
+        }
     }
     $roomName = clean_string($data['room_name'] ?? '', 150);
     if ($roomName === '') json_response(false, 'Room name is required.', 422);

@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/run-all.php';
+require_once __DIR__ . '/url-guard.php';
 apply_cors_headers();
 $admin = require_admin_auth();
 if (strtolower((string)($admin['role'] ?? '')) !== 'super_admin') json_response(false, 'Owner access required.', 403);
@@ -44,9 +45,8 @@ try {
         $room->execute([$roomId]);
         if (!$room->fetchColumn()) json_response(false, 'Room not found.', 404);
         if ($url !== '') {
-            $duplicate = $pdo->prepare('SELECT id FROM rooms WHERE booking_ical_url = ? AND id <> ? LIMIT 1');
-            $duplicate->execute([$url, $roomId]);
-            if ($duplicate->fetchColumn()) json_response(false, 'Calendar URL already belongs to another room.', 422);
+            $duplicateRoom = tulip_ics_duplicate_room($pdo, $url, (int)$roomId);
+            if ($duplicateRoom !== null) json_response(false, 'This Booking.com calendar URL is already assigned to another room.', 422);
         }
         $stmt = $pdo->prepare('UPDATE rooms SET booking_ical_url = ? WHERE id = ?');
         $stmt->execute([$url !== '' ? $url : null, $roomId]);
