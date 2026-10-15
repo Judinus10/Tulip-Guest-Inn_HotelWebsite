@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CreditCard, Wallet, ShieldCheck, Save, AlertTriangle, ChevronDown, LockKeyhole, CheckCircle2, CircleHelp, Loader2, RotateCcw, Info, ExternalLink, Check, X } from 'lucide-react'
+import { CreditCard, Wallet, ShieldCheck, Save, AlertTriangle, LockKeyhole, CheckCircle2, Loader2, RotateCcw, ExternalLink, Check, X } from 'lucide-react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
@@ -22,7 +22,6 @@ export default function PaymentManagement() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
-  const [detailsOpen, setDetailsOpen] = useState(false)
   const [savedSettings, setSavedSettings] = useState(initial)
   const [noticeVisible, setNoticeVisible] = useState(true)
   const update = (key, value) => setSettings(current => ({ ...current, [key]: value }))
@@ -98,14 +97,17 @@ export default function PaymentManagement() {
         </div>
         <aside className="space-y-4">
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h3 className="mb-4 flex items-center gap-2 text-base font-bold text-slate-900"><CreditCard className="h-5 w-5 text-blue-600" /> Payment Status</h3><div className="space-y-2">{[['Pay on Arrival',settings.pay_on_arrival],['Pay Online (PayHere)',settings.payhere_enabled]].map(([label,enabled]) => <div key={label} className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 px-3 py-3 text-sm"><span className="font-medium text-slate-700">{label}</span>{status(enabled)}</div>)}</div><p className="mt-3 text-xs text-slate-400">Statuses shown reflect unsaved changes until you save.</p></section>
-          <section className="flex gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm"><Info className="h-5 w-5 shrink-0 text-blue-600" /><div><h3 className="font-semibold text-blue-900">Before accepting online payments</h3><p className="mt-1 leading-6 text-blue-800">Enter valid credentials and complete a successful sandbox payment.</p></div></section>
-          <section className="rounded-2xl border border-slate-200 bg-white p-4"><button type="button" onClick={() => setDetailsOpen(v => !v)} aria-expanded={detailsOpen} className="flex w-full items-center justify-between gap-2 text-left text-sm font-semibold text-slate-800"><span className="flex items-center gap-2"><CircleHelp className="h-5 w-5 text-blue-600" /> Security & Help</span><ChevronDown className={`h-4 w-4 transition-transform ${detailsOpen ? 'rotate-180' : ''}`} /></button>{detailsOpen && <div className="mt-3 space-y-2 border-t border-slate-100 pt-3 text-xs leading-5 text-slate-600"><p>Credentials are sent only to the authenticated PHP backend and encrypted at rest.</p><p>Keep the server encryption key safe and protect your administrator account.</p></div>}</section>
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <label htmlFor="payment-admin-password" className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900"><LockKeyhole className="h-5 w-5 text-blue-600" /> Confirm Admin Password</label>
+            <p className="mb-3 text-xs leading-5 text-slate-500">Enter your admin password to securely save payment settings.</p>
+            <input id="payment-admin-password" type="password" required autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter admin password" className={field} />
+          </section>
         </aside>
       </div>
       {bothDisabled && <p className="flex items-center gap-2 text-sm text-red-600"><AlertTriangle className="h-4 w-4" /> At least one payment method must remain enabled.</p>}
       <div className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:px-6">
         <button type="button" onClick={reset} disabled={saving} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-50"><RotateCcw className="h-4 w-4" /> Reset Changes</button>
-        <div className="flex flex-wrap items-end gap-3"><label className="space-y-1 text-xs font-medium text-slate-600">Admin password (required to save)<input type="password" required autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Confirm your password" className={`${field} min-w-[210px]`} /></label><Button type="submit" disabled={saving || bothDisabled || missingCredentials}><Save className="h-4 w-4" /> {saving ? 'Saving...' : 'Save Settings'}</Button></div>
+        <Button type="submit" disabled={saving || bothDisabled || missingCredentials}><Save className="h-4 w-4" /> {saving ? 'Saving...' : 'Save Settings'}</Button>
       </div>
     </form>}
   </div>
