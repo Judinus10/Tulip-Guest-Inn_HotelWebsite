@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CreditCard, Wallet, ShieldCheck, Save, AlertTriangle, ChevronDown, LockKeyhole, CheckCircle2, CircleHelp, Loader2 } from 'lucide-react'
+import { CreditCard, Wallet, ShieldCheck, Save, AlertTriangle, ChevronDown, LockKeyhole, CheckCircle2, CircleHelp, Loader2, RotateCcw, Info, ExternalLink, Check, X } from 'lucide-react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
@@ -23,11 +23,13 @@ export default function PaymentManagement() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [savedSettings, setSavedSettings] = useState(initial)
+  const [noticeVisible, setNoticeVisible] = useState(true)
   const update = (key, value) => setSettings(current => ({ ...current, [key]: value }))
 
   useEffect(() => {
     let active = true
-    apiFetch(endpoint).then(readJsonResponse).then(result => { if (active) setSettings({ ...initial, ...result.data }) })
+    apiFetch(endpoint).then(readJsonResponse).then(result => { if (active) { const next = { ...initial, ...result.data }; setSettings(next); setSavedSettings(next) } })
       .catch(e => { if (active) setError(e.message) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
@@ -46,75 +48,65 @@ export default function PaymentManagement() {
     try {
       const response = await apiFetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...settings, merchant_secret: secret, admin_password: password }) })
       const result = await readJsonResponse(response)
-      setSettings({ ...initial, ...result.data }); setSecret(''); setPassword('')
+      setSettings({ ...initial, ...result.data }); setSavedSettings({ ...initial, ...result.data }); setSecret(''); setPassword('')
       setMessage('Payment settings saved. New public bookings will use the selected payment methods.')
     } catch (e) { setError(e.message || 'Unable to save payment settings.') }
     finally { setSaving(false) }
   }
 
-  return <div className="mx-auto max-w-5xl space-y-6 pb-12">
-    <PageHeader title="Payment Management" description="Choose how guests pay and manage your online payment gateway." />
+  const reset = () => { setSettings({ ...savedSettings }); setSecret(''); setPassword(''); setError(''); setMessage('') }
+  const status = (enabled) => <span className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{enabled ? 'Enabled' : 'Disabled'}</span>
 
-    <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-      <p><strong>Payment configuration.</strong> Changes apply to new bookings after saving. Complete a sandbox transaction before enabling live payments.</p>
+  return <div className="mx-auto max-w-[1450px] space-y-5 pb-12">
+    <div className="flex flex-wrap items-start justify-between gap-3 px-1">
+      <PageHeader title="Payment Management" description="Manage how guests pay and configure your online payment gateway." />
+      <a href="https://sandbox.payhere.lk/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"><ExternalLink className="h-4 w-4" /> Open PayHere Sandbox</a>
     </div>
-    {error && <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-    {message && <div role="status" className="flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><CheckCircle2 className="h-4 w-4 shrink-0" />{message}</div>}
-
-    {loading ? <div className="flex items-center justify-center gap-3 rounded-2xl border border-border bg-white p-14 text-sm text-text-secondary"><Loader2 className="h-5 w-5 animate-spin" />Loading payment settings...</div> : <form onSubmit={save} className="space-y-6">
-      <section className="rounded-2xl border border-border bg-white p-5 shadow-sm sm:p-7">
-        <div className="mb-6 flex items-start gap-3">
-          <div className="rounded-xl bg-blue-50 p-3 text-blue-600"><CreditCard className="h-5 w-5" /></div>
-          <div><h2 className="text-lg font-semibold text-text-primary">Accepted payment methods</h2><p className="mt-1 text-sm text-text-secondary">Enable one or both options. At least one must always be available.</p></div>
-        </div>
-
-        <div className="space-y-3">
-          <div className={`rounded-2xl border p-4 transition-colors sm:p-5 ${settings.pay_on_arrival ? 'border-blue-200 bg-blue-50/40' : 'border-border bg-white'}`}>
-            <div className="flex items-center gap-4">
-              <div className="rounded-xl bg-white p-3 text-slate-700 shadow-sm"><Wallet className="h-5 w-5" /></div>
-              <div className="min-w-0 flex-1"><h3 className="font-semibold text-text-primary">Pay on Arrival</h3><p className="mt-1 text-xs leading-5 text-text-secondary sm:text-sm">Guests reserve now and pay directly at the property.</p></div>
-              <div className="flex shrink-0 flex-col items-end gap-1"><Toggle checked={settings.pay_on_arrival} onChange={value => { setError(''); update('pay_on_arrival', value) }} label="Enable Pay on Arrival" /><span className="text-xs text-text-secondary">{settings.pay_on_arrival ? 'Enabled' : 'Disabled'}</span></div>
+    {noticeVisible && <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900"><AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" /><div className="flex-1"><strong>Payment configuration</strong><span className="ml-2">Saved settings apply to new bookings. Test PayHere in Sandbox before accepting live payments.</span></div><button type="button" onClick={() => setNoticeVisible(false)} aria-label="Dismiss notice"><X className="h-4 w-4" /></button></div>}
+    {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
+    {message && <div role="status" className="flex gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"><CheckCircle2 className="h-4 w-4" />{message}</div>}
+    {loading ? <div className="flex items-center justify-center gap-3 rounded-2xl bg-white p-14"><Loader2 className="h-5 w-5 animate-spin" /> Loading payment settings...</div> : <form onSubmit={save} className="space-y-4">
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="space-y-5">
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex items-start gap-4">
+              <div className="rounded-2xl bg-blue-50 p-3.5 text-blue-600"><Wallet className="h-7 w-7" /></div>
+              <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-bold text-slate-900">Pay on Arrival</h2><span className="rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">Recommended</span></div><p className="mt-1 text-sm text-slate-500">Guests reserve now and pay directly at the property.</p></div>
+              <div className="flex flex-col items-end gap-2"><Toggle checked={settings.pay_on_arrival} onChange={value => { setError(''); update('pay_on_arrival', value) }} label="Enable Pay on Arrival" /><span className="text-xs text-slate-400">{settings.pay_on_arrival ? 'Accept on-arrival payments' : 'Currently unavailable'}</span></div>
             </div>
-          </div>
-
-          <div className={`overflow-hidden rounded-2xl border transition-colors ${settings.payhere_enabled ? 'border-blue-300 bg-blue-50/40' : 'border-border bg-white'}`}>
-            <div className="flex items-center gap-4 p-4 sm:p-5">
-              <div className="rounded-xl bg-white p-3 text-blue-600 shadow-sm"><CreditCard className="h-5 w-5" /></div>
-              <div className="min-w-0 flex-1"><h3 className="font-semibold text-text-primary">Pay Online <span className="ml-1 text-xs font-normal text-text-secondary">via PayHere</span></h3><p className="mt-1 text-xs leading-5 text-text-secondary sm:text-sm">Accept secure online payments at checkout.</p></div>
-              <div className="flex shrink-0 flex-col items-end gap-1"><Toggle checked={settings.payhere_enabled} onChange={value => { setError(''); update('payhere_enabled', value) }} label="Enable PayHere online payments" /><span className="text-xs text-text-secondary">{settings.payhere_enabled ? 'Enabled' : 'Disabled'}</span></div>
+            {settings.pay_on_arrival && <div className="mt-5 space-y-2 rounded-xl bg-blue-50/70 p-4 text-sm text-slate-700">{['Guests can book without online payment','Booking payment status remains Pending until collected','No payment gateway credentials required'].map(item => <div key={item} className="flex items-center gap-2.5"><CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />{item}</div>)}</div>}
+          </section>
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex items-start gap-4 p-5 sm:p-6">
+              <div className="rounded-2xl bg-pink-50 p-3.5 text-pink-600"><CreditCard className="h-7 w-7" /></div>
+              <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-bold text-slate-900">Pay Online</h2><span className="rounded-lg bg-blue-50 px-2.5 py-1 text-sm text-blue-600">via <strong>PayHere</strong></span></div><p className="mt-1 text-sm text-slate-500">Accept secure online payments at checkout.</p></div>
+              <div className="flex flex-col items-end gap-2"><Toggle checked={settings.payhere_enabled} onChange={value => { setError(''); update('payhere_enabled', value) }} label="Enable PayHere online payments" /><span className="text-xs text-slate-400">{settings.payhere_enabled ? 'Online payments enabled' : 'Enable to configure gateway'}</span></div>
             </div>
-
-            {settings.payhere_enabled && <div className="border-t border-blue-200 bg-white px-4 py-5 sm:px-6 sm:py-6">
-              <div className="mb-5 flex items-start justify-between gap-3">
-                <div className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-5 w-5 text-blue-600" /><div><h4 className="font-semibold text-text-primary">Gateway credentials</h4><p className="mt-1 text-xs leading-5 text-text-secondary">Stored securely on the server. Existing secrets are never displayed.</p></div></div>
-                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${settings.secret_configured ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{settings.secret_configured ? 'Secret saved' : 'Setup required'}</span>
+            {settings.payhere_enabled && <div className="mx-5 mb-5 rounded-2xl border border-blue-100 bg-slate-50/70 p-4 sm:mx-6 sm:p-5">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2 font-semibold text-slate-900"><LockKeyhole className="h-5 w-5 text-blue-600" /> PayHere Credentials</div>{status(settings.secret_configured)}</div>
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_230px]">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="space-y-1.5 text-xs font-medium text-slate-600">Merchant ID<input className={field} value={settings.merchant_id || ''} maxLength={100} onChange={e => update('merchant_id', e.target.value)} placeholder="Your merchant ID" autoComplete="off" /></label>
+                  <label className="space-y-1.5 text-xs font-medium text-slate-600">Environment<select className={field} value={settings.environment} onChange={e => update('environment', e.target.value)}><option value="sandbox">Sandbox (Testing)</option><option value="live">Live (Production)</option></select></label>
+                  <label className="space-y-1.5 text-xs font-medium text-slate-600 sm:col-span-2">Merchant Secret<input className={field} type="password" autoComplete="new-password" value={secret} onChange={e => setSecret(e.target.value)} placeholder={settings.secret_configured ? 'Saved securely — enter only to replace' : 'Enter PayHere Merchant Secret'} /><span className="block text-xs font-normal text-slate-500">{settings.secret_configured ? 'Existing secret is hidden. Leave blank to keep it.' : 'Required to enable PayHere.'}</span></label>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3"><p className="mb-3 text-xs font-semibold text-slate-700">Payment gateway</p><div className="rounded-lg bg-blue-50 px-3 py-2 text-center font-bold text-blue-700">PayHere</div><a href="https://www.payhere.lk/" target="_blank" rel="noopener noreferrer" className="mt-4 flex items-center gap-2 text-xs font-semibold text-blue-600"><ExternalLink className="h-4 w-4" /> PayHere website</a><p className="mt-2 text-xs leading-5 text-slate-500">Configure credentials from your PayHere merchant account.</p></div>
               </div>
-              <div className="grid gap-5 sm:grid-cols-2">
-                <label className="space-y-2 text-sm font-medium text-text-primary"><span className="block">Environment</span><select className={field} value={settings.environment} onChange={e => update('environment', e.target.value)}><option value="sandbox">Sandbox — Testing</option><option value="live">Live — Real payments</option></select></label>
-                <label className="space-y-2 text-sm font-medium text-text-primary"><span className="block">Merchant ID</span><input className={field} value={settings.merchant_id || ''} maxLength={100} onChange={e => update('merchant_id', e.target.value)} placeholder="Enter PayHere Merchant ID" autoComplete="off" /></label>
-                <label className="space-y-2 text-sm font-medium text-text-primary sm:col-span-2"><span className="flex items-center justify-between gap-2">Merchant Secret <span className="text-xs font-normal text-text-secondary">{settings.secret_configured ? 'Leave blank to keep existing' : 'Required for setup'}</span></span><input className={field} type="password" autoComplete="new-password" value={secret} onChange={e => setSecret(e.target.value)} placeholder={settings.secret_configured ? 'Enter a new secret only to replace it' : 'Enter your PayHere Merchant Secret'} /></label>
-              </div>
-              <div className="mt-5 flex items-start gap-2 rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-600"><LockKeyhole className="mt-0.5 h-4 w-4 shrink-0" /><span>Saved secrets cannot be viewed. This version uses one credential set; changing Sandbox/Live does not automatically switch to separate credentials.</span></div>
+              <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-slate-500"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" /> Merchant Secrets are stored encrypted on the server and never returned to the browser. Sandbox and Live share one saved credential set in the current backend.</p>
             </div>}
-          </div>
+          </section>
         </div>
-        {bothDisabled && <p className="mt-4 flex items-center gap-2 text-sm text-red-600"><AlertTriangle className="h-4 w-4" />Enable at least one payment method to save.</p>}
-      </section>
-
-      <section className="rounded-2xl border border-border bg-white shadow-sm">
-        <button type="button" className="flex w-full items-center justify-between gap-4 p-5 text-left sm:px-7" onClick={() => setDetailsOpen(v => !v)} aria-expanded={detailsOpen}>
-          <span className="flex items-center gap-3"><span className="rounded-xl bg-slate-100 p-2.5 text-slate-600"><CircleHelp className="h-5 w-5" /></span><span><span className="block font-semibold text-text-primary">Security & setup information</span><span className="mt-1 block text-xs text-text-secondary">How your payment credentials are protected</span></span></span>
-          <ChevronDown className={`h-5 w-5 text-text-secondary transition-transform ${detailsOpen ? 'rotate-180' : ''}`} />
-        </button>
-        {detailsOpen && <div className="border-t border-border px-5 py-5 text-sm leading-7 text-text-secondary sm:px-7"><p>PayHere credentials are submitted only to the authenticated backend. Merchant Secrets are encrypted before database storage and are never returned in API responses.</p><p className="mt-2">A server-side encryption key must be configured before saving secrets. Protect the admin account and do not share credentials by email or chat.</p></div>}
-      </section>
-
-      <section className="rounded-2xl border border-border bg-white p-5 shadow-sm sm:p-7">
-        <div className="mb-5 flex items-start gap-3"><div className="rounded-xl bg-slate-100 p-3 text-slate-700"><LockKeyhole className="h-5 w-5" /></div><div><h2 className="text-base font-semibold text-text-primary">Confirm changes</h2><p className="mt-1 text-sm text-text-secondary">For security, enter your admin password before saving.</p></div></div>
-        <label className="block max-w-md space-y-2 text-sm font-medium text-text-primary"><span className="block">Admin password</span><input required type="password" autoComplete="current-password" className={field} value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your current password" /></label>
-        <div className="mt-6 flex justify-end border-t border-border pt-5"><Button type="submit" disabled={saving || bothDisabled || missingCredentials}><Save className="h-4 w-4" />{saving ? 'Saving changes...' : 'Save Changes'}</Button></div>
-      </section>
+        <aside className="space-y-4">
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h3 className="mb-4 flex items-center gap-2 text-base font-bold text-slate-900"><CreditCard className="h-5 w-5 text-blue-600" /> Payment Status</h3><div className="space-y-2">{[['Pay on Arrival',settings.pay_on_arrival],['Pay Online (PayHere)',settings.payhere_enabled]].map(([label,enabled]) => <div key={label} className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 px-3 py-3 text-sm"><span className="font-medium text-slate-700">{label}</span>{status(enabled)}</div>)}</div><p className="mt-3 text-xs text-slate-400">Statuses shown reflect unsaved changes until you save.</p></section>
+          <section className="flex gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm"><Info className="h-5 w-5 shrink-0 text-blue-600" /><div><h3 className="font-semibold text-blue-900">Before accepting online payments</h3><p className="mt-1 leading-6 text-blue-800">Enter valid credentials and complete a successful sandbox payment.</p></div></section>
+          <section className="rounded-2xl border border-slate-200 bg-white p-4"><button type="button" onClick={() => setDetailsOpen(v => !v)} aria-expanded={detailsOpen} className="flex w-full items-center justify-between gap-2 text-left text-sm font-semibold text-slate-800"><span className="flex items-center gap-2"><CircleHelp className="h-5 w-5 text-blue-600" /> Security & Help</span><ChevronDown className={`h-4 w-4 transition-transform ${detailsOpen ? 'rotate-180' : ''}`} /></button>{detailsOpen && <div className="mt-3 space-y-2 border-t border-slate-100 pt-3 text-xs leading-5 text-slate-600"><p>Credentials are sent only to the authenticated PHP backend and encrypted at rest.</p><p>Keep the server encryption key safe and protect your administrator account.</p></div>}</section>
+        </aside>
+      </div>
+      {bothDisabled && <p className="flex items-center gap-2 text-sm text-red-600"><AlertTriangle className="h-4 w-4" /> At least one payment method must remain enabled.</p>}
+      <div className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:px-6">
+        <button type="button" onClick={reset} disabled={saving} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-50"><RotateCcw className="h-4 w-4" /> Reset Changes</button>
+        <div className="flex flex-wrap items-end gap-3"><label className="space-y-1 text-xs font-medium text-slate-600">Admin password (required to save)<input type="password" required autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Confirm your password" className={`${field} min-w-[210px]`} /></label><Button type="submit" disabled={saving || bothDisabled || missingCredentials}><Save className="h-4 w-4" /> {saving ? 'Saving...' : 'Save Settings'}</Button></div>
+      </div>
     </form>}
   </div>
 }
