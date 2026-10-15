@@ -8,6 +8,7 @@ import {
 import { cn } from '@/lib/utils'
 import { navigation } from '@/config/navigation'
 import { Button } from '@/components/ui/button'
+import tulipLogo from '@/assets/logo2.png'
 
 function NavItem({ item, collapsed, onNavigate }) {
   return (
@@ -95,8 +96,8 @@ export function Sidebar({
           )}
         >
           <div className={cn('flex items-center gap-3', collapsed && 'justify-center')}>
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 shadow-sm shadow-blue-950/30 ring-1 ring-white/10">
-              <span className="text-sm font-bold text-white">JH</span>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-white/10">
+              <img src={tulipLogo} alt="Tulip Guest Inn logo" className="h-full w-full object-contain" />
             </div>
 
             {!collapsed && (

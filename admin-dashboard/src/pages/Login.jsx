@@ -6,7 +6,7 @@ import { Input, Label } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuth } from '@/context/AuthContext'
 import { useToastState } from '@/context/ToastContext'
-import logo from '@/assets/logo.jpeg'
+import logo from '@/assets/logo2.png'
 import companyLogo from '@/assets/company_logo.png'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
