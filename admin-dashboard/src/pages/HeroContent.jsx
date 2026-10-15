@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import defaultHero01 from '@/assets/hero-default/home-hero-01.jpg'
 import defaultHero02 from '@/assets/hero-default/home-hero-02.jpg'
 import defaultHero03 from '@/assets/hero-default/home-hero-03.jpg'
-import { ArrowDown, ArrowLeft, ArrowUp, CheckCircle2, Film, ImagePlus, Images, Loader2, Save, Trash2, UploadCloud, Eye, RotateCcw, Send } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowUp, CheckCircle2, X, Film, ImagePlus, Images, Loader2, Save, Trash2, UploadCloud, Eye, RotateCcw, Send } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { PageHeader, SectionCard } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,12 @@ import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
 const base = buildApiUrl('/settings')
 const defaultHeroImages = [defaultHero01, defaultHero02, defaultHero03]
 const empty = { source: 'default', mode: 'images', images: [], video: '', poster: '' }
-const normalized = (hero) => ({ ...empty, ...(hero || {}), source: hero?.source || ((hero?.images?.length || hero?.video) ? 'custom' : 'default') })
+const normalized = (hero) => {
+  const value = { ...empty, ...(hero || {}) }
+  const hasMedia = value.mode === 'video' ? Boolean(value.video) : Boolean(value.images?.length)
+  const source = hero?.source || (hasMedia ? 'custom' : 'default')
+  return { ...value, source: source === 'custom' && hasMedia ? 'custom' : 'default' }
+}
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
 
 export default function HeroContent({ embedded = false }) {
@@ -20,8 +25,13 @@ export default function HeroContent({ embedded = false }) {
   const [published, setPublished] = useState(empty)
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [message, setMessage] = useState('')
-  const [error, setError] = useState('')
+  const [toast, setToast] = useState(null)
+  const notify = (type, text) => setToast({ type, text, id: Date.now() })
+  useEffect(() => {
+    if (!toast) return
+    const timer = window.setTimeout(() => setToast(null), 4500)
+    return () => window.clearTimeout(timer)
+  }, [toast])
   const [preview, setPreview] = useState('draft')
   const [fallbackIndex, setFallbackIndex] = useState(0)
   useEffect(() => {
@@ -43,7 +53,7 @@ export default function HeroContent({ embedded = false }) {
     let active = true
     async function load() {
       try { if (active) await refresh() }
-      catch (e) { if (active) setError(e.message || 'Could not load hero settings.') }
+      catch (e) { if (active) notify('error', e.message || 'Could not load hero settings.') }
       finally { if (active) setLoading(false) }
     }
     load()
@@ -51,7 +61,7 @@ export default function HeroContent({ embedded = false }) {
   }, [])
 
   async function action(kind) {
-    setBusy(true); setMessage(''); setError('')
+    setBusy(true); setToast(null)
     try {
       const response = await apiFetch(`${base}/hero-content.php`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -59,14 +69,14 @@ export default function HeroContent({ embedded = false }) {
       })
       await readJsonResponse(response)
       await refresh()
-      setMessage(kind === 'publish' ? 'Saved draft published to the website.' : kind === 'draft' ? 'Draft saved successfully.' : 'Draft discarded.')
-    } catch (e) { setError(e.message || 'Unable to update hero.') }
+      notify('success', kind === 'publish' ? 'Saved draft published to the website.' : kind === 'draft' ? 'Draft saved successfully.' : 'Draft discarded.')
+    } catch (e) { notify('error', e.message || 'Unable to update hero.') }
     finally { setBusy(false) }
   }
 
   async function upload(file, kind, poster = false, replaceIndex = -1) {
     if (!file) return
-    setBusy(true); setMessage(''); setError('')
+    setBusy(true); setToast(null)
     try {
       const data = new FormData()
       data.append('file', file)
@@ -80,8 +90,8 @@ export default function HeroContent({ embedded = false }) {
         if (replaceIndex >= 0) return { ...prev, images: prev.images.map((old, i) => i === replaceIndex ? url : old) }
         return { ...prev, images: [...prev.images, url].slice(0, 3) }
       })
-      setMessage('Media uploaded. Save the draft to keep your changes.')
-    } catch (e) { setError(e.message || 'Upload failed.') }
+      notify('success', 'Media uploaded. Save the draft to keep your changes.')
+    } catch (e) { notify('error', e.message || 'Upload failed.') }
     finally { setBusy(false) }
   }
 
@@ -96,7 +106,6 @@ export default function HeroContent({ embedded = false }) {
   }
 
   const shown = preview === 'draft' ? draft : published
-  const usingDefaultImages = shown.source === 'default' || (!(shown.mode === 'video' && shown.video) && !shown.images?.length)
   const mediaPicker = (kind, label, poster = false, replaceIndex = -1) => (
     <label className={`inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium text-text-primary transition hover:border-blue-300 hover:bg-blue-50 ${busy ? 'pointer-events-none opacity-50' : ''}`}>
       <UploadCloud className="h-4 w-4" /> {label}
@@ -109,17 +118,19 @@ export default function HeroContent({ embedded = false }) {
       <Link to="/website-settings" className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium text-text-secondary hover:bg-slate-50"><ArrowLeft className="h-4 w-4" /> Website Settings</Link>
     </PageHeader>)}
 
-    {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
-    {message && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700"><CheckCircle2 className="h-4 w-4" />{message}</div>}
+    {toast && <div key={toast.id} role={toast.type === 'error' ? 'alert' : 'status'} className={`fixed right-5 top-5 z-[9999] flex w-[min(24rem,calc(100vw-2.5rem))] items-start gap-3 rounded-xl border bg-white p-4 shadow-xl ${toast.type === 'error' ? 'border-red-200 text-red-700' : 'border-emerald-200 text-emerald-700'}`}>
+      <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" /><span className="flex-1 text-sm">{toast.text}</span><button type="button" aria-label="Dismiss notification" onClick={() => setToast(null)}><X className="h-4 w-4" /></button>
+    </div>}
 
     {loading ? <SectionCard><div className="flex items-center gap-2 text-sm text-text-secondary"><Loader2 className="h-4 w-4 animate-spin" /> Loading hero content...</div></SectionCard> : <>
       <SectionCard>
         <h2 className="text-lg font-semibold text-text-primary">Homepage Banner Source</h2>
         <p className="mt-1 mb-4 text-sm text-text-secondary">Select the original protected images or your uploaded media. Changing the source never deletes uploads.</p>
+        <p className="mb-3 text-sm text-text-secondary">Currently published: <span className="font-semibold text-text-primary">{published.source === 'custom' ? 'Custom Media' : 'Default Images'}</span>{draft.source !== published.source && <span className="ml-2 text-amber-700">· Unpublished selection: {draft.source === 'custom' ? 'Custom Media' : 'Default Images'}</span>}</p>
         <div className="grid gap-3 sm:grid-cols-2">
-          {[{value:'default', title:'Use Default Images', detail:'Three original website banners, protected from editing.'}, {value:'custom', title:'Use Custom Media', detail:'Display your own uploaded images or video.'}].map(option => <button key={option.value} type="button" onClick={() => setDraft(prev => ({...prev, source:option.value}))} className={`rounded-xl border p-4 text-left ${draft.source === option.value ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-400' : 'border-border bg-white'}`}><span className="font-semibold text-text-primary">{option.title}</span><p className="mt-1 text-xs text-text-secondary">{option.detail}</p></button>)}
+          {[{value:'default', title:'Use Default Images', detail:'Three original website banners, protected from editing.'}, {value:'custom', title:'Use Custom Media', detail:'Display your own uploaded images or video.'}].map(option => <button key={option.value} type="button" onClick={() => setDraft(prev => ({...prev, source:option.value}))} className={`rounded-xl border p-4 text-left ${draft.source === option.value ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-400' : 'border-border bg-white'}`}><span className="font-semibold text-text-primary">{option.title}</span>{published.source === option.value && <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Currently live</span>}<p className="mt-1 text-xs text-text-secondary">{option.detail}</p></button>)}
         </div>
-        {draft.source === 'default' && <div className="mt-4 grid grid-cols-3 gap-3">{defaultHeroImages.map((url,i) => <div key={url} className="overflow-hidden rounded-lg border border-border"><img src={url} alt={`Protected default banner ${i+1}`} className="h-24 w-full object-cover"/><p className="p-2 text-xs text-text-secondary">Default {i+1} · Protected</p></div>)}</div>}
+
       </SectionCard>
       {draft.source === 'custom' && <SectionCard>
         <div className="mb-6 flex items-start gap-3">
@@ -164,13 +175,6 @@ export default function HeroContent({ embedded = false }) {
               {mediaPicker('image', 'Choose Image')}
             </div>}
           </div>
-          {draft.images.length === 0 && <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
-            <p className="text-sm font-semibold text-text-primary">Current public website slideshow (default)</p>
-            <p className="mt-1 text-xs text-text-secondary">These three images are bundled with the public website and are shown until you publish replacement images. Upload your new images above to create a draft; the defaults remain live until publishing.</p>
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {defaultHeroImages.map((url, index) => <div key={url} className="overflow-hidden rounded-lg border border-border bg-white"><img src={url} alt={`Current website hero image ${index + 1}`} className="h-32 w-full object-cover" /><div className="px-3 py-2 text-xs font-medium text-text-secondary">Default image {index + 1}</div></div>)}
-            </div>
-          </div>}
           <p className="text-xs text-text-secondary">The original homepage slideshow remains the fallback until you publish replacement images.</p>
         </div> : <div className="grid gap-5 lg:grid-cols-2">
           <div className="space-y-3">
@@ -188,15 +192,15 @@ export default function HeroContent({ embedded = false }) {
         </div>}
       </SectionCard>}
 
-      <SectionCard>
+      {draft.source === 'custom' && <SectionCard>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div><h2 className="text-lg font-semibold text-text-primary">Hero Preview</h2><p className="mt-1 text-sm text-text-secondary">Review the background before publishing. Visitors will not see drafts.</p></div>
+          <div><h2 className="text-lg font-semibold text-text-primary">Custom Hero Preview</h2><p className="mt-1 text-sm text-text-secondary">Review the background before publishing. Visitors will not see drafts.</p></div>
           <div className="inline-flex rounded-lg border border-border bg-slate-50 p-1">
             <button type="button" onClick={() => setPreview('draft')} className={`rounded-md px-3 py-1.5 text-sm font-medium ${preview === 'draft' ? 'bg-white text-blue-700 shadow-sm' : 'text-text-secondary'}`}>Draft</button>
             <button type="button" onClick={() => setPreview('published')} className={`rounded-md px-3 py-1.5 text-sm font-medium ${preview === 'published' ? 'bg-white text-blue-700 shadow-sm' : 'text-text-secondary'}`}>Published</button>
           </div>
         </div>
-        <div className="relative h-64 overflow-hidden rounded-xl bg-slate-900 sm:h-80">
+        {shown.source === 'default' ? <div className="rounded-xl border border-border bg-slate-50 p-6 text-sm text-text-secondary">The published homepage currently uses the protected default images. Select Draft to preview your custom media.</div> : <div className="relative h-64 overflow-hidden rounded-xl bg-slate-900 sm:h-80">
           {shown.source !== 'default' && shown.mode === 'video' && shown.video ? <video key={shown.video} src={shown.video} poster={shown.poster || undefined} muted loop autoPlay playsInline preload="metadata" className="absolute inset-0 h-full w-full object-cover" /> : shown.source !== 'default' && shown.images?.[0] ? <img src={shown.images[0]} alt="Homepage hero preview" className="absolute inset-0 h-full w-full object-cover" /> : <img src={defaultHeroImages[fallbackIndex]} alt="Current public website homepage hero" className="absolute inset-0 h-full w-full object-cover" />}
           <div className="pointer-events-none absolute inset-0 bg-black/35" />
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-4 text-center text-white">
@@ -204,9 +208,9 @@ export default function HeroContent({ embedded = false }) {
             <p className="font-serif text-3xl sm:text-5xl">Guest House & Rooms</p>
             <p className="mt-2 font-serif text-2xl italic text-amber-200 sm:text-4xl">Point Pedro</p>
           </div>
-        </div>
-        <p className="mt-3 text-xs text-text-secondary">{usingDefaultImages ? "Showing the three original public website hero images (rotating preview). " : ""}Preview approximates the homepage hero. The public website's existing typography and buttons are unchanged.</p>
-      </SectionCard>
+        </div>}
+        <p className="mt-3 text-xs text-text-secondary">Preview approximates the homepage hero. The public website's existing typography and buttons are unchanged.</p>
+      </SectionCard>}
 
       <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm shadow-slate-200/60 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-text-secondary">{dirty ? 'You have unsaved changes.' : 'All current edits are saved as a draft.'}</p>
