@@ -33,11 +33,6 @@ export default function HeroContent({ embedded = false }) {
     return () => window.clearTimeout(timer)
   }, [toast])
   const [preview, setPreview] = useState('draft')
-  const [fallbackIndex, setFallbackIndex] = useState(0)
-  useEffect(() => {
-    const timer = window.setInterval(() => setFallbackIndex(i => (i + 1) % defaultHeroImages.length), 5200)
-    return () => window.clearInterval(timer)
-  }, [])
   const dirty = !same(draft, saved)
 
   async function refresh() {
@@ -106,6 +101,13 @@ export default function HeroContent({ embedded = false }) {
   }
 
   const shown = preview === 'draft' ? draft : published
+  const previewImages = shown.source === 'default' ? defaultHeroImages : shown.images
+  const previewHasMedia = shown.source === 'default' || (shown.mode === 'video' ? Boolean(shown.video) : shown.images.length > 0)
+  const [previewImageIndex, setPreviewImageIndex] = useState(0)
+  useEffect(() => {
+    const timer = window.setInterval(() => setPreviewImageIndex(i => i + 1), 5200)
+    return () => window.clearInterval(timer)
+  }, [])
   const mediaPicker = (kind, label, poster = false, replaceIndex = -1) => (
     <label className={`inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-medium text-text-primary transition hover:border-blue-300 hover:bg-blue-50 ${busy ? 'pointer-events-none opacity-50' : ''}`}>
       <UploadCloud className="h-4 w-4" /> {label}
@@ -126,11 +128,19 @@ export default function HeroContent({ embedded = false }) {
       <SectionCard>
         <h2 className="text-lg font-semibold text-text-primary">Homepage Banner Source</h2>
         <p className="mt-1 mb-4 text-sm text-text-secondary">Select the original protected images or your uploaded media. Changing the source never deletes uploads.</p>
-        <p className="mb-3 text-sm text-text-secondary">Currently published: <span className="font-semibold text-text-primary">{published.source === 'custom' ? 'Custom Media' : 'Default Images'}</span>{draft.source !== published.source && <span className="ml-2 text-amber-700">· Unpublished selection: {draft.source === 'custom' ? 'Custom Media' : 'Default Images'}</span>}</p>
         <div className="grid gap-3 sm:grid-cols-2">
           {[{value:'default', title:'Use Default Images', detail:'Three original website banners, protected from editing.'}, {value:'custom', title:'Use Custom Media', detail:'Display your own uploaded images or video.'}].map(option => <button key={option.value} type="button" onClick={() => setDraft(prev => ({...prev, source:option.value}))} className={`rounded-xl border p-4 text-left ${draft.source === option.value ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-400' : 'border-border bg-white'}`}><span className="font-semibold text-text-primary">{option.title}</span>{published.source === option.value && <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Currently live</span>}<p className="mt-1 text-xs text-text-secondary">{option.detail}</p></button>)}
         </div>
-
+        {draft.source === 'default' && (
+          <div className="mt-4 grid gap-3 sm:grid-cols-3" aria-label="Protected default homepage images">
+            {defaultHeroImages.map((image, index) => (
+              <div key={image} className="overflow-hidden rounded-xl border border-border bg-white">
+                <img src={image} alt={`Default homepage banner ${index + 1}`} className="h-32 w-full object-cover sm:h-36" />
+                <div className="px-3 py-2 text-xs font-medium text-text-secondary">Default {index + 1} · Protected</div>
+              </div>
+            ))}
+          </div>
+        )}
       </SectionCard>
       {draft.source === 'custom' && <SectionCard>
         <div className="mb-6 flex items-start gap-3">
@@ -194,22 +204,37 @@ export default function HeroContent({ embedded = false }) {
 
       {draft.source === 'custom' && <SectionCard>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div><h2 className="text-lg font-semibold text-text-primary">Custom Hero Preview</h2><p className="mt-1 text-sm text-text-secondary">Review the background before publishing. Visitors will not see drafts.</p></div>
-          <div className="inline-flex rounded-lg border border-border bg-slate-50 p-1">
-            <button type="button" onClick={() => setPreview('draft')} className={`rounded-md px-3 py-1.5 text-sm font-medium ${preview === 'draft' ? 'bg-white text-blue-700 shadow-sm' : 'text-text-secondary'}`}>Draft</button>
-            <button type="button" onClick={() => setPreview('published')} className={`rounded-md px-3 py-1.5 text-sm font-medium ${preview === 'published' ? 'bg-white text-blue-700 shadow-sm' : 'text-text-secondary'}`}>Published</button>
+          <div>
+            <h2 className="text-lg font-semibold text-text-primary">Custom Hero Preview</h2>
+            <p className="mt-1 text-sm text-text-secondary">Preview your uploaded media before publishing it.</p>
+          </div>
+          <div className="flex rounded-lg border border-border bg-slate-50 p-1" role="group" aria-label="Preview version">
+            {['draft', 'published'].map(value => <button key={value} type="button" onClick={() => setPreview(value)} className={`rounded-md px-3 py-1.5 text-sm font-medium ${preview === value ? 'bg-white text-blue-700 shadow-sm' : 'text-text-secondary'}`}>{value === 'draft' ? 'Draft' : 'Published'}</button>)}
           </div>
         </div>
-        {shown.source === 'default' ? <div className="rounded-xl border border-border bg-slate-50 p-6 text-sm text-text-secondary">The published homepage currently uses the protected default images. Select Draft to preview your custom media.</div> : <div className="relative h-64 overflow-hidden rounded-xl bg-slate-900 sm:h-80">
-          {shown.source !== 'default' && shown.mode === 'video' && shown.video ? <video key={shown.video} src={shown.video} poster={shown.poster || undefined} muted loop autoPlay playsInline preload="metadata" className="absolute inset-0 h-full w-full object-cover" /> : shown.source !== 'default' && shown.images?.[0] ? <img src={shown.images[0]} alt="Homepage hero preview" className="absolute inset-0 h-full w-full object-cover" /> : <img src={defaultHeroImages[fallbackIndex]} alt="Current public website homepage hero" className="absolute inset-0 h-full w-full object-cover" />}
-          <div className="pointer-events-none absolute inset-0 bg-black/35" />
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-4 text-center text-white">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-amber-200">Point Pedro · Northern Sri Lanka</p>
-            <p className="font-serif text-3xl sm:text-5xl">Guest House & Rooms</p>
-            <p className="mt-2 font-serif text-2xl italic text-amber-200 sm:text-4xl">Point Pedro</p>
+        {previewHasMedia ? (
+          <div className="relative flex aspect-[16/8] min-h-[320px] items-center justify-center overflow-hidden rounded-xl bg-slate-950 sm:min-h-[400px]">
+            {shown.source === 'custom' && shown.mode === 'video' ? (
+              <video key={shown.video} src={shown.video} poster={shown.poster || undefined} muted loop autoPlay playsInline className="absolute inset-0 h-full w-full object-cover" />
+            ) : previewImages.length > 0 ? (
+              <img src={previewImages[previewImageIndex % previewImages.length]} alt="Homepage hero preview" className="absolute inset-0 h-full w-full object-cover transition-opacity duration-700" />
+            ) : null}
+            <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/60" />
+            <div className="relative z-10 mx-auto max-w-4xl px-4 text-center">
+              <p className="mb-4 text-[10px] font-medium uppercase tracking-[0.4em] text-[#e7c56b]">Point Pedro — Northern Sri Lanka</p>
+              <h3 className="mb-5 font-serif text-3xl font-light leading-tight text-white drop-shadow-lg sm:text-5xl lg:text-6xl">
+                Guest House &amp; Rooms in<br /><span className="italic text-[#e7c56b]">Point Pedro</span>
+              </h3>
+              <div className="mx-auto mb-5 h-px w-16 bg-[#e7c56b]" />
+              <p className="mx-auto mb-7 max-w-lg text-sm leading-relaxed text-white/85 sm:text-base">Experience peaceful accommodation, modern comfort and genuine Sri Lankan hospitality.</p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <span className="rounded bg-[#e7c56b] px-5 py-2.5 text-sm font-semibold text-slate-950">Book Your Stay</span>
+                <span className="rounded border border-white px-5 py-2.5 text-sm font-semibold text-white">Explore Rooms</span>
+              </div>
+            </div>
           </div>
-        </div>}
-        <p className="mt-3 text-xs text-text-secondary">Preview approximates the homepage hero. The public website's existing typography and buttons are unchanged.</p>
+        ) : <div className="flex min-h-52 items-center justify-center rounded-xl border border-dashed border-border bg-slate-50 px-6 text-center text-sm text-text-secondary">Upload custom media to see its preview here.</div>}
+        {previewHasMedia && (shown.source === 'default' || shown.mode === 'images') && previewImages.length > 1 && <p className="mt-2 text-xs text-text-secondary">Preview cycles through {previewImages.length} images, as on the public homepage.</p>}
       </SectionCard>}
 
       <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm shadow-slate-200/60 sm:flex-row sm:items-center sm:justify-between">
