@@ -115,14 +115,14 @@ function pickRandomGalleryPreview(
 
 export default function Home() {
   const [heroIndex, setHeroIndex] = useState(0);
-  const [publishedHero, setPublishedHero] = useState<{mode:'images'|'video';images:string[];video:string;poster:string}|null>(null);
+  const [publishedHero, setPublishedHero] = useState<{source?:'default'|'custom';mode:'images'|'video';images:string[];video:string;poster:string}|null>(null);
   useEffect(() => {
     let active = true;
-    requestJson<{mode:'images'|'video';images:string[];video:string;poster:string}>('/settings/hero-content.php')
+    requestJson<{source?:'default'|'custom';mode:'images'|'video';images:string[];video:string;poster:string}>('/settings/hero-content.php')
       .then(data => { if(active) setPublishedHero(data); }).catch(() => {});
     return () => { active=false; };
   }, []);
-  const videoHero = publishedHero?.mode === 'video' && Boolean(publishedHero.video);
+  const videoHero = publishedHero?.source !== 'default' && publishedHero?.mode === 'video' && Boolean(publishedHero.video);
 
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [homeRooms, setHomeRooms] = useState(rooms);
@@ -145,7 +145,7 @@ export default function Home() {
     return groups;
   }, [previewImages]);
   const featuredRooms = homeRooms.filter((r) => r.featured).slice(0, 3);
-  const activeHeroImages = publishedHero?.mode === "images" && publishedHero.images?.length ? publishedHero.images : heroImages;
+  const activeHeroImages = publishedHero?.source !== "default" && publishedHero?.mode === "images" && publishedHero.images?.length ? publishedHero.images : heroImages;
 
   useEffect(() => {
     if (videoHero) return;

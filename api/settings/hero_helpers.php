@@ -9,7 +9,7 @@ function hero_read(PDO $pdo, bool $admin=false): array {
  $row=$pdo->query("SELECT published_json,draft_json FROM website_hero WHERE id=1")->fetch(PDO::FETCH_ASSOC);
  $published=json_decode($row['published_json'] ?? 'null',true);
  $draft=json_decode($row['draft_json'] ?? 'null',true);
- $empty=['mode'=>'images','images'=>[],'video'=>'','poster'=>''];
+ $empty=['source'=>'default','mode'=>'images','images'=>[],'video'=>'','poster'=>''];
  return $admin ? ['published'=>$published ?: $empty,'draft'=>$draft ?: ($published ?: $empty)] : ($published ?: $empty);
 }
 function hero_valid_media(string $url, string $type): bool {
@@ -20,12 +20,15 @@ function hero_valid_media(string $url, string $type): bool {
 function hero_validate($data): array {
  if(!is_array($data)) throw new InvalidArgumentException('Invalid hero content.');
  $mode=$data['mode']??'images';
+ $source=$data['source']??((!empty($data['images']) || !empty($data['video'])) ? 'custom' : 'default');
+ if(!in_array($source,['default','custom'],true)) throw new InvalidArgumentException('Invalid hero source.');
  $images=$data['images']??[];
  $video=(string)($data['video']??'');
  $poster=(string)($data['poster']??'');
  if(!in_array($mode,['images','video'],true) || !is_array($images) || count($images)>3) throw new InvalidArgumentException('Select up to three images or one video.');
  foreach($images as $url) if(!is_string($url)||!hero_valid_media($url,'image')) throw new InvalidArgumentException('Invalid hero image.');
  if(!hero_valid_media($video,'video')||!hero_valid_media($poster,'image')) throw new InvalidArgumentException('Invalid hero video or poster.');
- if($mode==='video' && !$video) throw new InvalidArgumentException('Upload a video before selecting video mode.');
- return ['mode'=>$mode,'images'=>array_values($images),'video'=>$video,'poster'=>$poster];
+ if($source==='custom' && $mode==='images' && count($images)===0) throw new InvalidArgumentException('Upload at least one custom image before publishing custom media.');
+ if($source==='custom' && $mode==='video' && !$video) throw new InvalidArgumentException('Upload a video before selecting video mode.');
+ return ['source'=>$source,'mode'=>$mode,'images'=>array_values($images),'video'=>$video,'poster'=>$poster];
 }
