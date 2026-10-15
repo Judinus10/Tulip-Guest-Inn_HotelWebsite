@@ -52,9 +52,21 @@ export default function CalendarSync() {
           { label: 'Sync Health', value: data.failed_rooms ? `${data.failed_rooms} failed` : data.last_sync ? 'No reported failures' : 'Not verified', sub: 'Based on latest recorded results', icon: Activity, color: 'text-rose-600 bg-rose-50' },
         ].map(item => <div key={item.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-start gap-3"><div className={`rounded-xl p-3 ${item.color}`}><item.icon className="h-6 w-6" /></div><div className="min-w-0"><p className="text-sm text-slate-500">{item.label}</p><p className="mt-1 break-words text-xl font-bold text-slate-900">{item.value}</p><p className="mt-1 text-xs text-slate-400">{item.sub}</p></div></div></div>)}
       </div>
-      <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm sm:p-7">
-        <div className="flex flex-wrap items-center gap-4"><div className="rounded-xl bg-blue-50 p-3 text-blue-600"><RefreshCw className="h-7 w-7" /></div><div className="min-w-0 flex-1"><h2 className="text-xl font-bold text-slate-900">Automatic Calendar Sync</h2><p className="mt-1 text-sm text-slate-500">One master switch controls imports for every configured room.</p></div><button type="button" role="switch" aria-label="Automatic calendar synchronization" aria-checked={!!data.enabled} disabled={busy} onClick={() => act('toggle', { enabled: !data.enabled })} className={`relative h-8 w-14 rounded-full transition-colors disabled:opacity-50 ${data.enabled ? 'bg-blue-600' : 'bg-slate-300'}`}><span className={`absolute left-1 top-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${data.enabled ? 'translate-x-6' : ''}`} /></button><span className={`rounded-full px-3 py-1 text-xs font-semibold ${data.enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{data.enabled ? 'Enabled' : 'Paused'}</span></div>
-        <div className="mt-5 flex flex-col gap-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-slate-800">Master synchronization control</p><p className="mt-1 text-sm text-slate-500">Automatic imports require a configured server cron job. Disabling imports does not remove existing reservations.</p></div><Button type="button" disabled={!data.enabled || busy || !data.configured_rooms} onClick={() => act('sync')}><RefreshCw className={`mr-2 h-4 w-4 ${busy ? 'animate-spin' : ''}`} />Sync Now</Button></div>
+      <section className="rounded-2xl border border-blue-100 bg-white px-5 py-5 shadow-sm sm:px-7">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+          <div className="flex min-w-0 flex-1 items-center gap-4">
+            <div className="shrink-0 rounded-xl bg-blue-50 p-3 text-blue-600"><RefreshCw className="h-7 w-7" /></div>
+            <div className="min-w-0">
+              <h2 className="text-xl font-bold text-slate-900">Automatic Calendar Sync</h2>
+              <p className="mt-1 text-sm text-slate-500">One master switch controls imports for every configured room. Scheduled imports require a server cron job.</p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center justify-end gap-3">
+            <button type="button" role="switch" aria-label="Automatic calendar synchronization" aria-checked={!!data.enabled} disabled={busy} onClick={() => act('toggle', { enabled: !data.enabled })} className={`relative h-8 w-14 shrink-0 rounded-full transition-colors disabled:opacity-50 ${data.enabled ? 'bg-blue-600' : 'bg-slate-300'}`}><span className={`absolute left-1 top-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${data.enabled ? 'translate-x-6' : ''}`} /></button>
+            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${data.enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{data.enabled ? 'Enabled' : 'Paused'}</span>
+            <Button type="button" disabled={!data.enabled || busy || !data.configured_rooms} onClick={() => act('sync')}><RefreshCw className={`mr-2 h-4 w-4 ${busy ? 'animate-spin' : ''}`} />Sync Now</Button>
+          </div>
+        </div>
         {!data.legacy_enabled && <p className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">Enable ICS_SYNC_ENABLED in your server configuration to permit imports.</p>}
       </section>
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"><div className="mb-5 flex items-center justify-between gap-3"><div><h2 className="text-lg font-bold text-slate-900">Room Calendar Status</h2><p className="mt-1 text-sm text-slate-500">Manage each room's Booking.com iCal URL and run individual imports.</p></div><Button variant="outline" type="button" disabled={busy} onClick={() => refresh().catch(e => setError(e.message))}><RefreshCw className="mr-2 h-4 w-4" />Refresh</Button></div>
