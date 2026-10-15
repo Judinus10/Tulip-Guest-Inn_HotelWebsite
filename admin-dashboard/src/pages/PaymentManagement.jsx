@@ -24,6 +24,11 @@ export default function PaymentManagement() {
   const [error, setError] = useState('')
   const [savedSettings, setSavedSettings] = useState(initial)
   const [noticeVisible, setNoticeVisible] = useState(true)
+  useEffect(() => {
+    if (!message && !error) return undefined
+    const timer = window.setTimeout(() => { setMessage(''); setError('') }, 4500)
+    return () => window.clearTimeout(timer)
+  }, [message, error])
   const update = (key, value) => setSettings(current => ({ ...current, [key]: value }))
 
   useEffect(() => {
@@ -62,8 +67,13 @@ export default function PaymentManagement() {
       <a href="https://sandbox.payhere.lk/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"><ExternalLink className="h-4 w-4" /> Open PayHere Sandbox</a>
     </div>
     {noticeVisible && <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900"><AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" /><div className="flex-1"><strong>Payment configuration</strong><span className="ml-2">Saved settings apply to new bookings. Test PayHere in Sandbox before accepting live payments.</span></div><button type="button" onClick={() => setNoticeVisible(false)} aria-label="Dismiss notice"><X className="h-4 w-4" /></button></div>}
-    {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
-    {message && <div role="status" className="flex gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"><CheckCircle2 className="h-4 w-4" />{message}</div>}
+    {(error || message) && <div className="fixed right-5 top-20 z-[100] w-[min(380px,calc(100vw-2rem))]" aria-live="polite">
+      <div role={error ? 'alert' : 'status'} className={`flex items-start gap-3 rounded-xl border bg-white p-4 shadow-xl ${error ? 'border-red-200 text-red-700' : 'border-emerald-200 text-emerald-700'}`}>
+        {error ? <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />}
+        <p className="min-w-0 flex-1 text-sm leading-5">{error || message}</p>
+        <button type="button" aria-label="Dismiss notification" onClick={() => { setError(''); setMessage('') }} className="rounded p-0.5 hover:bg-slate-100"><X className="h-4 w-4" /></button>
+      </div>
+    </div>}
     {loading ? <div className="flex items-center justify-center gap-3 rounded-2xl bg-white p-14"><Loader2 className="h-5 w-5 animate-spin" /> Loading payment settings...</div> : <form onSubmit={save} className="space-y-4">
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-5">
@@ -102,13 +112,13 @@ export default function PaymentManagement() {
             <p className="mb-3 text-xs leading-5 text-slate-500">Enter your admin password to securely save payment settings.</p>
             <input id="payment-admin-password" type="password" required autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter admin password" className={field} />
           </section>
+          <div className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <button type="button" onClick={reset} disabled={saving} className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-50"><RotateCcw className="h-4 w-4" /> Reset Changes</button>
+            <Button type="submit" className="w-full justify-center" disabled={saving || bothDisabled || missingCredentials || !password.trim()}><Save className="h-4 w-4" /> {saving ? 'Saving...' : 'Save Settings'}</Button>
+          </div>
         </aside>
       </div>
       {bothDisabled && <p className="flex items-center gap-2 text-sm text-red-600"><AlertTriangle className="h-4 w-4" /> At least one payment method must remain enabled.</p>}
-      <div className="flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:px-6">
-        <button type="button" onClick={reset} disabled={saving} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-50"><RotateCcw className="h-4 w-4" /> Reset Changes</button>
-        <Button type="submit" disabled={saving || bothDisabled || missingCredentials}><Save className="h-4 w-4" /> {saving ? 'Saving...' : 'Save Settings'}</Button>
-      </div>
     </form>}
   </div>
 }
