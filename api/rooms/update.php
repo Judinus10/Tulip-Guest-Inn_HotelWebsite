@@ -13,6 +13,18 @@ try {
     $data = room_input_data();
     $id = (int) ($data['id'] ?? $_GET['id'] ?? 0);
     if ($id <= 0) json_response(false, 'Room id is required.', 422);
+    // Validate calendar ownership before updating any room fields or media.
+    $calendarUrl = trim((string) ($data['booking_ical_url'] ?? ''));
+    if ($calendarUrl !== '') {
+        $parts = parse_url($calendarUrl);
+        $host = strtolower((string) ($parts['host'] ?? ''));
+        if (!$parts || strtolower((string) ($parts['scheme'] ?? '')) !== 'https' || !in_array($host, ['ical.booking.com', 'admin.booking.com'], true)) {
+            json_response(false, 'Enter a valid Booking.com iCal export URL.', 422);
+        }
+        $duplicate = $pdo->prepare('SELECT id FROM rooms WHERE booking_ical_url = :url AND id <> :id LIMIT 1');
+        $duplicate->execute([':url' => $calendarUrl, ':id' => $id]);
+        if ($duplicate->fetchColumn()) json_response(false, 'This iCal URL is already assigned to another room.', 422);
+    }
     $roomName = clean_string($data['room_name'] ?? '', 150);
     if ($roomName === '') json_response(false, 'Room name is required.', 422);
     $legacyAmenities = parse_amenities_input($data['amenities'] ?? $data['amenities_summary'] ?? '');

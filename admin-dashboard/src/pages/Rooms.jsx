@@ -436,11 +436,12 @@ function RoomActionsDropdown({ room, isOpen, onToggle, onView, onEdit, onDelete 
 
 function Toast({ toast, onClose }) {
   if (!toast) return null
+  const failed = toast.type === 'error'
 
   return (
-    <div className="fixed right-6 top-6 z-50 flex w-[calc(100%-3rem)] max-w-sm items-start gap-3 rounded-xl border border-emerald-200 bg-white p-4 text-sm shadow-xl shadow-slate-900/10 sm:w-full">
-      <div className="mt-0.5 rounded-full bg-emerald-100 p-1 text-emerald-700">
-        <Check className="h-4 w-4" />
+    <div className={`fixed right-6 top-6 z-50 flex w-[calc(100%-3rem)] max-w-sm items-start gap-3 rounded-xl border ${failed ? 'border-red-200' : 'border-emerald-200'} bg-white p-4 text-sm shadow-xl shadow-slate-900/10 sm:w-full` } role={failed ? 'alert' : 'status'}>
+      <div className={`mt-0.5 rounded-full p-1 ${failed ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+        {failed ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}
       </div>
       <div className="flex-1">
         <p className="font-semibold text-text-primary">{toast.title}</p>
@@ -462,6 +463,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
   const [deletingImageId, setDeletingImageId] = useState(null)
   const [isProcessingImages, setIsProcessingImages] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   const isEdit = mode === 'edit'
 
@@ -569,6 +571,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
     if (!form.status.trim()) nextErrors.status = 'Status is required.'
 
     setErrors(nextErrors)
+    setSubmitError('')
     if (Object.keys(nextErrors).length > 0) return
 
     setIsSubmitting(true)
@@ -582,6 +585,10 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
         video: selectedVideo,
         remove_video: removeVideo,
       })
+    } catch (error) {
+      const message = error?.message || 'Unable to save room.'
+      setSubmitError(message)
+      if (/iCal|calendar|Booking\.com/i.test(message)) setErrors(current => ({ ...current, booking_ical_url: message }))
     } finally {
       setIsSubmitting(false)
     }
@@ -603,6 +610,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
         </div>
 
         <form onSubmit={handleSubmit} className="max-h-[calc(92vh-81px)] overflow-y-auto p-6">
+          {submitError && <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{submitError}</div>}
           <div className="grid gap-5 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="room_name">Room name</Label>
@@ -944,8 +952,8 @@ export default function Rooms() {
   const [openActionsId, setOpenActionsId] = useState(null)
   const [manageAmenitiesOpen, setManageAmenitiesOpen] = useState(false)
 
-  function showToast(title, message) {
-    setToast({ title, message })
+  function showToast(title, message, type = 'success') {
+    setToast({ title, message, type })
     window.setTimeout(() => setToast(null), 2800)
   }
 
@@ -1072,7 +1080,8 @@ export default function Rooms() {
       closeFormModal()
       await loadRooms()
     } catch (error) {
-      showToast('Room save failed', error.message || 'Unable to save room.')
+      showToast('Room save failed', error.message || 'Unable to save room.', 'error')
+      throw error // Keep edit modal open and preserve entered values.
     }
   }
 
@@ -1089,7 +1098,7 @@ export default function Rooms() {
       setDeleteRoom(null)
       await loadRooms()
     } catch (error) {
-      showToast('Delete failed', error.message || 'Unable to delete room.')
+      showToast('Delete failed', error.message || 'Unable to delete room.', 'error')
     }
   }
 
