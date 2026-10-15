@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { CalendarDays, RefreshCw, Loader2, BedDouble, Clock3, Activity, MoreHorizontal, Pencil, Trash2, X, CheckCircle2, AlertCircle, Link2 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
@@ -13,6 +14,11 @@ export default function CalendarSync() {
   const [busy, setBusy] = useState(false)
   const [roomBusy, setRoomBusy] = useState(null)
   const [menu, setMenu] = useState(null)
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
+  const menuRef = useRef(null)
+  const menuButtonRef = useRef(null)
+  const [page, setPage] = useState(1)
+  const pageSize = 8
   const [editing, setEditing] = useState(null)
   const [editError, setEditError] = useState('')
   const [url, setUrl] = useState('')
@@ -44,6 +50,42 @@ export default function CalendarSync() {
     finally { setBusy(false); setRoomBusy(null) }
   }
   const rooms = data?.rooms || []
+  const totalPages = Math.max(1, Math.ceil(rooms.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const visibleRooms = rooms.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
+  useEffect(() => {
+    if (menu === null) return
+    const closeOnOutside = event => {
+      if (menuRef.current?.contains(event.target) || menuButtonRef.current?.contains(event.target)) return
+      setMenu(null)
+    }
+    const closeOnEscape = event => { if (event.key === 'Escape') setMenu(null) }
+    const closeOnScroll = () => setMenu(null)
+    document.addEventListener('pointerdown', closeOnOutside)
+    document.addEventListener('keydown', closeOnEscape)
+    window.addEventListener('scroll', closeOnScroll, true)
+    window.addEventListener('resize', closeOnScroll)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutside)
+      document.removeEventListener('keydown', closeOnEscape)
+      window.removeEventListener('scroll', closeOnScroll, true)
+      window.removeEventListener('resize', closeOnScroll)
+    }
+  }, [menu])
+  function toggleRoomMenu(event, roomId) {
+    if (menu === roomId) { setMenu(null); return }
+    const rect = event.currentTarget.getBoundingClientRect()
+    const width = 216
+    const height = 142
+    const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8))
+    const top = rect.bottom + height + 8 <= window.innerHeight ? rect.bottom + 6 : Math.max(8, rect.top - height - 6)
+    menuButtonRef.current = event.currentTarget
+    setMenuPosition({ top, left })
+    setMenu(roomId)
+  }
   return <div className="mx-auto max-w-7xl space-y-5 pb-12">
     <PageHeader title="Calendar Synchronization" description="Manage Booking.com calendar imports across all configured rooms." />
     {(error || message) && <div className="fixed right-5 top-20 z-[100] w-[min(380px,calc(100vw-40px))]" role={error ? 'alert' : 'status'}>
@@ -80,7 +122,15 @@ export default function CalendarSync() {
         {!data.legacy_enabled && <p className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">Enable ICS_SYNC_ENABLED in your server configuration to permit imports.</p>}
       </section>
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"><div className="mb-5 flex items-center justify-between gap-3"><div><h2 className="text-lg font-bold text-slate-900">Room Calendar Status</h2><p className="mt-1 text-sm text-slate-500">Manage each room's Booking.com iCal URL and run individual imports.</p></div><Button variant="outline" type="button" disabled={busy} onClick={() => refresh().catch(e => setError(e.message))}><RefreshCw className="mr-2 h-4 w-4" />Refresh</Button></div>
-        <div className="overflow-x-auto"><table className="w-full min-w-[780px] text-left text-sm"><thead className="bg-slate-50 text-slate-500"><tr>{['Room', 'iCal Calendar', 'Connection / Sync Status', 'Last Sync', 'Actions'].map(x => <th key={x} className="px-4 py-3 font-semibold">{x}</th>)}</tr></thead><tbody>{rooms.length ? rooms.map(room => <tr key={room.id} className="border-t border-slate-100"><td className="px-4 py-4 font-semibold text-slate-900">{room.room_name}</td><td className="max-w-[250px] px-4 py-4"><span className="flex items-center gap-2 text-blue-600"><Link2 className="h-4 w-4 shrink-0" /><span className="truncate">{room.booking_ical_url}</span></span></td><td className="px-4 py-4"><span className={`rounded-full px-3 py-1 text-xs font-semibold ${room.last_sync_status === 'success' ? 'bg-emerald-50 text-emerald-700' : room.last_sync_status === 'failed' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>{room.last_sync_status === 'success' ? 'Synced' : room.last_sync_status === 'failed' ? 'Failed' : 'Not verified'}</span>{room.last_sync_status === 'failed' && room.last_sync_error && <p className="mt-2 max-w-xs text-xs text-red-600">{room.last_sync_error}</p>}</td><td className="px-4 py-4 text-slate-600">{dateText(room.last_sync_completed_at)}</td><td className="relative px-4 py-4"><button type="button" aria-label={`Actions for ${room.room_name}`} className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50" onClick={() => setMenu(menu === room.id ? null : room.id)}><MoreHorizontal className="h-4 w-4" /></button>{menu === room.id && <div className="absolute right-5 top-12 z-20 w-52 rounded-xl border border-slate-200 bg-white p-1 shadow-xl"><button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left hover:bg-slate-50" onClick={() => { setEditing(room); setEditError(''); setUrl(room.booking_ical_url || ''); setMenu(null) }}><Pencil className="h-4 w-4" />Edit calendar URL</button><button disabled={!data.enabled || roomBusy !== null} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left hover:bg-slate-50 disabled:opacity-40" onClick={() => act('sync_room', { room_id: Number(room.id) }, room.id)}><RefreshCw className="h-4 w-4" />Sync this room</button><button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" onClick={() => { setMenu(null); if (window.confirm(`Remove the Booking.com calendar URL for ${room.room_name}? Existing imported reservations will remain.`)) act('update_url', { room_id: Number(room.id), url: '' }, room.id) }}><Trash2 className="h-4 w-4" />Remove calendar URL</button></div>}</td></tr>) : <tr><td colSpan="5" className="py-12 text-center text-slate-500">No calendars configured. Add an iCal URL in Rooms → Edit Room.</td></tr>}</tbody></table></div>
+        <div className="overflow-x-auto"><table className="w-full min-w-[780px] text-left text-sm"><thead className="bg-slate-50 text-slate-500"><tr>{['Room', 'iCal Calendar', 'Connection / Sync Status', 'Last Sync', 'Actions'].map(x => <th key={x} className="px-4 py-3 font-semibold">{x}</th>)}</tr></thead><tbody>{rooms.length ? visibleRooms.map(room => <tr key={room.id} className="border-t border-slate-100"><td className="px-4 py-4 font-semibold text-slate-900">{room.room_name}</td><td className="max-w-[250px] px-4 py-4"><span className="flex items-center gap-2 text-blue-600"><Link2 className="h-4 w-4 shrink-0" /><span className="truncate">{room.booking_ical_url}</span></span></td><td className="px-4 py-4"><span className={`rounded-full px-3 py-1 text-xs font-semibold ${room.last_sync_status === 'success' ? 'bg-emerald-50 text-emerald-700' : room.last_sync_status === 'failed' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>{room.last_sync_status === 'success' ? 'Synced' : room.last_sync_status === 'failed' ? 'Failed' : 'Not verified'}</span>{room.last_sync_status === 'failed' && room.last_sync_error && <p className="mt-2 max-w-xs text-xs text-red-600">{room.last_sync_error}</p>}</td><td className="px-4 py-4 text-slate-600">{dateText(room.last_sync_completed_at)}</td><td className="px-4 py-4"><button type="button" aria-label={`Actions for ${room.room_name}`} aria-haspopup="menu" aria-expanded={menu === room.id} className="rounded-lg border border-slate-200 p-2 hover:bg-slate-50" onClick={event => toggleRoomMenu(event, room.id)}><MoreHorizontal className="h-4 w-4" /></button>{menu === room.id && createPortal(<div ref={menuRef} role="menu" style={{ position: 'fixed', top: menuPosition.top, left: menuPosition.left, width: 216 }} className="z-[1000] rounded-xl border border-slate-200 bg-white p-1 shadow-xl"><button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left hover:bg-slate-50" onClick={() => { setEditing(room); setEditError(''); setUrl(room.booking_ical_url || ''); setMenu(null) }}><Pencil className="h-4 w-4" />Edit calendar URL</button><button disabled={!data.enabled || roomBusy !== null} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left hover:bg-slate-50 disabled:opacity-40" onClick={() => act('sync_room', { room_id: Number(room.id) }, room.id)}><RefreshCw className="h-4 w-4" />Sync this room</button><button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-red-600 hover:bg-red-50" onClick={() => { setMenu(null); if (window.confirm(`Remove the Booking.com calendar URL for ${room.room_name}? Existing imported reservations will remain.`)) act('update_url', { room_id: Number(room.id), url: '' }, room.id) }}><Trash2 className="h-4 w-4" />Remove calendar URL</button></div>, document.body)}</td></tr>) : <tr><td colSpan="5" className="py-12 text-center text-slate-500">No calendars configured. Add an iCal URL in Rooms → Edit Room.</td></tr>}</tbody></table></div>
+        {rooms.length > pageSize && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 text-sm">
+          <span className="text-slate-500">Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, rooms.length)} of {rooms.length} rooms</span>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" disabled={currentPage === 1} onClick={() => { setPage(p => Math.max(1, p - 1)); setMenu(null) }}>Previous</Button>
+            <span className="px-2 font-medium text-slate-700">Page {currentPage} of {totalPages}</span>
+            <Button type="button" variant="outline" disabled={currentPage === totalPages} onClick={() => { setPage(p => Math.min(totalPages, p + 1)); setMenu(null) }}>Next</Button>
+          </div>
+        </div>}
       </section>
     </>}
     {editing && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setEditing(null) }}><form className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" onSubmit={async e => { e.preventDefault(); if (await act('update_url', { room_id: Number(editing.id), url: url.trim() }, editing.id)) { setEditing(null); setEditError('') } else { setEditError('Calendar URL could not be saved. Please correct it and try again.') } }}><div className="flex items-start justify-between"><div><h3 className="text-lg font-bold text-slate-900">Edit Calendar URL</h3><p className="mt-1 text-sm text-slate-500">{editing.room_name}</p></div><button type="button" aria-label="Close" onClick={() => setEditing(null)}><X className="h-5 w-5" /></button></div>{editError && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error || editError}</div>}<label className="mt-6 block text-sm font-medium text-slate-700" htmlFor="calendar-url">Booking.com iCal export URL</label><input id="calendar-url" type="url" required value={url} onChange={e => setUrl(e.target.value)} placeholder="https://ical.booking.com/..." className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-3 text-sm outline-none focus:border-blue-500" /><p className="mt-2 text-xs text-slate-500">Only HTTPS Booking.com calendar URLs are accepted. Saving the URL does not run synchronization automatically.</p><div className="mt-6 flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancel</Button><Button type="submit" disabled={roomBusy !== null}>{roomBusy !== null ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}Save URL</Button></div></form></div>}
