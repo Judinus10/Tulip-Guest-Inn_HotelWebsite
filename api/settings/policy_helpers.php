@@ -35,8 +35,9 @@ function policy_read(PDO $pdo, bool $admin=false): array {
  // Website Settings is the single source of truth for arrival/departure times.
  require_once __DIR__.'/contact_helpers.php';
  $stay=get_contact_settings($pdo);
- $published['check_in']=($stay['check_in_mode']==='fixed' ? 'From '.($stay['check_in_time']??'13:00') : 'Available 24 hours');
- $published['check_out']='From '.($stay['check_out_from']??'06:00').' to '.($stay['check_out_until']??'12:00');
+ $custom=($stay['stay_time_mode']??'custom')==='custom';
+ $published['check_in']=$custom ? ($stay['check_in_custom']??'Available 24 hours') : ($stay['check_in_time']??'13:00');
+ $published['check_out']=$custom ? ($stay['check_out_custom']??'From 06:00 to 12:00') : ($stay['check_out_until']??'12:00');
  if(!$admin)return $published;
  return ['published'=>$published,'draft'=>array_merge(is_array($draft)?policy_normalize($draft):$published,['check_in'=>$published['check_in'],'check_out'=>$published['check_out']])];
 }

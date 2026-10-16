@@ -26,6 +26,9 @@ function default_contact_settings(): array
         'whatsapp_reservation_number' => '+94 77 123 4567',
         'email' => defined('CONTACT_FROM_EMAIL') ? (string) CONTACT_FROM_EMAIL : '',
         'check_in_mode' => '24_hours',
+        'stay_time_mode' => 'custom',
+        'check_in_custom' => 'Available 24 hours',
+        'check_out_custom' => 'From 06:00 to 12:00',
         'check_in_time' => '13:00',
         'check_out_from' => '06:00',
         'check_out_until' => '12:00',
@@ -112,6 +115,12 @@ function save_contact_settings(PDO $pdo, array $settings): array
         $cleaned[$key] = clean_string($settings[$key] ?? $defaultValue, $maxLength);
     }
 
+    if (!in_array($cleaned['stay_time_mode'], ['standard', 'custom'], true)) {
+        json_response(false, 'Choose valid stay times.', 422);
+    }
+    if ($cleaned['stay_time_mode'] === 'custom' && ($cleaned['check_in_custom'] === '' || $cleaned['check_out_custom'] === '')) {
+        json_response(false, 'Enter check-in and check-out times.', 422);
+    }
     if (!in_array($cleaned['check_in_mode'], ['24_hours', 'fixed'], true)) {
         json_response(false, 'Choose a valid check-in mode.', 422);
     }

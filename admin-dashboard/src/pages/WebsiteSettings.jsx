@@ -21,6 +21,7 @@ import {
 import { PageHeader, SectionCard } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Input, Label, Textarea } from '@/components/ui/input'
+import TimeWheelPicker from '@/components/ui/TimeWheelPicker'
 import HeroContent from '@/pages/HeroContent'
 import LegalContent from '@/pages/LegalContent'
 import WebsiteFaqs from '@/pages/WebsiteFaqs'
@@ -35,6 +36,9 @@ const defaultSettings = {
   whatsapp_reservation_number: '+94 77 123 4567',
   email: 'reservations@tulipguestinn.com',
   check_in_mode: '24_hours',
+  stay_time_mode: 'custom',
+  check_in_custom: 'Available 24 hours',
+  check_out_custom: 'From 06:00 to 12:00',
   check_in_time: '13:00',
   check_out_from: '06:00',
   check_out_until: '12:00',
@@ -369,16 +373,19 @@ export default function WebsiteSettings() {
               </div>
 
               <div className="space-y-4 border-t border-border pt-5">
-                <div><Label>Check-in & Check-out Times</Label><p className="mt-1 text-xs text-text-secondary">These times appear across the public website, including booking information and hotel policies.</p></div>
+                <Label>Check-in & Check-out Times</Label>
                 <div className="grid grid-cols-2 gap-3">
-                  {[['24_hours','Available 24 hours'],['fixed','Set check-in time']].map(([value,label]) => <button key={value} type="button" onClick={() => updateSetting('check_in_mode',value)} className={`rounded-xl border px-3 py-3 text-left text-sm font-medium ${settings.check_in_mode === value ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-border bg-white text-text-secondary'}`}>{label}</button>)}
+                  {[['standard', 'Standard Times'], ['custom', 'Custom Times']].map(([mode, title]) => <button key={mode} type="button" onClick={() => updateSetting('stay_time_mode', mode)} className={`rounded-xl border px-3 py-3 text-left text-sm font-medium ${((settings.stay_time_mode || 'custom') === mode) ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-border bg-white text-text-secondary'}`}>{title}</button>)}
                 </div>
-                {settings.check_in_mode === 'fixed' && <div className="space-y-2"><Label htmlFor="check_in_time">Check-in starts at</Label><Input id="check_in_time" type="time" value={settings.check_in_time} onChange={e => updateSetting('check_in_time',e.target.value)} required /></div>}
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2"><Label htmlFor="check_out_from">Check-out from</Label><Input id="check_out_from" type="time" value={settings.check_out_from} onChange={e => updateSetting('check_out_from',e.target.value)} required /></div>
-                  <div className="space-y-2"><Label htmlFor="check_out_until">Check-out until</Label><Input id="check_out_until" type="time" value={settings.check_out_until} onChange={e => updateSetting('check_out_until',e.target.value)} required /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  {settings.stay_time_mode === 'standard' ? <>
+                    <div className="space-y-2"><Label>Check-in</Label><TimeWheelPicker label="Check-in" value={settings.check_in_time} onChange={value => updateSetting('check_in_time', value)} /></div>
+                    <div className="space-y-2"><Label>Check-out</Label><TimeWheelPicker label="Check-out" value={settings.check_out_until} onChange={value => updateSetting('check_out_until', value)} /></div>
+                  </> : <>
+                    <div className="space-y-2"><Label htmlFor="check_in_custom">Check-in</Label><Input id="check_in_custom" value={settings.check_in_custom} onChange={event => updateSetting('check_in_custom', event.target.value)} maxLength={255} /></div>
+                    <div className="space-y-2"><Label htmlFor="check_out_custom">Check-out</Label><Input id="check_out_custom" value={settings.check_out_custom} onChange={event => updateSetting('check_out_custom', event.target.value)} maxLength={255} /></div>
+                  </>}
                 </div>
-                <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">Check-in: {settings.check_in_mode === '24_hours' ? 'Available 24 hours' : `From ${settings.check_in_time}`} · Check-out: From {settings.check_out_from} to {settings.check_out_until}</p>
               </div>
 
               <div className="space-y-3 border-t border-border pt-5">
