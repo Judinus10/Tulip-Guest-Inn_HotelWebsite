@@ -404,13 +404,33 @@ export default function WebsiteSettings() {
                   <div className="space-y-2 rounded-xl border border-border bg-slate-50 p-3">
                     {weekDays.map((day) => {
                       const hours = readWeeklySchedule(settings.business_hours_schedule)[day]
-                      return <div key={day} className="grid items-center gap-2 rounded-lg bg-white p-3 sm:grid-cols-[100px_80px_90px_1fr_1fr]">
-                        <span className="text-sm font-medium capitalize text-text-primary">{day}</span>
-                        <label className="flex items-center gap-2 text-xs text-text-secondary"><input type="checkbox" checked={hours.enabled} onChange={(event) => updateBusinessDay(day, 'enabled', event.target.checked)} /> Open</label>
-                        <label className={`flex items-center gap-2 text-xs text-text-secondary ${!hours.enabled ? 'opacity-40' : ''}`}><input type="checkbox" checked={hours.all_day} disabled={!hours.enabled} onChange={(event) => updateBusinessDay(day, 'all_day', event.target.checked)} /> 24 hrs</label>
-                        <Input type="time" value={hours.open} disabled={!hours.enabled || hours.all_day} onChange={(event) => updateBusinessDay(day, 'open', event.target.value)} aria-label={`${day} opening time`} />
-                        <Input type="time" value={hours.close} disabled={!hours.enabled || hours.all_day} onChange={(event) => updateBusinessDay(day, 'close', event.target.value)} aria-label={`${day} closing time`} />
-                      </div>
+                      return (
+                        <div key={day} className="min-w-0 rounded-lg border border-border bg-white p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                            <span className="text-sm font-medium capitalize text-text-primary">{day}</span>
+                            <div className="flex flex-wrap items-center gap-4">
+                              <label className="flex items-center gap-2 whitespace-nowrap text-xs text-text-secondary">
+                                <input type="checkbox" checked={hours.enabled} onChange={(event) => updateBusinessDay(day, 'enabled', event.target.checked)} /> Open
+                              </label>
+                              <label className={`flex items-center gap-2 whitespace-nowrap text-xs text-text-secondary ${!hours.enabled ? 'opacity-40' : ''}`}>
+                                <input type="checkbox" checked={hours.all_day} disabled={!hours.enabled} onChange={(event) => updateBusinessDay(day, 'all_day', event.target.checked)} /> 24 hrs
+                              </label>
+                            </div>
+                          </div>
+                          {hours.enabled && !hours.all_day && (
+                            <div className="mt-3 grid min-w-0 grid-cols-2 gap-3">
+                              <div className="min-w-0 space-y-1">
+                                <label className="text-xs text-text-secondary" htmlFor={`${day}-opening`}>Opening</label>
+                                <Input id={`${day}-opening`} className="w-full min-w-0" type="time" value={hours.open} onChange={(event) => updateBusinessDay(day, 'open', event.target.value)} aria-label={`${day} opening time`} />
+                              </div>
+                              <div className="min-w-0 space-y-1">
+                                <label className="text-xs text-text-secondary" htmlFor={`${day}-closing`}>Closing</label>
+                                <Input id={`${day}-closing`} className="w-full min-w-0" type="time" value={hours.close} onChange={(event) => updateBusinessDay(day, 'close', event.target.value)} aria-label={`${day} closing time`} />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
                     })}
                   </div>
                 )}
