@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom'
 import { PageHeader, SectionCard } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
+import { optimizeImage } from '@/utils/imageProcessing'
 
 const base = buildApiUrl('/settings')
 const defaultHeroImages = [defaultHero01, defaultHero02, defaultHero03]
@@ -74,7 +75,16 @@ export default function HeroContent({ embedded = false }) {
     setBusy(true); setToast(null)
     try {
       const data = new FormData()
-      data.append('file', file)
+      // Optimize slideshow images and video posters before sending them to PHP.
+      // Videos are uploaded unchanged.
+      let uploadFile = file
+      if (kind === 'image') {
+        if (file.size > 300 * 1024 * 1024) {
+          throw new Error('This image exceeds 300 MB. Please choose a smaller image.')
+        }
+        uploadFile = await optimizeImage(file, { maxDimension: 2560, quality: 0.85 })
+      }
+      data.append('file', uploadFile)
       data.append('kind', kind)
       const response = await apiFetch(`${base}/hero-upload.php`, { method: 'POST', body: data })
       const result = await readJsonResponse(response)
