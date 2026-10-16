@@ -7,8 +7,6 @@ import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
 
 const url = buildApiUrl('/settings/policies.php')
 const fields = [
-  ['check_in','Check-in','Example: Available 24 hours'],
-  ['check_out','Check-out','Example: From 06:00 to 12:00'],
   ['cancellation','Cancellation & prepayment','State the actual booking conditions; do not promise free cancellation unless offered.'],
   ['children','Children','Child age and occupancy policy'],
   ['extra_beds','Cots & extra beds','Availability and restrictions'],

@@ -2,7 +2,7 @@
 declare(strict_types=1);
 function policy_defaults(): array {
  return [
-  'check_in'=>'1:00 PM', 'check_out'=>'12:00 PM',
+  'check_in'=>'Available 24 hours', 'check_out'=>'From 06:00 to 12:00',
   'cancellation'=>'Cancellation and prepayment conditions depend on your selected room and booking terms.',
   'children'=>'Children of all ages are welcome.',
   'extra_beds'=>'Cots and extra beds are not available.',
@@ -32,6 +32,11 @@ function policy_read(PDO $pdo, bool $admin=false): array {
  $published=json_decode($row['published_json']??'null',true);
  $draft=json_decode($row['draft_json']??'null',true);
  $published=is_array($published)?policy_normalize($published):policy_defaults();
+ // Website Settings is the single source of truth for arrival/departure times.
+ require_once __DIR__.'/contact_helpers.php';
+ $stay=get_contact_settings($pdo);
+ $published['check_in']=($stay['check_in_mode']==='fixed' ? 'From '.($stay['check_in_time']??'13:00') : 'Available 24 hours');
+ $published['check_out']='From '.($stay['check_out_from']??'06:00').' to '.($stay['check_out_until']??'12:00');
  if(!$admin)return $published;
- return ['published'=>$published,'draft'=>is_array($draft)?policy_normalize($draft):$published];
+ return ['published'=>$published,'draft'=>array_merge(is_array($draft)?policy_normalize($draft):$published,['check_in'=>$published['check_in'],'check_out'=>$published['check_out']])];
 }

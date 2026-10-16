@@ -1,3 +1,4 @@
+import { useHotelPolicies } from '../hooks/useHotelPolicies';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
@@ -74,6 +75,7 @@ function bookingNumber(id?: number, canonicalBookingNumber?: string) {
 }
 
 export default function BookingBill() {
+  const stayPolicies = useHotelPolicies();
   const toast = useToast();
   const [searchParams] = useSearchParams();
   const bookingId = searchParams.get('booking_id') || '';
@@ -269,8 +271,8 @@ export default function BookingBill() {
                     <div className="mt-7 rounded-[6px] border border-[#ead6b3] bg-[#fff7e9] p-4 text-[11px] leading-relaxed text-[#405049]">
                       <p className="mb-2 font-serif text-[17px] font-semibold text-[#14251f]">Important Notes</p>
                       <ul className="space-y-1.5 pl-4">
-                        <li className="list-disc">Check-in is available from 1:00 PM.</li>
-                        <li className="list-disc">Check-out is by 12:00 PM.</li>
+                        <li className="list-disc">Check-in: {stayPolicies.check_in}.</li>
+                        <li className="list-disc">Check-out: {stayPolicies.check_out}.</li>
                         <li className="list-disc">{isCashPayment ? 'Payment will be collected at the property.' : 'Please keep your payment receipt for verification at reception.'}</li>
                         <li className="list-disc">Contact support for booking changes before arrival.</li>
                       </ul>

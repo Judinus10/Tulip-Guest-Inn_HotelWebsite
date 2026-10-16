@@ -25,6 +25,10 @@ function default_contact_settings(): array
         'reception_contact_number' => '+94 21 222 4567',
         'whatsapp_reservation_number' => '+94 77 123 4567',
         'email' => defined('CONTACT_FROM_EMAIL') ? (string) CONTACT_FROM_EMAIL : '',
+        'check_in_mode' => '24_hours',
+        'check_in_time' => '13:00',
+        'check_out_from' => '06:00',
+        'check_out_until' => '12:00',
         'business_hours' => 'Daily · 7:00 AM – 10:00 PM',
         'business_hours_mode' => '24_7',
         'business_hours_schedule' => json_encode($weeklySchedule, JSON_UNESCAPED_SLASHES),
@@ -106,6 +110,18 @@ function save_contact_settings(PDO $pdo, array $settings): array
         }
         $maxLength = in_array($key, ['map_embed_url', 'facebook_link', 'instagram_link'], true) ? 1000 : 255;
         $cleaned[$key] = clean_string($settings[$key] ?? $defaultValue, $maxLength);
+    }
+
+    if (!in_array($cleaned['check_in_mode'], ['24_hours', 'fixed'], true)) {
+        json_response(false, 'Choose a valid check-in mode.', 422);
+    }
+    foreach (['check_in_time', 'check_out_from', 'check_out_until'] as $timeKey) {
+        if (!preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $cleaned[$timeKey])) {
+            json_response(false, 'Enter a valid time for ' . str_replace('_', ' ', $timeKey) . '.', 422);
+        }
+    }
+    if ($cleaned['check_out_from'] >= $cleaned['check_out_until']) {
+        json_response(false, 'Check-out end time must be later than the start time.', 422);
     }
 
     if (!in_array($cleaned['business_hours_mode'], ['24_7', 'custom'], true)) {

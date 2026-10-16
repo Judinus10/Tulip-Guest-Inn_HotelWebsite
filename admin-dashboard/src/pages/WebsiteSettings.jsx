@@ -34,6 +34,10 @@ const defaultSettings = {
   reception_contact_number: '+94 21 222 4567',
   whatsapp_reservation_number: '+94 77 123 4567',
   email: 'reservations@tulipguestinn.com',
+  check_in_mode: '24_hours',
+  check_in_time: '13:00',
+  check_out_from: '06:00',
+  check_out_until: '12:00',
   business_hours: 'Daily · 7:00 AM – 10:00 PM',
   business_hours_mode: '24_7',
   business_hours_schedule: JSON.stringify(Object.fromEntries(
@@ -362,6 +366,19 @@ export default function WebsiteSettings() {
                     />
                   </FieldWithIcon>
                 </div>
+              </div>
+
+              <div className="space-y-4 border-t border-border pt-5">
+                <div><Label>Check-in & Check-out Times</Label><p className="mt-1 text-xs text-text-secondary">These times appear across the public website, including booking information and hotel policies.</p></div>
+                <div className="grid grid-cols-2 gap-3">
+                  {[['24_hours','Available 24 hours'],['fixed','Set check-in time']].map(([value,label]) => <button key={value} type="button" onClick={() => updateSetting('check_in_mode',value)} className={`rounded-xl border px-3 py-3 text-left text-sm font-medium ${settings.check_in_mode === value ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-border bg-white text-text-secondary'}`}>{label}</button>)}
+                </div>
+                {settings.check_in_mode === 'fixed' && <div className="space-y-2"><Label htmlFor="check_in_time">Check-in starts at</Label><Input id="check_in_time" type="time" value={settings.check_in_time} onChange={e => updateSetting('check_in_time',e.target.value)} required /></div>}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2"><Label htmlFor="check_out_from">Check-out from</Label><Input id="check_out_from" type="time" value={settings.check_out_from} onChange={e => updateSetting('check_out_from',e.target.value)} required /></div>
+                  <div className="space-y-2"><Label htmlFor="check_out_until">Check-out until</Label><Input id="check_out_until" type="time" value={settings.check_out_until} onChange={e => updateSetting('check_out_until',e.target.value)} required /></div>
+                </div>
+                <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">Check-in: {settings.check_in_mode === '24_hours' ? 'Available 24 hours' : `From ${settings.check_in_time}`} · Check-out: From {settings.check_out_from} to {settings.check_out_until}</p>
               </div>
 
               <div className="space-y-3 border-t border-border pt-5">

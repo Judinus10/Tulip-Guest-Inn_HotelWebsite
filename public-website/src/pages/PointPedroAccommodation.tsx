@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useHotelPolicies } from '../hooks/useHotelPolicies';
 import { BedDouble, Car, Clock3, MapPin, Users, Wifi } from 'lucide-react';
 import PageHero from '../components/ui/PageHero';
 import bannerRooms from '../assets/images/banners/banner-rooms.jpg';
@@ -6,7 +7,7 @@ import homeWelcome from '../assets/images/home/home-welcome-01.jpg';
 
 const facts = [
   { icon: MapPin, title: 'Point Pedro Location', text: '189 V.M. Road, Point Pedro, Northern Province, Sri Lanka.' },
-  { icon: Clock3, title: 'Stay Times', text: 'Check-in from 1:00 PM and check-out by 12:00 PM.' },
+  { icon: Clock3, title: 'Stay Times', text: '__STAY_TIMES__' },
   { icon: BedDouble, title: 'Comfortable Rooms', text: 'Clean room options for solo travellers, couples and families.' },
   { icon: Wifi, title: 'Useful Facilities', text: 'Free WiFi, air conditioning and practical guest facilities.' },
   { icon: Car, title: 'On-site Parking', text: 'Free parking is available for guests travelling by vehicle.' },
@@ -20,7 +21,7 @@ const faqs = [
   },
   {
     question: 'What are the check-in and check-out times?',
-    answer: 'Check-in is available from 1:00 PM, and check-out is by 12:00 PM.',
+    answer: '__STAY_TIMES__',
   },
   {
     question: 'Can I book a room directly?',
@@ -29,6 +30,8 @@ const faqs = [
 ];
 
 export default function PointPedroAccommodation() {
+  const policies = useHotelPolicies();
+  const stayTimes = `Check-in: ${policies.check_in}. Check-out: ${policies.check_out}.`;
   return (
     <main>
       <PageHero
@@ -51,7 +54,7 @@ export default function PointPedroAccommodation() {
             </p>
             <p className="text-gray-500 leading-relaxed mb-8">
               Choose a room that suits your stay, review the available facilities, and book directly
-              through the website. Check-in starts at 1:00 PM and check-out is by 12:00 PM.
+              through the website. {stayTimes}
             </p>
             <div className="flex flex-wrap gap-3">
               <Link to="/rooms" className="btn-primary">View Rooms</Link>
@@ -81,7 +84,7 @@ export default function PointPedroAccommodation() {
               <article key={title} className="bg-white border border-border p-7">
                 <Icon className="text-gold mb-5" size={24} aria-hidden="true" />
                 <h3 className="font-serif text-xl text-dark mb-3">{title}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{text}</p>
+                <p className="text-sm text-gray-500 leading-relaxed">{text === '__STAY_TIMES__' ? stayTimes : text}</p>
               </article>
             ))}
           </div>
@@ -96,7 +99,7 @@ export default function PointPedroAccommodation() {
             {faqs.map((faq) => (
               <details key={faq.question} className="border border-border bg-cream p-6 group">
                 <summary className="font-serif text-lg text-dark cursor-pointer">{faq.question}</summary>
-                <p className="text-sm text-gray-500 leading-relaxed mt-4">{faq.answer}</p>
+                <p className="text-sm text-gray-500 leading-relaxed mt-4">{faq.answer === '__STAY_TIMES__' ? stayTimes : faq.answer}</p>
               </details>
             ))}
           </div>

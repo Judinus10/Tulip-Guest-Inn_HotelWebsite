@@ -3,7 +3,7 @@ import { requestJson } from '../services/apiClient';
 
 export type HotelPolicies = Record<'check_in'|'check_out'|'cancellation'|'children'|'extra_beds'|'minimum_age'|'pets'|'smoking'|'payments', string>;
 export const defaultHotelPolicies: HotelPolicies = {
-  check_in:'1:00 PM', check_out:'12:00 PM',
+  check_in:'Available 24 hours', check_out:'From 06:00 to 12:00',
   cancellation:'Cancellation and prepayment conditions depend on your selected room and booking terms.',
   children:'Children of all ages are welcome.', extra_beds:'Cots and extra beds are not available.',
   minimum_age:'No minimum age restriction.', pets:'Pets are not allowed.',

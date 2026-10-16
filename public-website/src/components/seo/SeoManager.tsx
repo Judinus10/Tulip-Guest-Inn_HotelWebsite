@@ -1,3 +1,4 @@
+import { useHotelPolicies } from '../../hooks/useHotelPolicies';
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
@@ -54,7 +55,7 @@ const pages: Record<string, SeoConfig> = {
   '/accommodation-point-pedro': {
     title: 'Accommodation in Point Pedro | Tulip Guest Inn',
     description:
-      'Stay at Tulip Guest Inn for clean, comfortable rooms in Point Pedro, Northern Province, Sri Lanka. Check in from 1 PM and check out by 12 PM.',
+      'Stay at Tulip Guest Inn for clean, comfortable rooms in Point Pedro, Northern Province, Sri Lanka.',
   },
   '/about': {
     title: 'About Tulip Guest Inn | Point Pedro, Sri Lanka',
@@ -128,6 +129,7 @@ function removeJsonLd(id: string) {
 
 export default function SeoManager() {
   const { pathname } = useLocation();
+  const stayPolicies = useHotelPolicies();
 
   useEffect(() => {
     const normalizedPath = pathname !== '/' ? pathname.replace(/\/+$/, '') : '/';
@@ -187,8 +189,8 @@ export default function SeoManager() {
         addressCountry: 'LK',
       },
       hasMap: MAP_URL,
-      checkinTime: '13:00',
-      checkoutTime: '12:00',
+      ...(stayPolicies.check_in.startsWith('From ') ? { checkinTime: stayPolicies.check_in.slice(5) } : {}),
+      checkoutTime: stayPolicies.check_out.split(' to ').pop() || '12:00',
       amenityFeature: [
         { '@type': 'LocationFeatureSpecification', name: 'Free WiFi', value: true },
         { '@type': 'LocationFeatureSpecification', name: 'Free on-site parking', value: true },
@@ -236,7 +238,7 @@ export default function SeoManager() {
             name: 'What are the check-in and check-out times?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'Check-in is available from 1:00 PM, and check-out is by 12:00 PM.',
+              text: `Check-in: ${stayPolicies.check_in}. Check-out: ${stayPolicies.check_out}.`,
             },
           },
           {
@@ -252,7 +254,7 @@ export default function SeoManager() {
     } else {
       removeJsonLd('faq');
     }
-  }, [pathname]);
+  }, [pathname, stayPolicies.check_in, stayPolicies.check_out]);
 
   return null;
 }
