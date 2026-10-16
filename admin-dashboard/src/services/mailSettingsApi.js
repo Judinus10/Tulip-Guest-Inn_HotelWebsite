@@ -25,3 +25,5 @@ export const toggleMailAccount = (id, enabled) => post('toggle-account.php', { i
 export const saveMailRoutes = (routes) => post('save-routes.php', { routes })
 export const saveMailProvider = (provider) => post('save-provider.php', provider)
 export const testMailProvider = (provider, recipientEmail) => post('test-provider.php', { provider, recipient_email: recipientEmail })
+
+export const saveNotificationRouting = (mode, recipients) => post('save-notification-routing.php', { mode, recipients })

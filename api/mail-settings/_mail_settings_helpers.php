@@ -107,6 +107,18 @@ function ensure_mail_settings_tables(PDO $pdo): void
     foreach ($defaults as $key => [$recipient, $customer, $hotel]) {
         $seed->execute([':function_key' => $key, ':recipient' => $recipient, ':customer' => $customer, ':hotel' => $hotel]);
     }
+    $pdo->exec("CREATE TABLE IF NOT EXISTS mail_notification_preferences (
+        id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+        routing_mode VARCHAR(20) NOT NULL DEFAULT 'default',
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $pdo->exec("INSERT IGNORE INTO mail_notification_preferences (id, routing_mode) VALUES (1, 'default')");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS mail_notification_recipients (
+        email_address VARCHAR(190) NOT NULL,
+        function_key VARCHAR(60) NOT NULL,
+        PRIMARY KEY (email_address, function_key),
+        KEY idx_notification_function (function_key)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     $ready[$connectionId] = true;
 }
 

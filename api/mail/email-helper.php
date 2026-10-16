@@ -2069,20 +2069,36 @@ function enqueue_email(
     int $maxAttempts = 3,
     ?string $fromEmail = null,
     ?string $fromName = null,
-    ?string $availableAt = null
+    ?string $availableAt = null,
+    bool $skipNotificationRouting = false
 ): bool {
     ensure_email_queue_table($pdo);
 
     $mailFunction = mail_function_key_for_type($emailType, (string) $relatedType);
+    $isHotelNotification = str_starts_with(strtolower($emailType), 'admin_')
+        || strtolower((string) $relatedType) === 'admin_stay_reminder';
+    $extraRecipients = [];
+    if (!$skipNotificationRouting && $isHotelNotification && in_array($mailFunction, ['booking', 'payment', 'contact', 'admin_alert'], true)) {
+        try {
+            ensure_mail_settings_tables($pdo);
+            $mode = $pdo->query('SELECT routing_mode FROM mail_notification_preferences WHERE id=1')->fetchColumn();
+            if ($mode === 'custom') {
+                $query = $pdo->prepare('SELECT email_address FROM mail_notification_recipients WHERE function_key = :function_key');
+                $query->execute([':function_key' => $mailFunction]);
+                $extraRecipients = array_column($query->fetchAll(PDO::FETCH_ASSOC), 'email_address');
+            }
+        } catch (Throwable $error) {
+            error_log('Notification recipient lookup failed: ' . $error->getMessage());
+        }
+    }
     try {
         $route = mail_route($pdo, $mailFunction);
         if ($route !== null) {
-            $isHotelNotification = str_starts_with(strtolower($emailType), 'admin_')
-                || strtolower((string) $relatedType) === 'admin_stay_reminder';
+
             if (!(bool) $route['is_enabled']) return false;
             if ($isHotelNotification && !(bool) $route['send_hotel_copy']) return false;
             if (!$isHotelNotification && !(bool) $route['send_customer_copy']) return false;
-            if ($isHotelNotification && filter_var((string) ($route['hotel_recipient_email'] ?? ''), FILTER_VALIDATE_EMAIL)) {
+            if ($isHotelNotification && !$skipNotificationRouting && !$extraRecipients && filter_var((string) ($route['hotel_recipient_email'] ?? ''), FILTER_VALIDATE_EMAIL)) {
                 $to = (string) $route['hotel_recipient_email'];
             }
             if (filter_var((string) ($route['reply_to_email'] ?? ''), FILTER_VALIDATE_EMAIL)) {
@@ -2136,6 +2152,18 @@ function enqueue_email(
             available_at = IF(LOWER(status) IN ('sent', 'cancelled', 'skipped'), available_at, LEAST(available_at, VALUES(available_at))),
             updated_at = NOW()"
     );
+
+    if ($extraRecipients) {
+        // Custom routing replaces the default hotel destination; customer emails are untouched.
+        $unique = array_values(array_unique(array_filter(array_map('strtolower', $extraRecipients),
+            static fn($address) => filter_var($address, FILTER_VALIDATE_EMAIL))));
+        $result = false;
+        foreach ($unique as $address) {
+            $result = enqueue_email($pdo, $relatedType, $relatedId, $address, $subject, $htmlBody,
+                $emailType, $replyTo, $maxAttempts, $fromEmail, $fromName, $availableAt, true) || $result;
+        }
+        return $result;
+    }
 
     return $stmt->execute([
         ':related_type' => $relatedType,

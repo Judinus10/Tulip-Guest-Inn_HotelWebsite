@@ -15,7 +15,11 @@ try {
     $byAccount = [];
     foreach ($functionRows as $row) $byAccount[(int) $row['mail_account_id']][] = (string) $row['function_key'];
     $routes = $pdo->query('SELECT * FROM mail_routing_rules ORDER BY function_key')->fetchAll(PDO::FETCH_ASSOC);
+    $notificationMode = (string) $pdo->query('SELECT routing_mode FROM mail_notification_preferences WHERE id=1')->fetchColumn();
+    $notificationRows = $pdo->query('SELECT email_address, function_key FROM mail_notification_recipients ORDER BY email_address, function_key')->fetchAll(PDO::FETCH_ASSOC);
     json_response(true, 'Mail settings loaded.', 200, ['data' => [
+        'notification_mode' => $notificationMode === 'custom' ? 'custom' : 'default',
+        'notification_recipients' => $notificationRows,
         'accounts' => array_map(fn($row) => public_mail_account($row, $byAccount[(int) $row['id']] ?? []), $accounts),
         'functions' => array_map(fn($key, $label) => ['key' => $key, 'label' => $label], array_keys(MAIL_FUNCTIONS), array_values(MAIL_FUNCTIONS)),
         'routes' => array_map(static function ($row) {

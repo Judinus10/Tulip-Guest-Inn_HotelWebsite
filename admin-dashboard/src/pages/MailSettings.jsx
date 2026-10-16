@@ -4,7 +4,7 @@ import { PageHeader, SectionCard } from '@/components/ui/page-header'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Input, Label } from '@/components/ui/input'
-import { deleteMailAccount, fetchMailSettings, saveMailAccount, saveMailProvider, saveMailRoutes, testMailAccount, testMailProvider, toggleMailAccount } from '@/services/mailSettingsApi'
+import { deleteMailAccount, fetchMailSettings, saveMailAccount, saveMailProvider, saveMailRoutes, saveNotificationRouting, testMailAccount, testMailProvider, toggleMailAccount } from '@/services/mailSettingsApi'
 import { deleteBusinessLink, fetchBusinessLinks, saveBusinessLink, toggleBusinessLink } from '@/services/businessLinksApi'
 
 const emptyAccount = {
@@ -212,6 +212,8 @@ export default function MailSettings() {
   const [deliveryChannel, setDeliveryChannel] = useState('microsoft_graph')
   const [data, setData] = useState({ accounts: [], functions: [], routes: [], providers: [] })
   const [routes, setRoutes] = useState([])
+  const [notificationMode, setNotificationMode] = useState('default')
+  const [notificationRecipients, setNotificationRecipients] = useState([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -232,6 +234,13 @@ export default function MailSettings() {
       const [result, links] = await Promise.all([fetchMailSettings(), fetchBusinessLinks()])
       setData(result)
       setRoutes(result.routes || [])
+      setNotificationMode(result.notification_mode || 'default')
+      const grouped = {}
+      for (const row of result.notification_recipients || []) {
+        if (!grouped[row.email_address]) grouped[row.email_address] = []
+        grouped[row.email_address].push(row.function_key)
+      }
+      setNotificationRecipients(Object.entries(grouped).map(([email_address, functions]) => ({ email_address, functions })))
       setBusinessLinks(links)
       setSelectedBusinessLink((current) => links.some((item) => String(item.id) === String(current) && item.is_enabled) ? current : String(links.find((item) => item.is_enabled)?.id || ''))
     } catch (error) { showToast(error.message || 'Mail settings could not be loaded.', 'error') }
@@ -300,6 +309,16 @@ export default function MailSettings() {
     finally { setBusy(false) }
   }
 
+  const saveNotificationAssignments = async () => {
+    setBusy(true)
+    try {
+      const payload = await saveNotificationRouting(notificationMode, notificationRecipients.filter((item) => item.email_address.trim() || item.functions.length))
+      showToast(payload.message || 'Notification routing saved.')
+      await load()
+    } catch (error) { showToast(error.message || 'Notification routing could not be saved.', 'error') }
+    finally { setBusy(false) }
+  }
+
   const saveLink = async (link) => {
     setBusy(true)
     try { const payload = await saveBusinessLink(link); showToast(payload.message); await load(); return true }
@@ -344,6 +363,36 @@ export default function MailSettings() {
         {deliveryChannel === 'google' && <GoogleConfigurationPanel config={providerConfig('google')} busy={busy} onSave={saveProvider} onTest={testProvider} />}
         {deliveryChannel === 'microsoft_graph' && <MicrosoftGraphPanel config={providerConfig('microsoft_graph')} busy={busy} onSave={saveProvider} onTest={testProvider} />}
       </div>
+
+      <SectionCard className="mt-5">
+        <div className="space-y-4 p-1">
+          <div><h2 className="text-lg font-semibold text-slate-900">Email Notification Routing</h2><p className="mt-1 text-sm text-slate-500">Choose who receives hotel notifications. Existing SMTP settings and customer confirmations remain unchanged.</p></div>
+          <div className="flex flex-wrap gap-5 text-sm">
+            <label className="flex items-center gap-2"><input type="radio" name="notificationMode" checked={notificationMode === 'default'} onChange={() => setNotificationMode('default')} />Default: one email per function</label>
+            <label className="flex items-center gap-2"><input type="radio" name="notificationMode" checked={notificationMode === 'custom'} onChange={() => setNotificationMode('custom')} />Custom: multiple functions per email</label>
+          </div>
+          {notificationMode === 'default' ? (
+            <div className="grid gap-3 md:grid-cols-3">
+              {['booking', 'contact', 'admin_alert'].map((key) => {
+                const current = routes.find((r) => r.function_key === key)
+                return <label key={key} className="space-y-2 text-sm font-medium text-slate-700"><span>{key === 'admin_alert' ? 'Admin notifications' : key === 'booking' ? 'Booking notifications' : 'Contact notifications'}</span><Input type="email" value={current?.hotel_recipient_email || ''} onChange={(event) => updateRoute(key, 'hotel_recipient_email', event.target.value)} placeholder="recipient@example.com" /></label>
+              })}
+              <p className="text-xs text-slate-500 md:col-span-3">Payment notifications continue using the existing payment route. Guest confirmations are always sent to the guest address.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {notificationRecipients.map((entry, index) => (
+                <div key={index} className="rounded-xl border border-slate-200 p-4">
+                  <div className="flex gap-2"><Input type="email" value={entry.email_address} placeholder="recipient@example.com" onChange={(event) => setNotificationRecipients((current) => current.map((row, i) => i === index ? { ...row, email_address: event.target.value } : row))} /><Button type="button" variant="outline" onClick={() => setNotificationRecipients((current) => current.filter((_, i) => i !== index))}><Trash2 className="h-4 w-4" /></Button></div>
+                  <div className="mt-3 flex flex-wrap gap-4">{[['booking','Booking'],['contact','Contact'],['admin_alert','Admin'],['payment','Payment']].map(([key,label]) => <label key={key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={entry.functions.includes(key)} onChange={(event) => setNotificationRecipients((current) => current.map((row, i) => i === index ? { ...row, functions: event.target.checked ? [...row.functions, key] : row.functions.filter((fn) => fn !== key) } : row))} />{label}</label>)}</div>
+                </div>
+              ))}
+              <Button type="button" variant="outline" onClick={() => setNotificationRecipients((current) => [...current, { email_address: '', functions: [] }])}><Plus className="h-4 w-4" />Add Recipient</Button>
+            </div>
+          )}
+          <div className="flex justify-end"><Button type="button" disabled={busy || loading} onClick={async () => { if (notificationMode === 'default') { await saveRoutes(); await saveNotificationAssignments() } else await saveNotificationAssignments() }}><Save className="h-4 w-4" />Save Notification Routing</Button></div>
+        </div>
+      </SectionCard>
 
       {editing && <AccountModal account={editing} functions={data.functions} busy={busy} onClose={() => setEditing(null)} onSave={saveAccount} />}
       {managingLinks && <BusinessLinksModal links={businessLinks} busy={busy} onClose={() => setManagingLinks(false)} onSave={saveLink} onToggle={toggleLink} onDelete={removeLink} />}
