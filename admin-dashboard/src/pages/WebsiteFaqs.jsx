@@ -19,6 +19,7 @@ export default function WebsiteFaqs({ embedded = false }) {
  function edit(index,field,value){setDraft(old=>old.map((item,i)=>i===index?{...item,[field]:value}:item))}
  function move(index,delta){setDraft(old=>{const next=[...old],target=index+delta;if(target<0||target>=next.length)return old;[next[index],next[target]]=[next[target],next[index]];return next})}
  async function action(kind){
+  if(draft.length>8){setError('Maximum 8 FAQs allowed. Remove extra questions before publishing.');return}
   setBusy(true);setError('');setMessage('')
   try{
    const response=await apiFetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'publish_now',faqs:draft})})
@@ -35,8 +36,8 @@ export default function WebsiteFaqs({ embedded = false }) {
   {draft===null?<SectionCard>Loading FAQs...</SectionCard>:<>
    <SectionCard>
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-     <div className="flex items-center gap-3"><div className="rounded-xl bg-blue-50 p-3 text-blue-600"><HelpCircle className="h-5 w-5"/></div><div><h2 className="text-lg font-semibold">FAQ Entries</h2><p className="text-sm text-text-secondary">Up to 30 entries. Click Publish to update the public website.</p></div></div>
-     <Button disabled={busy||draft.length>=30} onClick={()=>setDraft(old=>[...old,{question:'',answer:''}])}><Plus className="h-4 w-4"/> Add FAQ</Button>
+     <div className="flex items-center gap-3"><div className="rounded-xl bg-blue-50 p-3 text-blue-600"><HelpCircle className="h-5 w-5"/></div><div><h2 className="text-lg font-semibold">FAQ Entries</h2><p className="text-sm text-text-secondary">Up to 8 entries. Click Publish to update the public website.</p></div></div>
+     <Button disabled={busy||draft.length>=8} onClick={()=>setDraft(old=>[...old,{question:'',answer:''}])}><Plus className="h-4 w-4"/> Add FAQ</Button>
     </div>
     <div className="space-y-4">{draft.length===0&&<div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-text-secondary">No FAQs yet. Add your first question.</div>}
      {draft.map((item,index)=><div key={index} className="rounded-xl border border-border p-4">

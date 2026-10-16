@@ -5,7 +5,7 @@ function faq_init(PDO $pdo): void {
  $pdo->exec("INSERT IGNORE INTO website_faqs(id) VALUES (1)");
 }
 function faq_validate($items): array {
- if (!is_array($items) || count($items)>30) throw new InvalidArgumentException('Maximum 30 FAQs allowed.');
+ if (!is_array($items) || count($items)>8) throw new InvalidArgumentException('Maximum 8 FAQs allowed.');
  $result=[];
  foreach($items as $item){
   if(!is_array($item)) throw new InvalidArgumentException('Invalid FAQ.');
