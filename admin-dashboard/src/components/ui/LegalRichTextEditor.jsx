@@ -9,6 +9,7 @@ export default function LegalRichTextEditor({ value, onChange }) {
   if (ref.current && ref.current.innerHTML !== (value || '') && !ref.current.contains(document.activeElement)) ref.current.innerHTML = value || ''
  }, [value])
  const sync = () => onChange(ref.current?.innerHTML || '')
+ useEffect(() => { document.execCommand('defaultParagraphSeparator', false, 'p') }, [])
  const rememberSelection = () => {
   const selection = window.getSelection()
   if (selection?.rangeCount && ref.current?.contains(selection.anchorNode)) selectionRef.current = selection.getRangeAt(0).cloneRange()
@@ -45,8 +46,8 @@ export default function LegalRichTextEditor({ value, onChange }) {
    {btn('Undo',Undo2,'undo')}{btn('Redo',Redo2,'redo')}{btn('Clear formatting',RemoveFormatting,'removeFormat')}
   </div>
   <div ref={ref} contentEditable suppressContentEditableWarning role="textbox" aria-label="Legal page content" aria-multiline="true"
-   onInput={sync} onKeyUp={rememberSelection} onMouseUp={rememberSelection} onBlur={rememberSelection}
-   onPaste={e=>{e.preventDefault();document.execCommand('insertText',false,e.clipboardData.getData('text/plain'));sync()}}
-   className="min-h-[440px] max-h-[70vh] overflow-y-auto px-6 py-5 text-base leading-7 text-slate-700 outline-none focus:ring-2 focus:ring-inset focus:ring-blue-200 [&_h2]:my-6 [&_h2]:font-serif [&_h2]:text-2xl [&_h2]:font-normal [&_h2]:leading-snug [&_p]:my-3 [&_div]:my-3 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-7 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-7" />
+   onInput={sync} onKeyDown={e=>{ if(e.key==='Enter' && !e.shiftKey) document.execCommand('defaultParagraphSeparator', false, 'p') }} onKeyUp={rememberSelection} onMouseUp={rememberSelection} onBlur={rememberSelection}
+   onPaste={e=>{e.preventDefault();const plain=e.clipboardData.getData('text/plain');const safe=plain.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');const paragraphs=safe.split(/\r?\n/).map(line=>line||'<br>').join('</p><p>');document.execCommand('insertHTML',false,`<p>${paragraphs}</p>`);sync()}}
+   className="min-h-[440px] max-h-[70vh] overflow-y-auto px-6 py-5 text-base leading-7 text-slate-700 outline-none focus:ring-2 focus:ring-inset focus:ring-blue-200 [&_h2]:my-6 [&_h2]:font-serif [&_h2]:text-2xl [&_h2]:font-normal [&_h2]:leading-snug [&_p]:my-3 [&_p:empty]:min-h-[1.75rem] [&_div]:my-3 [&_div:empty]:min-h-[1.75rem] [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-7 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-7" />
  </div>
 }
