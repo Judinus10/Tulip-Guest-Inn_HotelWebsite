@@ -659,8 +659,8 @@ function get_room_base_price(string $roomName): float
         error_log('Room price lookup failed: ' . $e->getMessage());
     }
 
-    $roomRates = defined('ROOM_RATES') && is_array(ROOM_RATES) ? ROOM_RATES : [];
-    return (float) ($roomRates[$roomName] ?? 0);
+    // Room pricing must come from the database; never use hardcoded fallback rates.
+    return 0.0;
 }
 
 function calculate_booking_amount(string $roomName, string $checkInDate, string $checkOutDate): float

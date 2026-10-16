@@ -103,14 +103,7 @@ function jebal_env_json_array(string $key, array $default = []): array
     return is_array($decoded) && $decoded !== [] ? $decoded : $default;
 }
 
-$defaultRoomRates = [
-    'Ground Floor Room 1' => 8500.00,
-    'Ground Floor Room 2' => 8500.00,
-    'First Floor Room 1' => 9500.00,
-    'First Floor Room 2' => 9500.00,
-    'Family Room' => 14000.00,
-    'Private Cottage' => 18000.00,
-];
+
 
 $configuredAppEnv = strtolower(trim((string) jebal_env_value('APP_ENV', '')));
 if (!in_array($configuredAppEnv, ['local', 'staging', 'production'], true)) {
@@ -214,7 +207,7 @@ jebal_define('MAX_IMAGE_WIDTH', max(1, (int) jebal_env_value('MAX_IMAGE_WIDTH', 
 jebal_define('MAX_IMAGE_HEIGHT', max(1, (int) jebal_env_value('MAX_IMAGE_HEIGHT', 6000)));
 jebal_define('MAX_IMAGE_PIXELS', max(1, (int) jebal_env_value('MAX_IMAGE_PIXELS', 24000000)));
 
-jebal_define('ROOM_RATES', jebal_env_json_array('ROOM_RATES', $defaultRoomRates));
+
 
 if (APP_ENV === 'production') {
     $requiredProductionValues = [

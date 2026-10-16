@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertCircle, Building2, CheckCircle2, Cloud, Edit3, ExternalLink, KeyRound, Link2, Loader2, LockKeyhole, Mail, Plus, Save, Send, Server, Settings2, ShieldCheck, Trash2, X } from 'lucide-react'
+import { AlertCircle, Building2, CheckCircle2, Cloud, Edit3, Users, ExternalLink, KeyRound, Link2, Loader2, LockKeyhole, Mail, Plus, Save, Send, Server, Settings2, ShieldCheck, Trash2, X } from 'lucide-react'
 import { PageHeader, SectionCard } from '@/components/ui/page-header'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -208,7 +208,7 @@ function BusinessLinksModal({ links, busy, onClose, onSave, onToggle, onDelete }
 }
 
 export default function MailSettings() {
-  const [activeTab, setActiveTab] = useState('mailbox')
+  const [activeTab, setActiveTab] = useState('delivery')
   const [deliveryChannel, setDeliveryChannel] = useState('microsoft_graph')
   const [data, setData] = useState({ accounts: [], functions: [], routes: [], providers: [] })
   const [routes, setRoutes] = useState([])
@@ -347,9 +347,26 @@ export default function MailSettings() {
   return (
     <div>
       <Toast toast={toast} close={() => setToast({ message: '', type: 'success' })} />
-      <PageHeader title="Settings Manager" description="Configure outgoing email delivery channels for Tulip Guest Inn." />
+      <PageHeader title="Mail Integrations" description="Configure email delivery channels and choose who receives hotel notifications." />
 
-      <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="mb-6 rounded-2xl border border-border bg-white p-2 shadow-sm shadow-slate-200/60">
+        <div role="tablist" aria-label="Mail integration settings" className="flex gap-1 overflow-x-auto">
+          {[
+            { id: 'delivery', label: 'Delivery Channels', icon: Server },
+            { id: 'routing', label: 'Email Notification Routing', icon: Users },
+          ].map(({ id, label, icon: Icon }) => (
+            <button key={id} type="button" role="tab" aria-selected={activeTab === id}
+              onClick={() => setActiveTab(id)}
+              className={`flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                activeTab === id ? 'bg-blue-600 text-white shadow-sm' : 'text-text-secondary hover:bg-slate-100 hover:text-text-primary'
+              }`}>
+              <Icon className="h-4 w-4" /> {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {activeTab === 'delivery' && <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
         <SectionCard>
           <div className="mb-5"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Delivery channels</p><h2 className="mt-1 text-lg font-semibold text-slate-900">Choose a mail service</h2></div>
           <div className="space-y-3">
@@ -362,9 +379,9 @@ export default function MailSettings() {
         {deliveryChannel === 'server' && <SmtpConfigurationPanel config={providerConfig('server')} busy={busy} onSave={saveProvider} onTest={testProvider} />}
         {deliveryChannel === 'google' && <GoogleConfigurationPanel config={providerConfig('google')} busy={busy} onSave={saveProvider} onTest={testProvider} />}
         {deliveryChannel === 'microsoft_graph' && <MicrosoftGraphPanel config={providerConfig('microsoft_graph')} busy={busy} onSave={saveProvider} onTest={testProvider} />}
-      </div>
+      </div>}
 
-      <SectionCard className="mt-5">
+      {activeTab === 'routing' && <SectionCard>
         <div className="space-y-4 p-1">
           <div><h2 className="text-lg font-semibold text-slate-900">Email Notification Routing</h2><p className="mt-1 text-sm text-slate-500">Choose who receives hotel notifications. Existing SMTP settings and customer confirmations remain unchanged.</p></div>
           <div className="flex flex-wrap gap-5 text-sm">
@@ -392,7 +409,7 @@ export default function MailSettings() {
           )}
           <div className="flex justify-end"><Button type="button" disabled={busy || loading} onClick={async () => { if (notificationMode === 'default') { await saveRoutes(); await saveNotificationAssignments() } else await saveNotificationAssignments() }}><Save className="h-4 w-4" />Save Notification Routing</Button></div>
         </div>
-      </SectionCard>
+      </SectionCard>}
 
       {editing && <AccountModal account={editing} functions={data.functions} busy={busy} onClose={() => setEditing(null)} onSave={saveAccount} />}
       {managingLinks && <BusinessLinksModal links={businessLinks} busy={busy} onClose={() => setManagingLinks(false)} onSave={saveLink} onToggle={toggleLink} onDelete={removeLink} />}
