@@ -86,12 +86,14 @@ function ensure_room_video_column(PDO $pdo): void
     if (!$stmt->fetch()) $pdo->exec("ALTER TABLE rooms ADD COLUMN video_path VARCHAR(255) NULL DEFAULT NULL");
 }
 
+require_once __DIR__ . '/../utils/video_processing.php';
+
 function save_room_video(PDO $pdo, int $roomId, array $file): void
 {
     if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) return;
     if (($file['error'] ?? null) !== UPLOAD_ERR_OK) throw new RuntimeException('Video upload failed. Check PHP upload limits.');
     $size = (int) ($file['size'] ?? 0);
-    if ($size < 1 || $size > 50 * 1024 * 1024) throw new RuntimeException('Video must be 50 MB or smaller.');
+    if ($size < 1 || $size > 100 * 1024 * 1024) throw new RuntimeException('Video must be 100 MB or smaller.');
     $tmp = (string) ($file['tmp_name'] ?? '');
     if (!is_uploaded_file($tmp)) throw new RuntimeException('Invalid video upload.');
     $mime = (new finfo(FILEINFO_MIME_TYPE))->file($tmp);
@@ -99,9 +101,8 @@ function save_room_video(PDO $pdo, int $roomId, array $file): void
     if (!isset($extensions[$mime])) throw new RuntimeException('Only MP4 and WebM videos are supported.');
     $directory = __DIR__ . '/../uploads/rooms';
     if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) throw new RuntimeException('Unable to create video directory.');
-    $filename = 'room-video-' . $roomId . '-' . bin2hex(random_bytes(12)) . '.' . $extensions[$mime];
-    $destination = $directory . '/' . $filename;
-    if (!move_uploaded_file($tmp, $destination)) throw new RuntimeException('Unable to store video.');
+    $destination = optimize_uploaded_video($file, $directory . '/room-video-' . $roomId . '-' . bin2hex(random_bytes(12)));
+    $filename = basename($destination);
     $stmt = $pdo->prepare('SELECT video_path FROM rooms WHERE id = :id');
     $stmt->execute([':id' => $roomId]);
     $old = $stmt->fetchColumn();

@@ -7,7 +7,6 @@ import { Link } from 'react-router-dom'
 import { PageHeader, SectionCard } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
-import { optimizeImage } from '@/utils/imageProcessing'
 
 const base = buildApiUrl('/settings')
 const defaultHeroImages = [defaultHero01, defaultHero02, defaultHero03]
@@ -75,16 +74,8 @@ export default function HeroContent({ embedded = false }) {
     setBusy(true); setToast(null)
     try {
       const data = new FormData()
-      // Optimize slideshow images and video posters before sending them to PHP.
-      // Videos are uploaded unchanged.
-      let uploadFile = file
-      if (kind === 'image') {
-        if (file.size > 300 * 1024 * 1024) {
-          throw new Error('This image exceeds 300 MB. Please choose a smaller image.')
-        }
-        uploadFile = await optimizeImage(file, { maxDimension: 2560, quality: 0.85 })
-      }
-      data.append('file', uploadFile)
+      if (kind === 'video' && file.size > 100 * 1024 * 1024) throw new Error('Choose a video up to 100 MB. Compress the video and try again.')
+      data.append('file', file)
       data.append('kind', kind)
       const response = await apiFetch(`${base}/hero-upload.php`, { method: 'POST', body: data })
       const result = await readJsonResponse(response)
@@ -201,7 +192,7 @@ export default function HeroContent({ embedded = false }) {
             <p className="text-sm font-semibold text-text-primary">Background video</p>
             {draft.video ? <video src={draft.video} controls preload="metadata" className="aspect-video w-full rounded-xl bg-slate-900 object-cover" /> : <div className="flex aspect-video items-center justify-center rounded-xl border-2 border-dashed border-border bg-slate-50"><Film className="h-9 w-9 text-slate-400" /></div>}
             <div className="flex flex-wrap gap-2">{mediaPicker('video', draft.video ? 'Replace Video' : 'Upload Video')}{draft.video && <Button variant="outline" onClick={() => setDraft(p => ({ ...p, video: '' }))}><Trash2 className="h-4 w-4" /> Remove</Button>}</div>
-            <p className="text-xs text-text-secondary">MP4 or WebM · Maximum 50 MB · Video plays muted on the public homepage.</p>
+            <p className="text-xs text-text-secondary">MP4 or WebM · Maximum 100 MB · Video plays muted on the public homepage.</p>
           </div>
           <div className="space-y-3">
             <p className="text-sm font-semibold text-text-primary">Fallback poster</p>

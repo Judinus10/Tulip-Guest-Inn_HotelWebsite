@@ -720,8 +720,8 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
                 <Input id="room_video" type="file" accept="video/mp4,video/webm" disabled={isSubmitting}
                   onChange={(event) => {
                     const file = event.target.files?.[0] || null
-                    if (file && (file.size > 50 * 1024 * 1024 || !['video/mp4', 'video/webm'].includes(file.type))) {
-                      setErrors((current) => ({ ...current, video: 'Choose an MP4 or WebM video up to 50 MB.' }))
+                    if (file && (file.size > 100 * 1024 * 1024 || !['video/mp4', 'video/webm'].includes(file.type))) {
+                      setErrors((current) => ({ ...current, video: 'Choose an MP4 or WebM video up to 100 MB.' }))
                       event.target.value = ''
                       setSelectedVideo(null)
                       return
