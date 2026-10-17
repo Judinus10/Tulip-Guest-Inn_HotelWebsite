@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/ics-helper.php';
+require_once __DIR__ . '/../bookings/booking-expiry-helper.php';
 
 $roomId = filter_input(INPUT_GET, 'room_id', FILTER_VALIDATE_INT);
 $token = trim((string) ($_GET['token'] ?? ''));
@@ -39,11 +40,11 @@ $bookingStmt = $pdo->prepare(
     "SELECT id, check_in_date, check_out_date, status, updated_at
      FROM bookings
      WHERE room_name = :room_name
-       AND status NOT IN ('Cancelled', 'Rejected', 'Expired', 'Completed')
+       " . active_booking_conflict_sql() . "
        AND check_out_date >= CURDATE()
      ORDER BY check_in_date ASC, id ASC"
 );
-$bookingStmt->execute([':room_name' => $room['room_name']]);
+$bookingStmt->execute([':room_name' => $room['room_name'], ':hold_cutoff' => booking_hold_cutoff_datetime()]);
 
 $host = preg_replace('/[^A-Za-z0-9.-]/', '', (string) ($_SERVER['HTTP_HOST'] ?? 'tulip.local')) ?: 'tulip.local';
 $stamp = gmdate('Ymd\THis\Z');

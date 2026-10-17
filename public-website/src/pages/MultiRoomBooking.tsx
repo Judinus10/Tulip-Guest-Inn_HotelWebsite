@@ -10,6 +10,20 @@ import { PublicRequestError } from '../services/publicErrors';
 
 type AssignedRoom = Room & { allocatedGuests: number };
 
+// Calendar-only arithmetic avoids shifting a local midnight to the previous UTC day.
+function nextBookingDate(value: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return '';
+  const date = new Date(`${value}T00:00:00Z`);
+  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) return '';
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+function todayBookingDate(): string {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 function assignRooms(available: Room[], roomCount: number, guests: number): AssignedRoom[] {
   const selected = [...available].sort((a,b)=>b.guests-a.guests).slice(0, roomCount);
   if (selected.length !== roomCount || selected.reduce((s,r)=>s+r.guests,0) < guests) return [];
@@ -54,10 +68,10 @@ export default function MultiRoomBooking() {
     next.set(field, value);
     if (field === 'checkin') {
       const currentCheckout = next.get('checkout') || '';
-      if (!currentCheckout || currentCheckout <= value) {
-        const followingDay = new Date(`${value}T00:00:00`);
-        followingDay.setDate(followingDay.getDate() + 1);
-        next.set('checkout', followingDay.toISOString().split('T')[0]);
+      if (!value) {
+        next.delete('checkout');
+      } else if (!currentCheckout || currentCheckout <= value) {
+        next.set('checkout', nextBookingDate(value));
       }
     }
     setParams(next, { replace: true });
@@ -80,11 +94,11 @@ export default function MultiRoomBooking() {
       <div className="mb-3 grid bg-white border border-border sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col px-5 py-4 border-b sm:border-r lg:border-b-0 border-border">
           <span className="mb-2 flex items-center gap-1.5 text-[9px] tracking-[0.2em] uppercase text-gold"><Calendar size={12}/>Check In</span>
-          <input type="date" value={filters.checkIn} min={new Date().toISOString().split('T')[0]} onChange={e=>updateFilter('checkin',e.target.value)} className="bg-transparent text-sm outline-none"/>
+          <input type="date" value={filters.checkIn} min={todayBookingDate()} onChange={e=>updateFilter('checkin',e.target.value)} className="bg-transparent text-sm outline-none"/>
         </label>
         <label onMouseDown={warnCheckoutRequiresCheckIn} onTouchStart={warnCheckoutRequiresCheckIn} className="flex flex-col px-5 py-4 border-b lg:border-b-0 lg:border-r border-border">
           <span className="mb-2 flex items-center gap-1.5 text-[9px] tracking-[0.2em] uppercase text-gold"><Calendar size={12}/>Check Out</span>
-          <input type="date" value={filters.checkOut} disabled={!filters.checkIn} min={filters.checkIn||new Date().toISOString().split('T')[0]} onChange={e=>updateFilter('checkout',e.target.value)} className="bg-transparent text-sm outline-none disabled:cursor-not-allowed disabled:opacity-50"/>
+          <input type="date" value={filters.checkOut} disabled={!filters.checkIn} min={nextBookingDate(filters.checkIn)||todayBookingDate()} onChange={e=>updateFilter('checkout',e.target.value)} className="bg-transparent text-sm outline-none disabled:cursor-not-allowed disabled:opacity-50"/>
         </label>
         <label className="flex flex-col px-5 py-4 border-b sm:border-b-0 sm:border-r border-border">
           <span className="mb-2 flex items-center gap-1.5 text-[9px] tracking-[0.2em] uppercase text-gold"><Users size={12}/>Guests</span>

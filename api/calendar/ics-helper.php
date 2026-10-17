@@ -133,54 +133,107 @@ function ics_room_conflict(PDO $pdo, int $roomId, string $checkIn, string $check
 
 function unfold_ics(string $body): array
 {
-    $body = preg_replace("/\r\n[ \t]/", '', $body) ?? $body;
+    $body = preg_replace('/^\xEF\xBB\xBF/', '', $body) ?? $body;
+    $body = preg_replace('/(?:\r\n|\n|\r)[ \t]/', '', $body) ?? $body;
     return preg_split('/\r\n|\n|\r/', $body) ?: [];
 }
 
-function parse_ics_date(string $value): ?DateTimeImmutable
+function parse_ics_date(string $value, ?string $timezone = null): ?DateTimeImmutable
 {
     $value = trim($value);
-    if ($value === '') {
-        return null;
-    }
-
+    if (!preg_match('/^(?:\d{8}|\d{8}T\d{6}Z?)$/D', $value)) return null;
     try {
-        if (preg_match('/^\d{8}$/', $value)) {
-            return DateTimeImmutable::createFromFormat('!Ymd', $value, ics_timezone()) ?: null;
-        }
-        if (str_ends_with($value, 'Z')) {
-            return (new DateTimeImmutable($value, new DateTimeZone('UTC')))->setTimezone(ics_timezone());
-        }
-        return new DateTimeImmutable($value, ics_timezone());
+        $utc = str_ends_with($value, 'Z');
+        $zone = $utc ? new DateTimeZone('UTC') : ($timezone ? new DateTimeZone($timezone) : ics_timezone());
+        $format = strlen($value) === 8 ? 'Ymd' : ($utc ? 'Ymd\THis\Z' : 'Ymd\THis');
+        $date = DateTimeImmutable::createFromFormat('!' . $format, $value, $zone);
+        $errors = DateTimeImmutable::getLastErrors();
+        if (!$date || ($errors !== false && ($errors['warning_count'] || $errors['error_count']))
+            || $date->format($format) !== $value) return null;
+        return $date->setTimezone(ics_timezone());
     } catch (Throwable) {
         return null;
     }
 }
 
+/** Parse a complete snapshot, or throw before any reservation is changed. */
 function parse_ics_events(string $body): array
 {
     $events = [];
+    $stack = [];
     $current = null;
+    $opened = false;
+    $closed = false;
+    $version = null;
+    $uids = [];
     foreach (unfold_ics($body) as $line) {
-        if ($line === 'BEGIN:VEVENT') {
-            $current = [];
-            continue;
-        }
-        if ($line === 'END:VEVENT') {
-            if (is_array($current) && !empty($current['UID']) && !empty($current['DTSTART']) && !empty($current['DTEND'])) {
-                $events[] = $current;
-            }
-            $current = null;
-            continue;
-        }
-        if (!is_array($current) || !str_contains($line, ':')) {
-            continue;
-        }
+        if ($line === '') continue;
+        if (!str_contains($line, ':')) throw new RuntimeException('Malformed calendar line. Existing reservations were retained.');
         [$left, $value] = explode(':', $line, 2);
         $parts = explode(';', $left);
         $key = strtoupper((string) array_shift($parts));
+        $parent = $stack ? $stack[count($stack) - 1] : null;
+        if ($key === 'BEGIN') {
+            $component = strtoupper($value);
+            $allowed = $parent === null ? ['VCALENDAR']
+                : ($parent === 'VCALENDAR' ? ['VEVENT', 'VTIMEZONE']
+                : ($parent === 'VEVENT' ? ['VALARM'] : ($parent === 'VTIMEZONE' ? ['STANDARD', 'DAYLIGHT'] : [])));
+            if ($closed || !in_array($component, $allowed, true)
+                || ($component === 'VCALENDAR' && $opened)) throw new RuntimeException('Invalid calendar structure.');
+            if ($component === 'VCALENDAR') $opened = true;
+            if ($component === 'VEVENT') $current = [];
+            $stack[] = $component;
+            continue;
+        }
+        if ($key === 'END') {
+            if ($parent === null || strtoupper($value) !== $parent) throw new RuntimeException('Unbalanced calendar components.');
+            if ($parent === 'VEVENT') {
+                $uid = trim((string) ($current['UID'] ?? ''));
+                $start = parse_ics_date((string) ($current['DTSTART'] ?? ''), $current['DTSTART_TZID'] ?? null);
+                $end = parse_ics_date((string) ($current['DTEND'] ?? ''), $current['DTEND_TZID'] ?? null);
+                if ($uid === '' || strlen($uid) > 255 || isset($uids[$uid]) || !$start || !$end
+                    || $end <= $start || $end->format('Y-m-d') <= $start->format('Y-m-d')) {
+                    throw new RuntimeException('Invalid or duplicate calendar event. Existing reservations were retained.');
+                }
+                $current['UID'] = $uid;
+                $uids[$uid] = true;
+                $events[] = $current;
+                $current = null;
+            }
+            array_pop($stack);
+            if ($parent === 'VCALENDAR') $closed = true;
+            continue;
+        }
+        if ($parent === null || $closed) throw new RuntimeException('Unexpected content outside calendar.');
+        if ($parent === 'VCALENDAR') {
+            if ($key === 'VERSION') {
+                if ($version !== null || $value !== '2.0') throw new RuntimeException('Unsupported calendar version.');
+                $version = $value;
+            }
+            // Scheduling messages are not full availability snapshots.
+            if ($key === 'METHOD' && strtoupper($value) !== 'PUBLISH') throw new RuntimeException('Calendar is not a full published snapshot.');
+        }
+        if ($parent !== 'VEVENT') continue;
+        if (in_array($key, ['RRULE', 'RDATE', 'EXDATE', 'RECURRENCE-ID'], true)) {
+            throw new RuntimeException('Recurring events are not supported by this room-calendar importer.');
+        }
+        if (in_array($key, ['UID', 'DTSTART', 'DTEND', 'STATUS'], true) && array_key_exists($key, $current)) {
+            throw new RuntimeException('Duplicate calendar event property.');
+        }
         $current[$key] = $value;
+        if (in_array($key, ['DTSTART', 'DTEND'], true)) {
+            foreach ($parts as $parameter) {
+                if (stripos($parameter, 'TZID=') === 0) $current[$key . '_TZID'] = trim(substr($parameter, 5), '"');
+                if (stripos($parameter, 'VALUE=') === 0) {
+                    $type = strtoupper(substr($parameter, 6));
+                    if (($type === 'DATE' && !preg_match('/^\d{8}$/D', $value))
+                        || ($type === 'DATE-TIME' && !preg_match('/^\d{8}T\d{6}Z?$/D', $value))
+                        || !in_array($type, ['DATE', 'DATE-TIME'], true)) throw new RuntimeException('Invalid calendar date value.');
+                }
+            }
+        }
     }
+    if (!$opened || !$closed || $stack || $version !== '2.0') throw new RuntimeException('Incomplete calendar. Existing reservations were retained.');
     return $events;
 }
 
@@ -326,11 +379,11 @@ function sync_ics_room(PDO $pdo, array $map): array
         );
 
         foreach ($events as $event) {
-            $start = parse_ics_date((string) $event['DTSTART']);
-            $end = parse_ics_date((string) $event['DTEND']);
+            $start = parse_ics_date((string) $event['DTSTART'], $event['DTSTART_TZID'] ?? null);
+            $end = parse_ics_date((string) $event['DTEND'], $event['DTEND_TZID'] ?? null);
             $uid = mb_substr(trim((string) $event['UID']), 0, 255);
             if (!$start || !$end || $end <= $start || $uid === '') {
-                continue;
+                throw new RuntimeException('Invalid event; calendar update rolled back.');
             }
 
             $status = strtoupper(trim((string) ($event['STATUS'] ?? '')));
@@ -350,12 +403,16 @@ function sync_ics_room(PDO $pdo, array $map): array
             $seen[] = $uid;
         }
 
-        // Anything previously imported but absent from the newest complete feed is cancelled.
-        $pdo->prepare(
-            "UPDATE external_calendar_events
-             SET is_active = 0, status = 'CANCELLED'
-             WHERE room_id = :room_id AND provider = 'booking.com' AND is_active = 1 AND last_seen_at < :seen"
-        )->execute([':room_id' => $roomId, ':seen' => $now]);
+        // Reconcile by UID, not second-resolution timestamps: two successful
+        // syncs in one second must still release events absent from the new feed.
+        $cancelSql = "UPDATE external_calendar_events SET is_active = 0, status = 'CANCELLED'
+            WHERE room_id = ? AND provider = 'booking.com' AND is_active = 1";
+        $cancelParams = [$roomId];
+        if ($seen !== []) {
+            $cancelSql .= ' AND external_uid NOT IN (' . implode(',', array_fill(0, count($seen), '?')) . ')';
+            $cancelParams = array_merge($cancelParams, $seen);
+        }
+        $pdo->prepare($cancelSql)->execute($cancelParams);
 
         $pdo->commit();
         $pdo->prepare(
