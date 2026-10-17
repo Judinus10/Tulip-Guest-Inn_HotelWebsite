@@ -14,6 +14,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../payment-settings/_helpers.php';
 require_once __DIR__ . '/../bookings/booking-expiry-helper.php';
+require_once __DIR__ . '/../bookings/multi-room-helper.php';
+require_once __DIR__ . '/../calendar/ics-helper.php';
 require_once __DIR__ . '/../bookings/booking-audit-helper.php';
 require_once __DIR__ . '/../invoices/invoice-helper.php';
 require_once __DIR__ . '/../mail/email-helper.php';
@@ -92,6 +94,7 @@ try {
     $pdo = get_db_connection();
     ensure_booking_audit_table($pdo);
     ensure_email_queue_table($pdo);
+    if (ics_enabled()) ensure_ics_schema($pdo);
     $pdo->beginTransaction();
 
     $paymentStmt = $pdo->prepare('SELECT * FROM payments WHERE order_id = :order_id LIMIT 1 FOR UPDATE');
@@ -129,6 +132,9 @@ try {
         notify_text_response(404, 'Booking not found');
     }
 
+    $scopeRows = multi_room_lock_booking_scope($pdo, $booking);
+    $scopeIds = array_map(static fn(array $row): int => (int) $row['id'], $scopeRows);
+    $scopeSqlIds = implode(',', $scopeIds);
     $sideEffects['booking_id'] = $bookingId;
 
     $expectedAmount = normalize_payhere_amount((string) ($existingPayment['amount'] ?? $booking['amount'] ?? 0));
@@ -161,9 +167,9 @@ try {
         $rejectBooking = $pdo->prepare(
             "UPDATE bookings
              SET payment_status = 'Failed', updated_at = NOW()
-             WHERE id = :id AND payment_status <> 'Paid'"
+             WHERE id IN ({$scopeSqlIds}) AND payment_status <> 'Paid'"
         );
-        $rejectBooking->execute([':id' => $bookingId]);
+        $rejectBooking->execute();
 
         $pdo->commit();
         error_log('PayHere notify rejected: amount/currency mismatch for order ' . $orderId);
@@ -195,38 +201,22 @@ try {
         notify_text_response(200, 'OK final state already processed');
     }
 
-    // If the user did not pay and the booking hold is expired, release the room now.
+    // Expiry and gateway results apply to the entire reservation.
     if ($incomingPaymentStatus !== 'Paid') {
-        expire_pending_bookings($pdo, $bookingId, false);
-        $bookingStmt = $pdo->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1 FOR UPDATE');
-        $bookingStmt->execute([':id' => $bookingId]);
-        $booking = $bookingStmt->fetch() ?: $booking;
+        foreach ($scopeIds as $scopeId) expire_pending_bookings($pdo, $scopeId, false);
     }
 
     $finalPaymentStatus = $incomingPaymentStatus;
     $finalBookingStatus = $finalPaymentStatus === 'Paid' ? 'Confirmed' : 'Pending';
+    if ($finalPaymentStatus === 'Payment Pending' && booking_hold_is_expired($booking)) {
+        $finalPaymentStatus = 'Cancelled';
+        $finalBookingStatus = 'Cancelled';
+    }
 
-    if ($finalPaymentStatus === 'Paid') {
-        $conflictStatement = $pdo->prepare(
-            "SELECT blocker.id
-             FROM bookings current_booking
-             INNER JOIN bookings blocker
-               ON blocker.room_name = current_booking.room_name
-              AND blocker.id <> current_booking.id
-              AND blocker.status = 'Confirmed'
-              AND current_booking.check_in_date < blocker.check_out_date
-              AND current_booking.check_out_date > blocker.check_in_date
-             WHERE current_booking.id = :booking_id
-             LIMIT 1"
-        );
-        $conflictStatement->execute([':booking_id' => $bookingId]);
-
-        if ($conflictStatement->fetch()) {
-            $finalPaymentStatus = 'Paid';
-            $finalBookingStatus = 'Pending';
-            $statusMessage = trim($statusMessage . ' Paid but booking has a confirmed overlap; manual review required.');
-            error_log('Paid PayHere booking has availability conflict and needs manual review. Booking ID: ' . $bookingId);
-        }
+    if ($finalPaymentStatus === 'Paid' && multi_room_scope_has_conflict($pdo, $scopeRows)) {
+        $finalBookingStatus = 'Pending';
+        $statusMessage = trim($statusMessage . ' Paid but a room has an overlapping reservation; manual review required.');
+        error_log('Paid PayHere booking needs availability review. Booking ID: ' . $bookingId);
     }
 
     if (in_array($finalPaymentStatus, ['Failed', 'Cancelled', 'Refunded'], true)) {
@@ -260,25 +250,21 @@ try {
         ':id' => (int) $existingPayment['id'],
     ]);
 
+    // Room amounts are allocated at booking creation. The payment amount is
+    // the group total and must never replace one room's individual amount.
     $updateBooking = $pdo->prepare(
-        'UPDATE bookings
-         SET status = :status,
-             payment_status = :payment_status,
-             amount = :amount,
-             currency = :currency,
-             updated_at = NOW()
-         WHERE id = :id'
+        "UPDATE bookings SET status = :status, payment_status = :payment_status,
+             currency = :currency, updated_at = NOW()
+         WHERE id IN ({$scopeSqlIds})"
     );
     $updateBooking->execute([
         ':status' => $finalBookingStatus,
         ':payment_status' => $finalPaymentStatus,
-        ':amount' => (float) $payhereAmount,
         ':currency' => $payhereCurrency,
-        ':id' => $bookingId,
     ]);
 
     if ($finalPaymentStatus === 'Paid') {
-        booking_audit_log($pdo, $bookingId, 'payment_success', 'Payment Success', 'PayHere payment was verified and booking was confirmed.', [
+        booking_audit_log($pdo, $bookingId, 'payment_success', 'Payment Success', $finalBookingStatus === 'Confirmed' ? 'PayHere payment was verified and all rooms were confirmed.' : 'PayHere payment was verified; availability requires manual review.', [
             'order_id' => $orderId,
             'payment_id' => $paymentId,
             'amount' => $payhereAmount,
@@ -300,11 +286,9 @@ try {
     }
 
     if (in_array($finalPaymentStatus, ['Paid', 'Failed', 'Cancelled'], true)) {
-        cancel_scheduled_pending_booking_emails(
-            $pdo,
-            $bookingId,
-            'PayHere verified final payment status: ' . $finalPaymentStatus
-        );
+        foreach ($scopeIds as $scopeId) {
+            cancel_scheduled_pending_booking_emails($pdo, $scopeId, 'PayHere verified final payment status: ' . $finalPaymentStatus);
+        }
     }
 
     $pdo->commit();

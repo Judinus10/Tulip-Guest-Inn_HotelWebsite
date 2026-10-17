@@ -8,6 +8,8 @@ ob_start();
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../mail/email-helper.php';
 require_once __DIR__ . '/multi-room-helper.php';
+require_once __DIR__ . '/booking-expiry-helper.php';
+require_once __DIR__ . '/../calendar/ics-helper.php';
 
 apply_cors_headers();
 require_admin_auth();
@@ -34,6 +36,7 @@ function calendar_status_key(mixed $value): string
 
 try {
     $pdo = get_db_connection();
+    if (ics_enabled()) ensure_ics_schema($pdo);
     $pdo->beginTransaction();
 
     $stmt = $pdo->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1 FOR UPDATE');
@@ -80,21 +83,22 @@ try {
         ]);
     }
 
-    if ($status === 'confirmed') {
-        $conflict = $pdo->prepare("SELECT id FROM bookings WHERE id <> :id AND room_name = :room_name AND status IN ('Confirmed','Checked In') AND :check_in < check_out_date AND :check_out > check_in_date LIMIT 1");
-        $conflict->execute([
-            ':id' => $id,
-            ':room_name' => $booking['room_name'],
-            ':check_in' => $booking['check_in_date'],
-            ':check_out' => $booking['check_out_date'],
-        ]);
-        if ($conflict->fetch()) {
+    $scopeRows = multi_room_lock_booking_scope($pdo, $booking);
+    foreach ($scopeRows as $scopeRow) {
+        $rowStatus = calendar_status_key($scopeRow['status'] ?? 'Pending');
+        if ($rowStatus !== $status && !in_array($status, $transitions[$rowStatus] ?? [], true)) {
             $pdo->rollBack();
-            json_response(false, 'Cannot confirm because this room has an overlapping active booking.', 200, [
-                'severity' => 'warning',
-                'error_code' => 'ROOM_BOOKING_CONFLICT',
+            json_response(false, 'A room in this group cannot make the requested status change.', 200, [
+                'severity' => 'warning', 'error_code' => 'INVALID_STATUS_TRANSITION',
             ]);
         }
+    }
+    if (in_array($status, ['confirmed', 'checked_in'], true)
+        && multi_room_scope_has_conflict($pdo, $scopeRows)) {
+        $pdo->rollBack();
+        json_response(false, 'Cannot confirm or check in: a room in this booking has an overlapping reservation.', 200, [
+            'severity' => 'warning', 'error_code' => 'ROOM_BOOKING_CONFLICT',
+        ]);
     }
 
     $displayMap = [
