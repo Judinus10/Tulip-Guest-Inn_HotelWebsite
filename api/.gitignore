@@ -11,3 +11,4 @@ public-website/src/services/galleryApi.js
 /uploads/
 mail/assets/
 .env copy
+.user.ini

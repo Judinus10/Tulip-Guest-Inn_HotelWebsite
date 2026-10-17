@@ -1,5 +1,10 @@
 Options -Indexes
-LimitRequestBody 67108864
+LimitRequestBody 117440512
+
+# Environment files include credentials, including staged production configuration.
+<FilesMatch "^\.env(?:[._ ].*)?$">
+  Require all denied
+</FilesMatch>
 
 <IfModule mod_rewrite.c>
   RewriteEngine Off

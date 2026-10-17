@@ -21,7 +21,9 @@ function optimize_uploaded_video(array $file, string $destinationBase): string {
     if (!function_exists('exec') || in_array('exec', array_map('trim', explode(',', (string)ini_get('disable_functions'))), true)) {
         throw new RuntimeException('Automatic video compression is unavailable on this server. Please compress your video to 50 MB or less and try again.');
     }
-    $ffmpeg = trim((string) (getenv('FFMPEG_BINARY') ?: 'ffmpeg'));
+    $ffmpeg = trim((string) (function_exists('jebal_env_value')
+        ? jebal_env_value('FFMPEG_BINARY', 'ffmpeg')
+        : (getenv('FFMPEG_BINARY') ?: 'ffmpeg')));
     if ($ffmpeg === '' || preg_match('/[\r\n]/', $ffmpeg)) throw new RuntimeException('Video compression is not configured. Compress the video to 50 MB or less and try again.');
     $output = $destinationBase . '.mp4';
     $command = escapeshellarg($ffmpeg).' -nostdin -hide_banner -loglevel error -y -i '.escapeshellarg($source)
