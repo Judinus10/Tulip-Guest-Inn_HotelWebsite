@@ -84,7 +84,7 @@ function send_html_email(string $to, string $subject, string $htmlBody, ?string 
 {
     try {
         try {
-            $providerResult = send_via_active_provider(get_db_connection(), $to, $subject, $htmlBody);
+            $providerResult = send_via_active_provider(get_db_connection(), $to, $subject, $htmlBody, $replyTo);
             if ($providerResult !== null) return $providerResult;
         } catch (Throwable $providerError) {
             error_log('Active mail provider failed: ' . $providerError->getMessage());
@@ -1277,6 +1277,26 @@ function queue_staying_guest_booking_email(PDO $pdo, array $booking, string $sta
     );
 }
 
+/** Manual bookings use their actual status and payment method, and remain queued. */
+function queue_booking_received_emails(PDO $pdo, array $booking): int
+{
+    $id = (int) ($booking['id'] ?? 0);
+    if ($id < 1) return 0;
+    $payment = ['amount' => $booking['amount'] ?? 0, 'status' => $booking['payment_status'] ?? 'Payment Pending',
+        'method' => $booking['payment_method'] ?? 'Cash'];
+    $state = ($payment['status'] === 'Paid') ? 'paid' : (($booking['status'] ?? '') === 'Confirmed' ? 'confirmed' : 'received');
+    $customerQueued = enqueue_email($pdo, 'booking', $id, (string) ($booking['email'] ?? ''),
+        'Booking details - Tulip Guest Inn #' . $id, booking_email_html($state, $booking, $payment),
+        'booking_manual_received', null, 3, booking_from_email(), booking_from_name());
+    $hotelQueued = enqueue_email($pdo, 'booking', $id, booking_admin_email(),
+        'New manual booking - Tulip Guest Inn #' . $id, admin_booking_email_html($state, $booking, $payment, ['Payment Method' => $payment['method']]),
+        'admin_manual_booking', $booking['email'] ?? null, 3, booking_from_email(), booking_from_name());
+    $guestQueued = queue_staying_guest_booking_email($pdo, $booking, $state, $payment,
+        'staying_guest_manual_booking', 'Booking details for you');
+    update_booking_email_status($pdo, $id, $customerQueued ? 'Queued' : 'Queue Failed');
+    return (int) $customerQueued + (int) $hotelQueued + (int) $guestQueued;
+}
+
 function send_booking_received_emails(PDO $pdo, array $booking): void
 {
     $bookingId = (int) ($booking['id'] ?? 0);
@@ -1622,7 +1642,7 @@ function queue_booking_pending_emails(PDO $pdo, array $booking, array $payment =
 
     $adminEmail = booking_admin_email();
     $adminType = 'booking_payment_pending_admin';
-    if ($adminEmail !== '' && !email_queue_job_exists($pdo, 'booking', $bookingId, $adminType, $adminEmail)) {
+    if (!email_queue_job_exists($pdo, 'booking', $bookingId, $adminType, $adminEmail)) {
         $adminBody = admin_booking_email_html('pending', $booking, $payment, [
             'Order ID' => $orderId !== '' ? $orderId : '-',
         ]);
@@ -1717,7 +1737,7 @@ function queue_payment_success_emails(PDO $pdo, array $booking, array $payment):
     }
 
     $adminEmail = booking_admin_email();
-    if ($adminEmail !== '' && !booking_email_sent($pdo, $bookingId, [$adminType])) {
+    if (!booking_email_sent($pdo, $bookingId, [$adminType])) {
         $bodyAdmin = admin_booking_email_html('paid', $booking, $payment);
 
         if (enqueue_email(
@@ -1778,7 +1798,7 @@ function queue_payment_failed_email(PDO $pdo, array $booking): int
     }
 
     $adminEmail = booking_admin_email();
-    if ($adminEmail !== '' && !booking_email_sent($pdo, $bookingId, ['admin_payment_failed'])) {
+    if (!booking_email_sent($pdo, $bookingId, ['admin_payment_failed'])) {
         $adminBody = admin_booking_email_html('failed', $booking);
 
         if (enqueue_email(
@@ -2075,7 +2095,7 @@ function enqueue_email(
     ensure_email_queue_table($pdo);
 
     $mailFunction = mail_function_key_for_type($emailType, (string) $relatedType);
-    $isHotelNotification = str_starts_with(strtolower($emailType), 'admin_')
+    $isHotelNotification = (str_starts_with(strtolower($emailType), 'admin_') || str_ends_with(strtolower($emailType), '_admin'))
         || strtolower((string) $relatedType) === 'admin_stay_reminder';
     $extraRecipients = [];
     if (!$skipNotificationRouting && $isHotelNotification && in_array($mailFunction, ['booking', 'payment', 'contact', 'admin_alert'], true)) {
@@ -2107,6 +2127,18 @@ function enqueue_email(
         }
     } catch (Throwable $routeError) {
         error_log('Mail routing fallback used for ' . $emailType . ': ' . $routeError->getMessage());
+    }
+
+    if ($extraRecipients) {
+        // Custom routing replaces the default hotel destination; customer emails are untouched.
+        $unique = array_values(array_unique(array_filter(array_map('strtolower', $extraRecipients),
+            static fn($address) => filter_var($address, FILTER_VALIDATE_EMAIL))));
+        $result = false;
+        foreach ($unique as $address) {
+            $result = enqueue_email($pdo, $relatedType, $relatedId, $address, $subject, $htmlBody,
+                $emailType, $replyTo, $maxAttempts, $fromEmail, $fromName, $availableAt, true) || $result;
+        }
+        return $result;
     }
 
     $to = trim($to);
@@ -2153,18 +2185,6 @@ function enqueue_email(
             updated_at = NOW()"
     );
 
-    if ($extraRecipients) {
-        // Custom routing replaces the default hotel destination; customer emails are untouched.
-        $unique = array_values(array_unique(array_filter(array_map('strtolower', $extraRecipients),
-            static fn($address) => filter_var($address, FILTER_VALIDATE_EMAIL))));
-        $result = false;
-        foreach ($unique as $address) {
-            $result = enqueue_email($pdo, $relatedType, $relatedId, $address, $subject, $htmlBody,
-                $emailType, $replyTo, $maxAttempts, $fromEmail, $fromName, $availableAt, true) || $result;
-        }
-        return $result;
-    }
-
     return $stmt->execute([
         ':related_type' => $relatedType,
         ':related_id' => $relatedId,
@@ -2186,26 +2206,22 @@ function queue_contact_enquiry_emails(PDO $pdo, int $enquiryId, string $name, st
     $ref = 'INQ-' . str_pad((string) $enquiryId, 5, '0', STR_PAD_LEFT);
     $adminEmail = contact_admin_email();
 
-    if ($adminEmail !== '' && filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
-        $adminBody = contact_admin_email_html($name, $email, $phone, $subject, $message, $ref);
+    $adminBody = contact_admin_email_html($name, $email, $phone, $subject, $message, $ref);
 
-        if (enqueue_email(
-            $pdo,
-            'enquiry',
-            $enquiryId,
-            $adminEmail,
-            'New contact enquiry - Tulip Guest Inn ' . $ref,
-            $adminBody,
-            'admin_contact_enquiry',
-            $email,
-            3,
-            contact_from_email(),
-            contact_from_name()
-        )) {
-            $queued++;
-        }
-    } else {
-        error_log('ADMIN_EMAIL is missing or invalid. Contact admin queue skipped for enquiry #' . $enquiryId);
+    if (enqueue_email(
+        $pdo,
+        'enquiry',
+        $enquiryId,
+        $adminEmail,
+        'New contact enquiry - Tulip Guest Inn ' . $ref,
+        $adminBody,
+        'admin_contact_enquiry',
+        $email,
+        3,
+        contact_from_email(),
+        contact_from_name()
+    )) {
+        $queued++;
     }
 
     if (filter_var($email, FILTER_VALIDATE_EMAIL)) {

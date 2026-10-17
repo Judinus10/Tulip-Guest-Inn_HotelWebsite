@@ -14,7 +14,7 @@ rate_limit_or_fail('password_otp_request', 5, 30);
 function ensure_admin_password_otp_table(PDO $pdo): void
 {
     $pdo->exec(
-        "CREATE TABLE IF NOT EXISTS admin_password_otps (
+        "CREATE TABLE IF NOT EXISTS admin_password_otps_v2 (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT,
             admin_user_id INT NOT NULL,
             request_token CHAR(64) NOT NULL,
@@ -25,9 +25,9 @@ function ensure_admin_password_otp_table(PDO $pdo): void
             created_at DATETIME NOT NULL,
             updated_at DATETIME NOT NULL,
             PRIMARY KEY (id),
-            UNIQUE KEY uniq_admin_password_otps_token (request_token),
-            KEY idx_admin_password_otps_admin_user (admin_user_id),
-            KEY idx_admin_password_otps_expiry (expires_at_epoch)
+            UNIQUE KEY uniq_admin_password_otps_v2_token (request_token),
+            KEY idx_admin_password_otps_v2_admin_user (admin_user_id),
+            KEY idx_admin_password_otps_v2_expiry (expires_at_epoch)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
 }
@@ -40,10 +40,10 @@ function get_admin_password_hash(PDO $pdo, int $adminId): ?string
     return is_string($hash) && $hash !== '' ? $hash : null;
 }
 
-function cleanup_admin_password_otps(PDO $pdo, int $adminId): void
+function cleanup_admin_password_otps_v2(PDO $pdo, int $adminId): void
 {
     $stmt = $pdo->prepare(
-        'DELETE FROM admin_password_otps
+        'DELETE FROM admin_password_otps_v2
          WHERE admin_user_id = :admin_user_id
            AND (used_at IS NOT NULL OR expires_at_epoch < :expired_before)'
     );
@@ -72,7 +72,7 @@ try {
         json_response(false, 'Current password is incorrect.', 422);
     }
 
-    cleanup_admin_password_otps($pdo, (int) $admin['id']);
+    cleanup_admin_password_otps_v2($pdo, (int) $admin['id']);
 
     $recipientEmail = filter_var((string) ($admin['email'] ?? ''), FILTER_VALIDATE_EMAIL)
         ? (string) $admin['email']
@@ -99,14 +99,14 @@ try {
     $pdo->beginTransaction();
 
     $invalidate = $pdo->prepare(
-        'UPDATE admin_password_otps
+        'UPDATE admin_password_otps_v2
          SET used_at = NOW(), updated_at = NOW()
          WHERE admin_user_id = :admin_user_id AND used_at IS NULL'
     );
     $invalidate->execute([':admin_user_id' => (int) $admin['id']]);
 
     $insert = $pdo->prepare(
-        'INSERT INTO admin_password_otps
+        'INSERT INTO admin_password_otps_v2
             (admin_user_id, request_token, otp_hash, expires_at_epoch, used_at, attempts, created_at, updated_at)
          VALUES
             (:admin_user_id, :request_token, :otp_hash, :expires_at_epoch, NULL, 0, NOW(), NOW())'

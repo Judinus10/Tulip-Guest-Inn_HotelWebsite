@@ -207,7 +207,7 @@ function test_email_catalog(string $recipient): array
         'contact_customer' => [
             'label' => 'Contact auto reply - customer',
             'subject' => 'TEST: We received your message - Tulip Guest Inn ' . $contactRef,
-            'body' => contact_customer_email_html('Test Guest', $contactRef, 'Room availability question'),
+            'body' => contact_customer_email_html('Test Guest', $recipient, '+94 77 123 4567', 'Room availability question', 'This is a dummy contact message for email UI testing.', $contactRef),
             'from_email' => contact_from_email(),
             'from_name' => contact_from_name(),
         ],

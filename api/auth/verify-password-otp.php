@@ -13,7 +13,7 @@ rate_limit_or_fail('password_otp_verify', 10, 30);
 function ensure_admin_password_otp_table(PDO $pdo): void
 {
     $pdo->exec(
-        "CREATE TABLE IF NOT EXISTS admin_password_otps (
+        "CREATE TABLE IF NOT EXISTS admin_password_otps_v2 (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT,
             admin_user_id INT NOT NULL,
             request_token CHAR(64) NOT NULL,
@@ -24,9 +24,9 @@ function ensure_admin_password_otp_table(PDO $pdo): void
             created_at DATETIME NOT NULL,
             updated_at DATETIME NOT NULL,
             PRIMARY KEY (id),
-            UNIQUE KEY uniq_admin_password_otps_token (request_token),
-            KEY idx_admin_password_otps_admin_user (admin_user_id),
-            KEY idx_admin_password_otps_expiry (expires_at_epoch)
+            UNIQUE KEY uniq_admin_password_otps_v2_token (request_token),
+            KEY idx_admin_password_otps_v2_admin_user (admin_user_id),
+            KEY idx_admin_password_otps_v2_expiry (expires_at_epoch)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
 }
@@ -70,7 +70,7 @@ try {
 
     $otpStmt = $pdo->prepare(
         'SELECT id, otp_hash, expires_at_epoch, used_at, attempts
-         FROM admin_password_otps
+         FROM admin_password_otps_v2
          WHERE request_token = :request_token AND admin_user_id = :admin_user_id
          LIMIT 1'
     );
@@ -85,19 +85,19 @@ try {
     }
 
     if ((int) $otpRow['expires_at_epoch'] < time()) {
-        $expire = $pdo->prepare('UPDATE admin_password_otps SET used_at = NOW(), updated_at = NOW() WHERE id = :id');
+        $expire = $pdo->prepare('UPDATE admin_password_otps_v2 SET used_at = NOW(), updated_at = NOW() WHERE id = :id');
         $expire->execute([':id' => (int) $otpRow['id']]);
         json_response(false, 'OTP expired. Resend OTP and try again.', 410);
     }
 
     if ((int) $otpRow['attempts'] >= 5) {
-        $lock = $pdo->prepare('UPDATE admin_password_otps SET used_at = NOW(), updated_at = NOW() WHERE id = :id');
+        $lock = $pdo->prepare('UPDATE admin_password_otps_v2 SET used_at = NOW(), updated_at = NOW() WHERE id = :id');
         $lock->execute([':id' => (int) $otpRow['id']]);
         json_response(false, 'Too many incorrect OTP attempts. Start again.', 429);
     }
 
     if (!password_verify($otp, (string) $otpRow['otp_hash'])) {
-        $attempt = $pdo->prepare('UPDATE admin_password_otps SET attempts = attempts + 1, updated_at = NOW() WHERE id = :id');
+        $attempt = $pdo->prepare('UPDATE admin_password_otps_v2 SET attempts = attempts + 1, updated_at = NOW() WHERE id = :id');
         $attempt->execute([':id' => (int) $otpRow['id']]);
         json_response(false, 'Invalid OTP.', 422);
     }
@@ -118,7 +118,7 @@ try {
         ':id' => (int) $admin['id'],
     ]);
 
-    $markUsed = $pdo->prepare('UPDATE admin_password_otps SET used_at = NOW(), updated_at = NOW() WHERE id = :id');
+    $markUsed = $pdo->prepare('UPDATE admin_password_otps_v2 SET used_at = NOW(), updated_at = NOW() WHERE id = :id');
     $markUsed->execute([':id' => (int) $otpRow['id']]);
 
     $revokeOtherSessions = $pdo->prepare(

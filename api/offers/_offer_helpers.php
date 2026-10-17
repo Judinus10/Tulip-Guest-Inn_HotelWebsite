@@ -61,6 +61,12 @@ function offer_ensure_schema(PDO $pdo): void
     offer_add_column_if_missing($pdo, 'start_date', "DATE NULL");
     offer_add_column_if_missing($pdo, 'end_date', "DATE NULL");
     offer_add_column_if_missing($pdo, 'sort_order', "INT NOT NULL DEFAULT 0");
+    offer_add_column_if_missing($pdo, 'booking_scope', "VARCHAR(10) NOT NULL DEFAULT 'both'");
+    offer_add_column_if_missing($pdo, 'minimum_nights', "INT NOT NULL DEFAULT 1");
+    offer_add_column_if_missing($pdo, 'minimum_rooms', "INT NOT NULL DEFAULT 1");
+    offer_add_column_if_missing($pdo, 'minimum_guests', "INT NOT NULL DEFAULT 1");
+    offer_add_column_if_missing($pdo, 'priority', "INT NOT NULL DEFAULT 0");
+    offer_add_column_if_missing($pdo, 'automatic_apply', "TINYINT(1) NOT NULL DEFAULT 1");
 }
 
 function offer_bootstrap(bool $requireAuth = true): PDO
@@ -139,6 +145,20 @@ function offer_upload_image(string $fieldName = 'image'): ?string
     return 'uploads/offers/' . $result['filename'];
 }
 
+/** Store the local upload path even when the edit form sends its public URL. */
+function offer_storable_image_path(?string $value): string
+{
+    $value = trim((string) $value);
+    if ($value === '') return '';
+    $path = parse_url($value, PHP_URL_PATH);
+    if (!is_string($path)) throw new InvalidArgumentException('Invalid offer image path.');
+    $filename = rawurldecode(basename(str_replace('\\', '/', $path)));
+    if (!preg_match('/^[a-zA-Z0-9_. -]+\.(?:jpg|jpeg|png|webp)$/iD', $filename)) {
+        throw new InvalidArgumentException('Invalid offer image filename.');
+    }
+    return 'uploads/offers/' . $filename;
+}
+
 function offer_parse_details(mixed $details): array
 {
     if (is_array($details)) {
@@ -185,6 +205,12 @@ function offer_normalize(array $row): array
         'start_date' => $row['start_date'] ?? '',
         'end_date' => $row['end_date'] ?? '',
         'sort_order' => (int) ($row['sort_order'] ?? 0),
+        'booking_scope' => in_array(($row['booking_scope'] ?? 'both'), ['single', 'multi', 'both'], true) ? ($row['booking_scope'] ?? 'both') : 'both',
+        'minimum_nights' => max(1, (int) ($row['minimum_nights'] ?? 1)),
+        'minimum_rooms' => max(1, (int) ($row['minimum_rooms'] ?? 1)),
+        'minimum_guests' => max(1, (int) ($row['minimum_guests'] ?? 1)),
+        'priority' => (int) ($row['priority'] ?? 0),
+        'automatic_apply' => (bool) ($row['automatic_apply'] ?? true),
         'created_at' => $row['created_at'] ?? '',
         'updated_at' => $row['updated_at'] ?? '',
     ];

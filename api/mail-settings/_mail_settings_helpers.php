@@ -176,6 +176,7 @@ function mail_settings_audit(PDO $pdo, array $admin, string $action, string $typ
 function mail_function_key_for_type(string $emailType, string $relatedType = ''): string
 {
     $type = strtolower($emailType);
+    if (str_starts_with($type, 'admin_stay_reminder') || strtolower($relatedType) === 'admin_stay_reminder') return 'admin_alert';
     if (str_contains($type, 'contact_auto') || str_contains($type, 'customer_contact')) return 'contact_auto_reply';
     if (str_contains($type, 'contact') || strtolower($relatedType) === 'enquiry') return 'contact';
     if (str_contains($type, 'reminder') || str_contains($type, 'stay')) return 'stay_reminder';
@@ -207,7 +208,7 @@ function database_mail_profile(PDO $pdo, string $functionKey): ?array
 function mail_route(PDO $pdo, string $functionKey): ?array
 {
     ensure_mail_settings_tables($pdo);
-    $stmt = $pdo->prepare('SELECT * FROM mail_routing_rules WHERE function_key = :function_key AND is_enabled = 1 LIMIT 1');
+    $stmt = $pdo->prepare('SELECT * FROM mail_routing_rules WHERE function_key = :function_key LIMIT 1');
     $stmt->execute([':function_key' => $functionKey]);
     $route = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$route) return null;

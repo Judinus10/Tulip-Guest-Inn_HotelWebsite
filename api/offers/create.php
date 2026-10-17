@@ -15,7 +15,7 @@ try {
     $endDate = offer_clean($_POST['end_date'] ?? '', 10);
     $status = offer_valid_status((string) ($_POST['status'] ?? 'active'));
     $sortOrder = (int) ($_POST['sort_order'] ?? 0);
-    $bookingScope = in_array(($_POST['booking_scope'] ?? 'both'), ['single', 'multi', 'both'], true) ? $_POST['booking_scope'] : 'both';
+    $bookingScope = in_array(($_POST['booking_scope'] ?? 'both'), ['single', 'multi', 'both'], true) ? ($_POST['booking_scope'] ?? 'both') : 'both';
     $minimumNights = max(1, (int) ($_POST['minimum_nights'] ?? 1));
     $minimumRooms = max(1, (int) ($_POST['minimum_rooms'] ?? 1));
     $minimumGuests = max(1, (int) ($_POST['minimum_guests'] ?? 1));

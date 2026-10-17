@@ -359,7 +359,6 @@ a{text-decoration:none;}
 </tr></table>
 </td></tr>
 </table>
-' . $button . '
 <div class="booking-customer-help" style="padding:22px 0 24px;border-top:1px solid #dfe3ea;">
 <div class="booking-customer-help-title" style="margin:0 0 14px;color:#071230;font-size:14px;line-height:1.35;font-weight:800;">Need help?</div>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" class="booking-customer-help-items" style="width:100%;"><tr>

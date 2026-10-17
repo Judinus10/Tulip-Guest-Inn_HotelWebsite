@@ -106,12 +106,44 @@ function microsoft_graph_access_token(array $config): string
     return (string) $json['access_token'];
 }
 
-function send_via_microsoft_graph(array $config, string $to, string $subject, string $html): bool
+/** Only application-owned files referenced by CID are attached. */
+function provider_inline_assets(string $html): array
+{
+    if (!function_exists('email_icon_file_map')) return [];
+    $paths = ['jebal-brand-logo' => email_logo_path(), 'complyx-brand-logo' => email_company_logo_path()];
+    foreach (email_icon_file_map() as $name => $path) $paths['jebal-email-icon-' . $name] = $path;
+    $assets = [];
+    foreach ($paths as $cid => $path) {
+        if ($path !== '' && is_file($path) && str_contains($html, 'cid:' . $cid)) {
+            $assets[] = ['path' => $path, 'cid' => $cid, 'name' => basename($path), 'mime' => email_image_mime_type($path)];
+        }
+    }
+    return $assets;
+}
+
+function provider_graph_message(string $to, string $subject, string $html, ?string $replyTo = null): array
+{
+    $message = ['subject' => $subject, 'body' => ['contentType' => 'HTML', 'content' => $html],
+        'toRecipients' => [['emailAddress' => ['address' => $to]]]];
+    if ($replyTo !== null && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
+        $message['replyTo'] = [['emailAddress' => ['address' => $replyTo]]];
+    }
+    foreach (provider_inline_assets($html) as $asset) {
+        $bytes = file_get_contents($asset['path']);
+        if ($bytes === false) throw new RuntimeException('Unable to read an embedded email image.');
+        $message['attachments'][] = ['@odata.type' => '#microsoft.graph.fileAttachment',
+            'name' => $asset['name'], 'contentType' => $asset['mime'], 'contentId' => $asset['cid'],
+            'isInline' => true, 'contentBytes' => base64_encode($bytes)];
+    }
+    return $message;
+}
+
+function send_via_microsoft_graph(array $config, string $to, string $subject, string $html, ?string $replyTo = null): bool
 {
     $sender = trim((string) ($config['sender_email'] ?? ''));
     if (!filter_var($sender, FILTER_VALIDATE_EMAIL)) throw new RuntimeException('The Office 365 sender address is invalid.');
     $token = microsoft_graph_access_token($config);
-    $payload = ['message'=>['subject'=>$subject, 'body'=>['contentType'=>'HTML','content'=>$html], 'toRecipients'=>[['emailAddress'=>['address'=>$to]]]], 'saveToSentItems'=>true];
+    $payload = ['message' => provider_graph_message($to, $subject, $html, $replyTo), 'saveToSentItems' => true];
     [$status, $body] = provider_http_request('https://graph.microsoft.com/v1.0/users/' . rawurlencode($sender) . '/sendMail', [
         CURLOPT_POST => true,
         CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $token, 'Content-Type: application/json'],
@@ -121,7 +153,7 @@ function send_via_microsoft_graph(array $config, string $to, string $subject, st
     return true;
 }
 
-function send_via_provider_smtp(array $config, string $to, string $subject, string $html): bool
+function send_via_provider_smtp(array $config, string $to, string $subject, string $html, ?string $replyTo = null): bool
 {
     if (!class_exists(\PHPMailer\PHPMailer\PHPMailer::class)) throw new RuntimeException('The server mail library is unavailable.');
     $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
@@ -137,6 +169,10 @@ function send_via_provider_smtp(array $config, string $to, string $subject, stri
     $mail->CharSet = 'UTF-8';
     $mail->setFrom((string) $config['sender_email'], (string) $config['sender_name']);
     $mail->addAddress($to);
+    if ($replyTo !== null && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) $mail->addReplyTo($replyTo);
+    foreach (provider_inline_assets($html) as $asset) {
+        $mail->addEmbeddedImage($asset['path'], $asset['cid'], $asset['name'], 'base64', $asset['mime']);
+    }
     $mail->isHTML(true);
     $mail->Subject = $subject;
     $mail->Body = $html;
@@ -145,12 +181,12 @@ function send_via_provider_smtp(array $config, string $to, string $subject, stri
 }
 
 /** Returns null when no database-managed provider is active. */
-function send_via_active_provider(PDO $pdo, string $to, string $subject, string $html): ?bool
+function send_via_active_provider(PDO $pdo, string $to, string $subject, string $html, ?string $replyTo = null): ?bool
 {
     $config = active_provider_setting($pdo);
     if (!$config) return null;
     if ((string) $config['provider'] === 'microsoft_graph' && !empty($config['oauth_client_id']) && !empty($config['encrypted_client_secret'])) {
-        return send_via_microsoft_graph($config, $to, $subject, $html);
+        return send_via_microsoft_graph($config, $to, $subject, $html, $replyTo);
     }
-    return send_via_provider_smtp($config, $to, $subject, $html);
+    return send_via_provider_smtp($config, $to, $subject, $html, $replyTo);
 }

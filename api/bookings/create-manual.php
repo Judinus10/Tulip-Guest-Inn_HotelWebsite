@@ -208,6 +208,7 @@ try {
         'status' => $bookingStatus,
         'booking_status' => $bookingStatus,
         'payment_status' => $paymentStatus,
+        'payment_method' => $paymentMethod === '' ? 'Cash' : $paymentMethod,
         'amount' => $amount,
         'currency' => PAYMENT_CURRENCY,
     ];

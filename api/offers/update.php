@@ -25,12 +25,12 @@ try {
     $endDate = offer_clean($_POST['end_date'] ?? '', 10);
     $status = offer_valid_status((string) ($_POST['status'] ?? 'active'));
     $sortOrder = (int) ($_POST['sort_order'] ?? ($existing['sort_order'] ?? 0));
-    $bookingScope = in_array(($_POST['booking_scope'] ?? 'both'), ['single', 'multi', 'both'], true) ? $_POST['booking_scope'] : 'both';
-    $minimumNights = max(1, (int) ($_POST['minimum_nights'] ?? 1));
-    $minimumRooms = max(1, (int) ($_POST['minimum_rooms'] ?? 1));
-    $minimumGuests = max(1, (int) ($_POST['minimum_guests'] ?? 1));
-    $priority = (int) ($_POST['priority'] ?? 0);
-    $automaticApply = filter_var($_POST['automatic_apply'] ?? true, FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
+    $bookingScope = in_array(($_POST['booking_scope'] ?? $existing['booking_scope'] ?? 'both'), ['single', 'multi', 'both'], true) ? ($_POST['booking_scope'] ?? $existing['booking_scope'] ?? 'both') : 'both';
+    $minimumNights = max(1, (int) ($_POST['minimum_nights'] ?? $existing['minimum_nights'] ?? 1));
+    $minimumRooms = max(1, (int) ($_POST['minimum_rooms'] ?? $existing['minimum_rooms'] ?? 1));
+    $minimumGuests = max(1, (int) ($_POST['minimum_guests'] ?? $existing['minimum_guests'] ?? 1));
+    $priority = (int) ($_POST['priority'] ?? $existing['priority'] ?? 0);
+    $automaticApply = filter_var($_POST['automatic_apply'] ?? $existing['automatic_apply'] ?? true, FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
 
     if ($title === '' || $description === '') {
         offer_json(['success' => false, 'message' => 'Title and description are required.'], 400);
@@ -43,7 +43,7 @@ try {
     offer_validate_dates($startDate, $endDate);
 
     $uploadedImage = offer_upload_image('image');
-    $imagePath = $uploadedImage ?? offer_storable_image_path($_POST['image_path'] ?? '');
+    $imagePath = $uploadedImage ?? offer_storable_image_path($_POST['image_path'] ?? $existing['image_path'] ?? '');
     $discountLabel = offer_format_discount_label($discountType, $discountValue);
     $details = json_encode(offer_parse_details($_POST['details'] ?? []), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
