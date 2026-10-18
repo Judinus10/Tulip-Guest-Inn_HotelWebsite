@@ -26,12 +26,29 @@ try {
         KEY idx_admin_email_change_user (admin_user_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
-    if ($action === 'request') {
+    ensure_admin_resend_column($pdo, 'admin_email_change_requests');
+
+    if (in_array($action, ['request', 'resend'], true)) {
         // Delivery retries must never consume the verification allowance.
-        rate_limit_or_fail('admin_email_send', 8, 30);
-        rate_limit_subject('admin_email_send_user', (string)$admin['id'], 8, 30);
+        $isResend = $action === 'resend';
+        rate_limit_or_fail($isResend ? 'admin_email_code_resend' : 'admin_email_send', $isResend ? 10 : 8, 30);
+        rate_limit_subject($isResend ? 'admin_email_resend_user' : 'admin_email_send_user', (string)$admin['id'], $isResend ? 6 : 8, 30);
+        $resendCount = 0;
+        $previous = null;
+        if ($isResend) {
+            $oldToken = (string)($data['request_token'] ?? '');
+            if (!preg_match('/^[a-f0-9]{64}$/D', $oldToken)) json_response(false, 'Invalid verification request. Start again.', 422);
+            $lookup = $pdo->prepare('SELECT * FROM admin_email_change_requests WHERE request_hash=? AND admin_user_id=?');
+            $lookup->execute([hash('sha256',$oldToken),(int)$admin['id']]);
+            $previous = $lookup->fetch(PDO::FETCH_ASSOC);
+            if (!$previous || $previous['used_at'] !== null) json_response(false, 'This code has been replaced or used. Start again.', 410);
+            $resendCount = (int)($previous['resend_count'] ?? 0);
+            if ($resendCount >= ADMIN_VERIFICATION_MAX_RESENDS) json_response(false, 'You have used both resends. Close this dialog and start a new verification.', 429, ['error_code'=>'OTP_RESEND_LIMIT']);
+            if ((int)$previous['attempts'] >= 5) json_response(false, 'Too many incorrect codes. Start again.', 429);
+            if ((int)$previous['expires_at_epoch'] > time()) json_response(false, 'Wait until the current code expires before resending.', 429);
+        }
         $password = (string) ($data['current_password'] ?? '');
-        $newEmail = mb_strtolower(trim((string) ($data['new_email'] ?? '')));
+        $newEmail = $previous ? (string)$previous['new_email'] : mb_strtolower(trim((string) ($data['new_email'] ?? '')));
         if (strlen($newEmail) > 190 || !filter_var($newEmail, FILTER_VALIDATE_EMAIL)) json_response(false, 'Enter a valid new email.', 422);
         $stmt = $pdo->prepare('SELECT email, password_hash FROM admin_users WHERE id = ? AND is_active = 1');
         $stmt->execute([(int) $admin['id']]);
@@ -51,10 +68,10 @@ try {
         $pdo->beginTransaction();
         $invalidate = $pdo->prepare('UPDATE admin_email_change_requests SET used_at = NOW() WHERE admin_user_id = ? AND used_at IS NULL');
         $invalidate->execute([(int) $admin['id']]);
-        $insert = $pdo->prepare('INSERT INTO admin_email_change_requests (admin_user_id, new_email, request_hash, otp_hash, expires_at_epoch) VALUES (?, ?, ?, ?, ?)');
-        $insert->execute([(int) $admin['id'], $newEmail, hash('sha256', $token), $otpHash, $expiresAtEpoch]);
+        $insert = $pdo->prepare('INSERT INTO admin_email_change_requests (admin_user_id, new_email, request_hash, otp_hash, expires_at_epoch, resend_count) VALUES (?, ?, ?, ?, ?, ?)');
+        $insert->execute([(int) $admin['id'], $newEmail, hash('sha256', $token), $otpHash, $expiresAtEpoch, $isResend ? $resendCount + 1 : 0]);
         $pdo->commit();
-        json_response(true, 'Verification code sent to the new email.', 200, ['data' => ['request_token' => $token, 'expires_in' => max(0, $expiresAtEpoch - time())]]);
+        json_response(true, 'Verification code sent to the new email.', 200, ['data' => ['request_token' => $token, 'expires_in' => max(0, $expiresAtEpoch - time()), 'email'=>$newEmail, 'resends_remaining'=>ADMIN_VERIFICATION_MAX_RESENDS - ($isResend ? $resendCount + 1 : 0)]]);
     }
 
     if ($action !== 'verify') json_response(false, 'Invalid action.', 422);

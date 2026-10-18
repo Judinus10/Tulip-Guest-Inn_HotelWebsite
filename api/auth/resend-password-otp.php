@@ -9,7 +9,7 @@ apply_cors_headers();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(false, 'Only POST requests are allowed.', 405);
 }
-rate_limit_or_fail('password_otp_resend', 4, 30);
+rate_limit_or_fail('password_code_resend', 10, 30);
 
 function ensure_admin_password_otp_table(PDO $pdo): void
 {
@@ -34,7 +34,7 @@ function ensure_admin_password_otp_table(PDO $pdo): void
 
 try {
     $admin = require_admin_auth();
-    rate_limit_subject('otp_resend', (string)$admin['id'], 10, 30);
+    rate_limit_subject('password_code_resend_user', (string)$admin['id'], 6, 30);
     security_lock_account(get_db_connection(), (int)$admin['id']);
     $data = read_request_data();
 
@@ -46,9 +46,10 @@ try {
 
     $pdo = get_db_connection();
     ensure_admin_password_otp_table($pdo);
+    ensure_admin_resend_column($pdo, 'admin_password_otps_v2');
 
     $stmt = $pdo->prepare(
-        'SELECT id, expires_at_epoch, used_at
+        'SELECT id, expires_at_epoch, used_at, attempts, resend_count
          FROM admin_password_otps_v2
          WHERE request_token = :request_token AND admin_user_id = :admin_user_id
          LIMIT 1'
@@ -62,6 +63,10 @@ try {
     if (!$existing || !empty($existing['used_at'])) {
         json_response(false, 'OTP request is no longer valid. Start again.', 410);
     }
+
+    $resendCount = (int)($existing['resend_count'] ?? 0);
+    if ($resendCount >= ADMIN_VERIFICATION_MAX_RESENDS) json_response(false, 'You have used both resends. Close this dialog and start a new verification.', 429, ['error_code'=>'OTP_RESEND_LIMIT']);
+    if ((int)($existing['attempts'] ?? 0) >= 5) json_response(false, 'Too many incorrect codes. Start a new verification.', 429);
 
     if ((int) $existing['expires_at_epoch'] > time()) {
         json_response(false, 'Wait until the current OTP expires before resending.', 429, [
@@ -102,15 +107,16 @@ try {
 
     $insert = $pdo->prepare(
         'INSERT INTO admin_password_otps_v2
-            (admin_user_id, request_token, otp_hash, expires_at_epoch, used_at, attempts, created_at, updated_at)
+            (admin_user_id, request_token, otp_hash, expires_at_epoch, used_at, attempts, resend_count, created_at, updated_at)
          VALUES
-            (:admin_user_id, :request_token, :otp_hash, :expires_at_epoch, NULL, 0, NOW(), NOW())'
+            (:admin_user_id, :request_token, :otp_hash, :expires_at_epoch, NULL, 0, :resend_count, NOW(), NOW())'
     );
     $insert->execute([
         ':admin_user_id' => (int) $admin['id'],
         ':request_token' => $requestToken,
         ':otp_hash' => $otpHash,
         ':expires_at_epoch' => $expiresAtEpoch,
+        ':resend_count' => $resendCount + 1,
     ]);
 
     $pdo->commit();
@@ -120,6 +126,7 @@ try {
             'request_token' => $requestToken,
             'expires_in' => max(0, $expiresAtEpoch - time()),
             'email' => $recipientEmail,
+            'resends_remaining' => ADMIN_VERIFICATION_MAX_RESENDS - $resendCount - 1,
         ],
     ]);
 } catch (Throwable $e) {
