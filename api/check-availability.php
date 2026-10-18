@@ -37,7 +37,7 @@ try {
     expire_pending_bookings($pdo, null, false);
 
     if ($roomId > 0) {
-        $roomStmt = $pdo->prepare('SELECT id, room_name FROM rooms WHERE id = :id LIMIT 1');
+        $roomStmt = $pdo->prepare('SELECT id, room_name, status FROM rooms WHERE id = :id LIMIT 1');
         $roomStmt->execute([':id' => $roomId]);
         $room = $roomStmt->fetch();
 
@@ -47,7 +47,7 @@ try {
 
         $roomName = (string) $room['room_name'];
     } else {
-        $roomStmt = $pdo->prepare('SELECT id, room_name FROM rooms WHERE room_name = :room_name LIMIT 1');
+        $roomStmt = $pdo->prepare('SELECT id, room_name, status FROM rooms WHERE room_name = :room_name LIMIT 1');
         $roomStmt->execute([':room_name' => $roomName]);
         $room = $roomStmt->fetch();
         if (!$room) {
@@ -73,7 +73,7 @@ try {
     ]);
     $conflict = $stmt->fetch();
     $bookingComConflict = ics_room_conflict($pdo, $roomId, $checkInDate, $availabilityCheckOutDate);
-    $unavailable = (bool) $conflict || $bookingComConflict;
+    $unavailable = strcasecmp((string) ($room['status'] ?? ''), 'Available') !== 0 || (bool) $conflict || $bookingComConflict;
 
     json_response(true, $unavailable ? 'Room is unavailable for the selected dates.' : 'Room is available.', 200, [
         'available' => !$unavailable,

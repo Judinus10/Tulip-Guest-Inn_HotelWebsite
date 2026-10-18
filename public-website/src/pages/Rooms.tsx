@@ -4,7 +4,6 @@ import { BedDouble, Calendar, Users } from 'lucide-react';
 import PageHero from '../components/ui/PageHero';
 import RoomCard from '../components/ui/RoomCard';
 import CTASection from '../components/ui/CTASection';
-import { rooms as fallbackRooms } from '../data/rooms';
 import type { Room } from '../data/rooms';
 import { fetchPublicRooms } from '../services/publicApi';
 import bannerRooms from '../assets/images/banners/banner-rooms.jpg';
@@ -40,7 +39,7 @@ export default function Rooms() {
   const urlFilters = useMemo(() => readFilters(searchParams), [searchParams]);
   const [form, setForm] = useState(urlFilters);
   const [active, setActive] = useState<Category>('all');
-  const [roomList, setRoomList] = useState<Room[]>(fallbackRooms);
+  const [roomList, setRoomList] = useState<Room[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -71,13 +70,14 @@ export default function Rooms() {
     // Load every available physical room for the dates. Filtering the API by
     // total guests here would incorrectly demand one room for the whole group.
     fetchPublicRooms(params).then((data) => { if (mounted) setRoomList(data); })
-      .catch((e) => { if (mounted) { const message=e instanceof Error?e.message:'Unable to load rooms.'; setRoomList(hasDates ? [] : fallbackRooms); setError(message); toast.error(message); } })
+      .catch((e) => { if (mounted) { const message=e instanceof Error?e.message:'Unable to load rooms.'; setRoomList([]); setError(message); toast.error(message); } })
       .finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
   }, [urlFilters.checkIn, urlFilters.checkOut]);
 
   const guests = Math.max(1, Number(form.guests));
   const hasSearched = Boolean(urlFilters.checkIn && urlFilters.checkOut && urlFilters.checkOut > urlFilters.checkIn);
+  const datesPending = Boolean((form.checkIn || form.checkOut) && (!form.checkIn || !form.checkOut || form.checkOut <= form.checkIn || form.checkIn !== urlFilters.checkIn || form.checkOut !== urlFilters.checkOut));
   const categoryRooms = active === 'all' ? roomList : roomList.filter((room) => room.category === active);
   const singleRoomMatches = categoryRooms.filter((room) => room.guests >= guests);
   const suggestedRooms = minimumRoomCombination(categoryRooms, guests);
@@ -128,7 +128,7 @@ export default function Rooms() {
     </div></section>
 
     <section className="section-padding bg-background"><div className="container-custom">
-      {hasSearched && needsMultipleRooms && <div className="mb-10 border border-gold/40 bg-gold/5 p-7 text-center">
+      {hasSearched && !datesPending && !loading && needsMultipleRooms && <div className="mb-10 border border-gold/40 bg-gold/5 p-7 text-center">
         <p className="text-[10px] uppercase tracking-[0.22em] text-gold">Multiple rooms recommended</p>
         <h2 className="mt-2 font-serif text-2xl text-dark">{guests} guests require at least {suggestedRooms.length} available rooms</h2>
         <p className="mt-2 text-sm text-gray-500">Suggested combined capacity: {suggestedCapacity} guests. You can change the assigned rooms and guest allocation on the next page.</p>
@@ -136,7 +136,7 @@ export default function Rooms() {
       </div>}
 
       {hasSearched && !loading && singleRoomMatches.length > 0 && <div className="mb-8 border border-border bg-white p-5 text-center text-sm text-gray-500">These rooms can accommodate all {guests} guests in one room. You may book one directly.</div>}
-      {loading ? <p className="py-20 text-center text-gray-400">Checking availability...</p> : categoryRooms.length === 0 ? <p className="py-20 text-center text-gray-400">No rooms are available for the selected dates.</p> : resultRooms.length === 0 ? <div className="py-20 text-center"><p className="text-gray-500">No room is available for a capacity of {guests} guests.</p><p className="mt-2 text-sm text-gray-400">Please use the multiple-room booking option above.</p></div> : <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{resultRooms.map((room,i)=><RoomCard key={room.id} room={room} index={i}/>)}</div>}
+      {datesPending ? <p className="py-20 text-center text-gray-400">Select valid check-in and check-out dates to see available rooms.</p> : loading ? <p className="py-20 text-center text-gray-400">Checking availability...</p> : categoryRooms.length === 0 ? <p className="py-20 text-center text-gray-400">No rooms are available for the selected dates.</p> : resultRooms.length === 0 ? <div className="py-20 text-center"><p className="text-gray-500">No room is available for a capacity of {guests} guests.</p><p className="mt-2 text-sm text-gray-400">Please use the multiple-room booking option above.</p></div> : <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{resultRooms.map((room,i)=><RoomCard key={room.id} room={room} index={i}/>)}</div>}
     </div></section>
     <CTASection title="Ready for a Restful Stay?" subtitle="Our team is on hand to help you find the perfect rooms for your visit." btnLabel="Book Your Room" btnPath="/booking" />
   </main>;

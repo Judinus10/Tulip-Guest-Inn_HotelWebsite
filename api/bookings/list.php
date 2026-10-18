@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../calendar/ics-helper.php';
 require_once __DIR__ . '/multi-room-helper.php';
+require_once __DIR__ . '/../rooms/_room_helpers.php';
 
 apply_cors_headers();
 
@@ -16,6 +17,8 @@ require_admin_auth();
 
 try {
     $pdo = get_db_connection();
+    ensure_rooms_schema($pdo);
+    $roomNumbers = $pdo->query('SELECT id, room_number FROM rooms')->fetchAll(PDO::FETCH_KEY_PAIR);
     $stmt = $pdo->query(
         "SELECT
             b.id,
@@ -45,7 +48,7 @@ try {
                 WHEN b.room_name = 'Private Cottage' THEN 'Cottage'
                 ELSE 'Guest House'
             END AS room_type,
-            CONCAT('R', LPAD(COALESCE(r.id, b.id), 2, '0')) AS room_code,
+            COALESCE(NULLIF(r.room_number, ''), CONCAT('R', LPAD(COALESCE(r.id, b.id), 2, '0'))) AS room_code,
             CASE
                 WHEN b.room_name = 'Private Cottage' THEN 'Cottage'
                 ELSE 'Guest House'
@@ -98,12 +101,14 @@ try {
             'booking_id' => (int) $row['id'],
             'room_id' => (int) ($row['room_id'] ?? 0),
             'room_name' => (string) ($row['room_name'] ?? ''),
+            'room_code' => (string) (($roomNumbers[(int) $row['room_id']] ?? '') ?: ('R' . str_pad((string) $row['room_id'], 2, '0', STR_PAD_LEFT))),
             'guests' => (int) ($row['guests'] ?? 0),
             'capacity' => (int) ($row['max_guests'] ?? 0),
             'price_per_night' => (float) ($row['base_price'] ?? 0),
             'amount' => (float) ($row['amount'] ?? 0),
         ], $groupRows);
         $bookingRow['room_count'] = count($groupRows);
+        $bookingRow['room_code'] = implode(', ', array_column($bookingRow['group_rooms'], 'room_code'));
         $bookingRow['room_name'] = implode(', ', array_column($groupRows, 'room_name'));
         $bookingRow['guests'] = array_sum(array_map(static fn(array $row): int => (int) ($row['guests'] ?? 0), $groupRows));
         $bookingRow['adults'] = $bookingRow['guests'];
@@ -113,7 +118,7 @@ try {
     $external = [];
     if (ics_enabled()) {
         ensure_ics_schema($pdo);
-        $external = $pdo->query("SELECT e.id, CONCAT('BC-', LPAD(e.id,5,'0')) booking_no, CASE WHEN e.is_active=0 OR UPPER(COALESCE(e.status,'')) IN ('CANCELLED','CANCELED') THEN 'Booking.com cancelled reservation' ELSE 'Booking.com reservation' END guest_name, '' guest_email, '' guest_phone, '' booker_name, '' booker_email, '' booker_phone, 0 is_booking_for_other, NULL staying_guest_name, NULL staying_guest_email, NULL staying_guest_phone, NULL staying_guest_note, r.id room_id, r.room_name, 'External' room_type, CONCAT('R',LPAD(r.id,2,'0')) room_code, 'Guest House' property_type, e.start_date check_in_date, e.end_date check_out_date, e.start_date check_in, e.end_date check_out, 0 guests, 0 adults, 0 children, GREATEST(1,DATEDIFF(e.end_date,e.start_date)) total_nights, '' special_requests, '' special_request, CASE WHEN e.is_active=0 OR UPPER(COALESCE(e.status,'')) IN ('CANCELLED','CANCELED') THEN 'cancelled' ELSE 'external' END booking_status, 'External' payment_status, 0 total_amount, 'USD' payment_currency, NULL invoice_number, NULL invoice_file_path, 'N/A' email_status, e.created_at, e.updated_at, 'booking.com' source, s.last_sync_status sync_status, s.last_sync_completed_at last_synced_at, e.is_active external_is_active, e.status external_status FROM external_calendar_events e JOIN rooms r ON r.id=e.room_id LEFT JOIN external_calendar_sync_status s ON s.room_id=e.room_id ORDER BY e.start_date DESC, e.created_at DESC")->fetchAll();
+        $external = $pdo->query("SELECT e.id, CONCAT('BC-', LPAD(e.id,5,'0')) booking_no, CASE WHEN e.is_active=0 OR UPPER(COALESCE(e.status,'')) IN ('CANCELLED','CANCELED') THEN 'Booking.com cancelled reservation' ELSE 'Booking.com reservation' END guest_name, '' guest_email, '' guest_phone, '' booker_name, '' booker_email, '' booker_phone, 0 is_booking_for_other, NULL staying_guest_name, NULL staying_guest_email, NULL staying_guest_phone, NULL staying_guest_note, r.id room_id, r.room_name, 'External' room_type, COALESCE(NULLIF(r.room_number,''),CONCAT('R',LPAD(r.id,2,'0'))) room_code, 'Guest House' property_type, e.start_date check_in_date, e.end_date check_out_date, e.start_date check_in, e.end_date check_out, 0 guests, 0 adults, 0 children, GREATEST(1,DATEDIFF(e.end_date,e.start_date)) total_nights, '' special_requests, '' special_request, CASE WHEN e.is_active=0 OR UPPER(COALESCE(e.status,'')) IN ('CANCELLED','CANCELED') THEN 'cancelled' ELSE 'external' END booking_status, 'External' payment_status, 0 total_amount, 'USD' payment_currency, NULL invoice_number, NULL invoice_file_path, 'N/A' email_status, e.created_at, e.updated_at, 'booking.com' source, s.last_sync_status sync_status, s.last_sync_completed_at last_synced_at, e.is_active external_is_active, e.status external_status FROM external_calendar_events e JOIN rooms r ON r.id=e.room_id LEFT JOIN external_calendar_sync_status s ON s.room_id=e.room_id ORDER BY e.start_date DESC, e.created_at DESC")->fetchAll();
     }
     // Merge website and Booking.com records first, then apply one shared
     // newest-first order. Sorting each source separately before appending

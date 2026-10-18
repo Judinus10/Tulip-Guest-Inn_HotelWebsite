@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import { Calendar, Users, Home, Check, Phone, Mail } from 'lucide-react';
 import PageHero from '../components/ui/PageHero';
 import AnimatedSection from '../components/ui/AnimatedSection';
-import { rooms as fallbackRooms } from '../data/rooms';
 import type { Room } from '../data/rooms';
 import { createCheckoutSession, fetchPublicFeatures, fetchPublicRooms, submitBookingRequest } from '../services/publicApi';
 import bannerBooking from '../assets/images/banners/banner-booking.jpg';
@@ -68,8 +67,11 @@ export default function Booking() {
     stayingGuestNote: '',
     paymentMethod: 'Cash',
   });
-  const [bookingRooms, setBookingRooms] = useState<Room[]>(fallbackRooms);
+  const [bookingRooms, setBookingRooms] = useState<Room[]>([]);
   const [submitError, setSubmitError] = useState('');
+  const availabilityKey = `${form.checkIn}|${form.checkOut}|${form.guests}`;
+  const [checkedAvailabilityKey, setCheckedAvailabilityKey] = useState('');
+  const [availabilityError, setAvailabilityError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [onlinePaymentEnabled, setOnlinePaymentEnabled] = useState(false);
   const [arrivalEnabled, setArrivalEnabled] = useState(false);
@@ -135,12 +137,14 @@ export default function Booking() {
       params.guests = form.guests;
     }
 
+    setBookingRooms([]);
+    setAvailabilityError('');
     fetchPublicRooms(params)
       .then((backendRooms) => {
-        if (mounted) setBookingRooms(backendRooms);
+        if (mounted) { setBookingRooms(backendRooms); setCheckedAvailabilityKey(availabilityKey); }
       })
       .catch(() => {
-        if (mounted) setBookingRooms(hasDateFilter ? [] : fallbackRooms);
+        if (mounted) { setBookingRooms([]); setAvailabilityError('Unable to check room availability. Please try again.'); setCheckedAvailabilityKey(availabilityKey); }
       });
 
     return () => {
@@ -148,8 +152,9 @@ export default function Booking() {
     };
   }, [form.checkIn, form.checkOut, form.guests]);
 
-  const roomTypeOptions = buildRoomTypeOptions(bookingRooms);
-  const selectedRoom = bookingRooms.find((r) => r.slug === form.roomType);
+  const availabilityReady = checkedAvailabilityKey === availabilityKey && !availabilityError;
+  const roomTypeOptions = buildRoomTypeOptions(availabilityReady ? bookingRooms : []);
+  const selectedRoom = (availabilityReady ? bookingRooms : []).find((r) => r.slug === form.roomType);
 
   const nights =
     form.checkIn && form.checkOut
@@ -191,8 +196,8 @@ export default function Booking() {
     }
 
     if (!selectedRoom) {
-      setSubmitError('Please select a valid room type.');
-      toast.warning('Please select a valid room type.');
+      setSubmitError(availabilityError || 'Choose an available room for these dates and guest count.');
+      toast.warning(availabilityError || 'Choose an available room for these dates and guest count.');
       return;
     }
 
@@ -571,7 +576,7 @@ export default function Booking() {
                   </div>
                 )}
 
-                <button type="submit" className="btn-primary w-full justify-center py-4 text-xs" disabled={(!arrivalEnabled && !onlinePaymentEnabled) || isSubmitting}>
+                <button type="submit" className="btn-primary w-full justify-center py-4 text-xs" disabled={(!arrivalEnabled && !onlinePaymentEnabled) || isSubmitting || !availabilityReady || !selectedRoom}>
                   {isSubmitting
                     ? form.paymentMethod === 'Cash' ? 'Submitting Booking...' : 'Preparing Payment...'
                     : form.paymentMethod === 'Cash' ? 'Submit Booking' : 'Continue to Payment'}

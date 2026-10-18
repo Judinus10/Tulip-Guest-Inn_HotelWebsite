@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../mail/email-helper.php';
 require_once __DIR__ . '/../calendar/ics-helper.php';
+require_once __DIR__ . '/booking-expiry-helper.php';
 
 apply_cors_headers();
 require_admin_auth();
@@ -99,6 +100,7 @@ if ($guests > 20) {
 try {
     $pdo = get_db_connection();
     lock_booking_inventory($pdo);
+    if (ics_enabled()) ensure_ics_schema($pdo);
     $pdo->beginTransaction();
 
     $roomStmt = $pdo->prepare('SELECT id, room_name, max_guests, status FROM rooms WHERE room_name = :room_name LIMIT 1 FOR UPDATE');
@@ -119,14 +121,14 @@ try {
         "SELECT id
          FROM bookings
          WHERE room_name = :room_name
-           AND status IN ('Confirmed', 'Pending')
-           AND COALESCE(payment_status, '') NOT IN ('Failed', 'Cancelled', 'Refunded')
+           " . active_booking_conflict_sql() . "
            AND :requested_check_in < check_out_date
            AND :requested_check_out > check_in_date
          LIMIT 1"
     );
     $conflict->execute([
         ':room_name' => $roomName,
+        ':hold_cutoff' => booking_hold_cutoff_datetime(),
         ':requested_check_in' => $checkInDate,
         ':requested_check_out' => $checkOutDate,
     ]);
@@ -143,7 +145,8 @@ try {
         json_response(false, 'Unable to calculate booking amount for the selected room.', 422);
     }
 
-    $bookingStatus = 'Pending';
+    // An admin-created reservation is confirmed even when payment is still due.
+    $bookingStatus = 'Confirmed';
 
     $stmt = $pdo->prepare(
         'INSERT INTO bookings

@@ -29,6 +29,35 @@ function ensure_rooms_schema(PDO $pdo): void
     if (!isset($columns['room_size'])) {
         $pdo->exec("ALTER TABLE rooms ADD COLUMN room_size DECIMAL(8,2) NOT NULL DEFAULT 24 AFTER bed_type");
     }
+
+    if (!isset($columns['room_number'])) {
+        try {
+            $pdo->exec("ALTER TABLE rooms ADD COLUMN room_number VARCHAR(30) NULL DEFAULT NULL UNIQUE");
+        } catch (PDOException $e) {
+            if ((int) ($e->errorInfo[1] ?? 0) !== 1060) throw $e;
+        }
+    }
+    $pdo->exec("UPDATE rooms SET room_number = CONCAT('R', LPAD(id, GREATEST(2, CHAR_LENGTH(id)), '0')) WHERE room_number IS NULL");
+}
+
+function room_number_input(PDO $pdo, array $data, int $roomId = 0): string
+{
+    if (!array_key_exists('room_number', $data) && $roomId > 0) {
+        $stmt = $pdo->prepare('SELECT room_number FROM rooms WHERE id = ?');
+        $stmt->execute([$roomId]);
+        return (string) $stmt->fetchColumn();
+    }
+    $number = trim((string) ($data['room_number'] ?? ''));
+    if ($number === '') {
+        throw new InvalidArgumentException('Room number is missing from the submitted form. Refresh the page and enter the room number again.');
+    }
+    if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9 ._\/-]{0,29}$/D', $number)) {
+        throw new InvalidArgumentException('Enter a room number of up to 30 letters, numbers, spaces, dots, hyphens, underscores or slashes.');
+    }
+    $stmt = $pdo->prepare('SELECT id FROM rooms WHERE room_number = ? AND id <> ? LIMIT 1');
+    $stmt->execute([$number, $roomId]);
+    if ($stmt->fetchColumn()) throw new InvalidArgumentException('This room number is already assigned to another room.');
+    return $number;
 }
 
 function ensure_room_ical_column(PDO $pdo): void
@@ -89,20 +118,26 @@ function ensure_room_video_column(PDO $pdo): void
 
 require_once __DIR__ . '/../utils/video_processing.php';
 
-function save_room_video(PDO $pdo, int $roomId, array $file): void
+function prepare_room_video(int $roomId, array $file): ?string
 {
-    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) return;
-    if (($file['error'] ?? null) !== UPLOAD_ERR_OK) throw new RuntimeException('Video upload failed. Check PHP upload limits.');
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) return null;
+    if (($file['error'] ?? null) !== UPLOAD_ERR_OK) throw new RoomVideoProcessingException('Video upload failed. Check PHP upload limits.');
     $size = (int) ($file['size'] ?? 0);
-    if ($size < 1 || $size > 100 * 1024 * 1024) throw new RuntimeException('Video must be 100 MB or smaller.');
+    if ($size < 1 || $size > 100 * 1024 * 1024) throw new RoomVideoProcessingException('Video must be 100 MB or smaller.');
     $tmp = (string) ($file['tmp_name'] ?? '');
-    if (!is_uploaded_file($tmp)) throw new RuntimeException('Invalid video upload.');
+    if (!is_uploaded_file($tmp)) throw new RoomVideoProcessingException('Invalid video upload.');
     $mime = (new finfo(FILEINFO_MIME_TYPE))->file($tmp);
     $extensions = ['video/mp4' => 'mp4', 'video/webm' => 'webm'];
-    if (!isset($extensions[$mime])) throw new RuntimeException('Only MP4 and WebM videos are supported.');
+    if (!isset($extensions[$mime])) throw new RoomVideoProcessingException('Only MP4 and WebM videos are supported.');
     $directory = __DIR__ . '/../uploads/rooms';
-    if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) throw new RuntimeException('Unable to create video directory.');
-    $destination = optimize_uploaded_video($file, $directory . '/room-video-' . $roomId . '-' . bin2hex(random_bytes(12)));
+    if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) throw new RoomVideoProcessingException('Unable to create video directory.');
+    return optimize_uploaded_video($file, $directory . '/room-video-' . $roomId . '-' . bin2hex(random_bytes(12)));
+}
+
+function save_room_video(PDO $pdo, int $roomId, array $file, ?string $preparedVideo = null): void
+{
+    $destination = $preparedVideo ?? prepare_room_video($roomId, $file);
+    if ($destination === null) return;
     $filename = basename($destination);
     $stmt = $pdo->prepare('SELECT video_path FROM rooms WHERE id = :id');
     $stmt->execute([':id' => $roomId]);
@@ -213,6 +248,7 @@ function normalize_room(array $room, array $images = [], array $amenityRecords =
 
     return [
         'id' => (int) $room['id'],
+        'room_number' => (string) ($room['room_number'] ?? ('R' . str_pad((string) $room['id'], 2, '0', STR_PAD_LEFT))),
         'slug' => (string) ($room['slug'] ?? ''),
         'name' => (string) ($room['room_name'] ?? ''),
         'room_name' => (string) ($room['room_name'] ?? ''),
@@ -329,7 +365,30 @@ function save_room_images(PDO $pdo, int $roomId, array $files): void
 
 function room_input_data(): array
 {
-    if (str_starts_with($_SERVER['CONTENT_TYPE'] ?? '', 'multipart/form-data')) return $_POST;
+    $contentType = strtolower(trim((string) ($_SERVER['CONTENT_TYPE'] ?? '')));
+    if (str_starts_with($contentType, 'multipart/form-data')) {
+        // PHP empties both $_POST and $_FILES when the complete multipart body
+        // exceeds post_max_size. Check this before reporting missing fields.
+        $postMax = trim((string) ini_get('post_max_size'));
+        $unit = strtolower(substr($postMax, -1));
+        $multiplier = ['k' => 1024, 'm' => 1048576, 'g' => 1073741824][$unit] ?? 1;
+        $postMaxBytes = (float) $postMax * $multiplier;
+        if ($postMaxBytes > 0 && (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > $postMaxBytes) {
+            json_response(false, 'The room images and video exceed PHP post_max_size (' . $postMax . '). Use smaller files or increase post_max_size in php.ini and restart Apache.', 413);
+        }
+        foreach ($_FILES as $upload) {
+            $errors = (array) ($upload['error'] ?? []);
+            array_walk_recursive($errors, static function ($error): void {
+                if (in_array((int) $error, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+                    json_response(false, 'A room image or video exceeds the upload size limit. Use a smaller file or increase upload_max_filesize in php.ini and restart Apache.', 413);
+                }
+            });
+        }
+        if ($_POST === []) {
+            json_response(false, 'The room form could not be read. Refresh the page and submit it again with smaller files.', 422);
+        }
+        return $_POST;
+    }
     return read_request_data();
 }
 

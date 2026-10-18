@@ -4,6 +4,7 @@ require_once __DIR__ . '/_room_helpers.php';
 apply_cors_headers();
 require_admin_auth();
 require_post_request();
+$preparedVideo = null;
 try {
     $pdo = get_db_connection();
     ensure_rooms_schema($pdo);
@@ -13,6 +14,7 @@ try {
     ensure_amenity_tables($pdo);
     $data = room_input_data();
     if (array_key_exists('booking_ical_url', $data)) require_calendar_permission($pdo, (int)($data['id'] ?? 0), (string)$data['booking_ical_url']);
+    $roomNumber = room_number_input($pdo, $data, 0);
     $roomName = clean_string($data['room_name'] ?? '', 150);
     if ($roomName === '') json_response(false, 'Room name is required.', 422);
     $slug = slugify_room($data['slug'] ?? $roomName);
@@ -21,8 +23,10 @@ try {
         ? parse_amenity_ids($data['amenity_ids'])
         : amenity_ids_for_names($pdo, $legacyAmenities);
     $amenities = amenity_names_for_ids($pdo, $amenityIds);
-    $stmt = $pdo->prepare("INSERT INTO rooms (room_name, slug, room_category, description, max_guests, bed_type, room_size, base_price, currency, amenities, show_unavailable_amenities, status, sort_order) VALUES (:room_name, :slug, :room_category, :description, :max_guests, :bed_type, :room_size, :base_price, :currency, :amenities, :show_unavailable_amenities, :status, :sort_order)");
+    $preparedVideo = prepare_room_video(0, $_FILES['video'] ?? []);
+    $stmt = $pdo->prepare("INSERT INTO rooms (room_number, room_name, slug, room_category, description, max_guests, bed_type, room_size, base_price, currency, amenities, show_unavailable_amenities, status, sort_order) VALUES (:room_number, :room_name, :slug, :room_category, :description, :max_guests, :bed_type, :room_size, :base_price, :currency, :amenities, :show_unavailable_amenities, :status, :sort_order)");
     $stmt->execute([
+        ':room_number' => $roomNumber,
         ':room_name' => $roomName,
         ':slug' => $slug,
         ':room_category' => normalize_room_category($data['room_category'] ?? $data['category'] ?? 'standard'),
@@ -41,12 +45,19 @@ try {
     replace_room_amenities($pdo, $roomId, $amenityIds);
     save_room_ical_url($pdo, $roomId, (string) ($data['booking_ical_url'] ?? ''));
     save_room_images($pdo, $roomId, $_FILES['images'] ?? []);
-    save_room_video($pdo, $roomId, $_FILES['video'] ?? []);
+    save_room_video($pdo, $roomId, $_FILES['video'] ?? [], $preparedVideo);
+    $preparedVideo = null;
     $rooms = get_room_payload($pdo, false);
     $room = array_values(array_filter($rooms, static fn($item) => (int) $item['id'] === $roomId))[0] ?? null;
     json_response(true, 'Room created.', 201, ['data' => $room, 'room' => $room]);
 } catch (InvalidArgumentException $e) {
+    if ($preparedVideo !== null && is_file($preparedVideo)) @unlink($preparedVideo);
+    json_response(false, $e->getMessage(), 422);
+} catch (RoomVideoProcessingException $e) {
+    if ($preparedVideo !== null && is_file($preparedVideo)) @unlink($preparedVideo);
     json_response(false, $e->getMessage(), 422);
 } catch (Throwable $e) {
+    if ($preparedVideo !== null && is_file($preparedVideo)) @unlink($preparedVideo);
+    if ($e instanceof PDOException && (int) ($e->errorInfo[1] ?? 0) === 1062) json_response(false, 'Room number or slug already exists. Use a unique value.', 422);
     json_response(false, 'Unable to create room.', 500, ['error' => APP_ENV === 'local' ? $e->getMessage() : null]);
 }

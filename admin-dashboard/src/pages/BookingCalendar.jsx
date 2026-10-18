@@ -326,7 +326,7 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, onMarkPaid, upd
             <h3 className="text-sm font-bold text-slate-950">Room & Payment</h3>
             <div className="mt-3 space-y-2 text-sm text-slate-700">
               <p><span className="font-semibold text-slate-500">Room:</span> {booking.room_name}</p>
-              <p><span className="font-semibold text-slate-500">Room code:</span> {booking.room_code}</p>
+              <p><span className="font-semibold text-slate-500">Room code(s):</span> {booking.room_code}</p>
               <p><span className="font-semibold text-slate-500">Property type:</span> {booking.property_type}</p>
               <p><span className="font-semibold text-slate-500">Amount:</span> {isBookingCom ? 'Managed in Booking.com' : currencyFormatter.format(booking.total_amount)}</p>
               <div className="flex items-center gap-2"><span className="font-semibold text-slate-500">Booking status:</span> <Badge variant={statusVariant[getBookingStatusKey(booking.booking_status)] || 'secondary'}>{normalizeStatus(booking.booking_status)}</Badge></div>

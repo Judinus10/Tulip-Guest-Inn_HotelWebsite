@@ -9,6 +9,7 @@ import type { Room } from '../data/rooms';
 import { fetchPublicRoom, fetchPublicRooms } from '../services/publicApi';
 import { fetchPropertyContent } from '../services/propertyContentApi';
 import type { NearbyPlace } from '../services/propertyContentApi';
+import { useToast } from '../components/ui/ToastProvider';
 import { formatMoney } from '../services/formatters';
 
 interface RoomBookingForm {
@@ -24,13 +25,15 @@ const today = () => new Date().toISOString().split('T')[0];
 export default function RoomDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const toast = useToast();
+  const [checkingRoom, setCheckingRoom] = useState(false);
   const [searchParams] = useSearchParams();
   const queryCheckIn = searchParams.get('checkin') || searchParams.get('checkIn') || '';
   const queryCheckOut = searchParams.get('checkout') || searchParams.get('checkOut') || '';
   const queryGuests = searchParams.get('guests') || '1';
   const fallbackRoom = fallbackRooms.find((r) => r.slug === id || r.id === id);
   const [room, setRoom] = useState<Room | undefined>(fallbackRoom);
-  const [roomList, setRoomList] = useState<Room[]>(fallbackRooms);
+  const [roomList, setRoomList] = useState<Room[]>([]);
   const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([]);
   const [loading, setLoading] = useState(!fallbackRoom);
   const [bookingForm, setBookingForm] = useState<RoomBookingForm>({
@@ -78,10 +81,10 @@ export default function RoomDetails() {
         setRoom(fallbackRooms.find((r) => r.slug === id || r.id === id));
       }
 
-      if (roomsResult.status === 'fulfilled' && roomsResult.value.length > 0) {
+      if (roomsResult.status === 'fulfilled') {
         setRoomList(roomsResult.value);
       } else {
-        setRoomList(fallbackRooms);
+        setRoomList([]);
       }
 
       setLoading(false);
@@ -199,7 +202,7 @@ export default function RoomDetails() {
   const validateBookingForm = () => {
     const nextInvalid: Partial<Record<RoomBookingField, boolean>> = {
       checkIn: !bookingForm.checkIn,
-      checkOut: !bookingForm.checkOut,
+      checkOut: !bookingForm.checkOut || bookingForm.checkOut <= bookingForm.checkIn,
       guests: !bookingForm.guests,
     };
 
@@ -223,7 +226,7 @@ export default function RoomDetails() {
     setBookingForm((prev) => {
       const next = { ...prev, [field]: value };
 
-      if (field === 'checkIn' && next.checkOut && next.checkOut < value) {
+      if (field === 'checkIn' && next.checkOut && next.checkOut <= value) {
         next.checkOut = '';
       }
 
@@ -233,8 +236,15 @@ export default function RoomDetails() {
     if (value) markInvalid(field, false);
   };
 
-  const handleBookRoom = () => {
-    if (!validateBookingForm()) return;
+  const handleBookRoom = async () => {
+    if (!validateBookingForm() || checkingRoom) return;
+    setCheckingRoom(true);
+    try {
+      const available = await fetchPublicRooms({ check_in_date: bookingForm.checkIn, check_out_date: bookingForm.checkOut, guests: bookingForm.guests });
+      if (!available.some((item) => item.id === room.id)) {
+        toast.warning('This room is unavailable for the selected dates or guest count. Please choose another room.');
+        return;
+      }
 
     const params = new URLSearchParams({
       room: room.slug,
@@ -245,6 +255,11 @@ export default function RoomDetails() {
     });
 
     navigate(`/booking?${params.toString()}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to check availability.');
+    } finally {
+      setCheckingRoom(false);
+    }
   };
 
   const bookingInputClass = (field: RoomBookingField) =>
@@ -489,9 +504,10 @@ export default function RoomDetails() {
                 <button
                   type="button"
                   onClick={handleBookRoom}
+                  disabled={checkingRoom}
                   className="btn-primary w-full justify-center mb-3"
                 >
-                  Book This Room
+                  {checkingRoom ? 'Checking availability…' : 'Book This Room'}
                 </button>
                 <Link
                   to="/contact"

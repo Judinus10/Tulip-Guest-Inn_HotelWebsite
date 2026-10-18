@@ -30,6 +30,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input, Label } from '@/components/ui/input'
 import { bookingRooms, bookingStatuses, initialBookings, paymentStatuses } from '@/data/bookingData'
 import { listRooms } from '@/services/roomsApi'
+import { useRoomAvailability } from '@/hooks/useRoomAvailability'
 import { exportCsv, exportExcel, exportPdf } from '@/utils/exportData'
 import {
   checkGroupRoomAvailability,
@@ -154,6 +155,7 @@ function normalizeRoom(room) {
   return {
     id: Number(room.id || 0),
     room_name: room.room_name || room.name || '',
+    room_number: room.room_number || '',
     room_type: room.room_type || room.type || room.floor || 'Guest House',
     price_per_night: Number(room.price_per_night || room.price || room.rate || 0),
     capacity: Number(room.capacity || room.max_guests || room.guests || 1),
@@ -205,7 +207,7 @@ function isActiveBookingForAvailability(booking) {
   if (bookingStatus === 'cancelled' || bookingStatus === 'canceled') return false
   if (['failed', 'cancelled', 'canceled', 'refunded'].includes(paymentStatus)) return false
 
-  return ['pending', 'confirmed', 'checked_in', 'checked in'].includes(bookingStatus)
+  return ['pending', 'confirmed', 'checked_in', 'checked in', 'external'].includes(bookingStatus)
 }
 
 function hasDateOverlap(requestedCheckIn, requestedCheckOut, existingCheckIn, existingCheckOut) {
@@ -221,7 +223,7 @@ function isRoomAvailableForDates(roomName, checkInDate, checkOutDate, bookings) 
     const bookingRoom = String(booking.room_name || '').trim().toLowerCase()
     const selectedRoom = String(roomName || '').trim().toLowerCase()
 
-    if (bookingRoom !== selectedRoom) return false
+    if (!(booking.group_rooms?.length ? booking.group_rooms.map((room) => String(room.room_name).trim().toLowerCase()) : [bookingRoom]).includes(selectedRoom)) return false
     if (!isActiveBookingForAvailability(booking)) return false
 
     return hasDateOverlap(checkInDate, checkOutDate, booking.check_in || booking.check_in_date, booking.check_out || booking.check_out_date)
@@ -236,7 +238,7 @@ function getUnavailableRoomNames(checkInDate, checkOutDate, bookings, excludeBoo
       .filter((booking) => Number(booking.id) !== Number(excludeBookingId))
       .filter((booking) => isActiveBookingForAvailability(booking))
       .filter((booking) => hasDateOverlap(checkInDate, checkOutDate, booking.check_in || booking.check_in_date, booking.check_out || booking.check_out_date))
-      .map((booking) => String(booking.room_name || '').trim().toLowerCase())
+      .flatMap((booking) => booking.group_rooms?.length ? booking.group_rooms.map((room) => String(room.room_name || '').trim().toLowerCase()) : [String(booking.room_name || '').trim().toLowerCase()])
       .filter(Boolean)
   )
 }
@@ -644,32 +646,25 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
   }
 
   const today = getTodayInputDate()
-  const unavailableRoomNames = useMemo(
-    () => getUnavailableRoomNames(form.check_in_date, form.check_out_date, bookings),
-    [form.check_in_date, form.check_out_date, bookings]
-  )
-
-  const availableRooms = useMemo(() => {
-    if (!form.check_in_date || !form.check_out_date || form.check_out_date <= form.check_in_date) return rooms
-    return rooms.filter((room) => !unavailableRoomNames.has(String(room.room_name || '').trim().toLowerCase()))
-  }, [rooms, unavailableRoomNames, form.check_in_date, form.check_out_date])
+  const roomAvailability = useRoomAvailability(form.check_in_date, form.check_out_date)
+  const unavailableRoomNames = roomAvailability.unavailableNames
+  const availableRooms = rooms.filter((room) => roomAvailability.availableNames.has(String(room.room_name || '').trim().toLowerCase()) && Number(room.capacity || room.max_guests || 0) >= Number(form.guests || 1))
 
   const selectedRoom = getRoom(0, form.room_name, rooms)
   const nights = getNights(form.check_in_date, form.check_out_date)
   const estimatedAmount = nights * Number(selectedRoom?.price_per_night || 0)
-  const selectedRoomAvailable = isRoomAvailableForDates(form.room_name, form.check_in_date, form.check_out_date, bookings)
+  const selectedRoomAvailable = availableRooms.some((room) => room.room_name === form.room_name)
   const canCheckAvailability = form.check_in_date && form.check_out_date && form.check_out_date > form.check_in_date
 
   useEffect(() => {
     if (!canCheckAvailability) return
 
-    if (form.room_name && unavailableRoomNames.has(String(form.room_name).trim().toLowerCase())) {
-      const firstAvailableRoom = availableRooms[0]?.room_name || ''
-      if (firstAvailableRoom) {
-        setForm((current) => ({ ...current, room_name: firstAvailableRoom }))
-      }
+    if (roomAvailability.loading || roomAvailability.error) return
+    if (!availableRooms.some((room) => room.room_name === form.room_name)) {
+      const nextRoom = availableRooms[0]?.room_name || ''
+      if (form.room_name !== nextRoom) setForm((current) => ({ ...current, room_name: nextRoom }))
     }
-  }, [canCheckAvailability, unavailableRoomNames, availableRooms, form.room_name])
+  }, [canCheckAvailability, roomAvailability.loading, roomAvailability.error, availableRooms, form.room_name])
 
   const scrollToField = (fieldName) => {
     const element = fieldRefs[fieldName]?.current
@@ -724,6 +719,8 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
     if (form.check_in_date && form.check_out_date && form.check_out_date <= form.check_in_date) {
       nextErrors.check_out_date = 'Check-out date must be after check-in date.'
     }
+
+    if (roomAvailability.loading || roomAvailability.error) nextErrors.room_name = roomAvailability.error || 'Wait for the availability check to finish.'
 
     if (canCheckAvailability && !selectedRoomAvailable) {
       nextErrors.room_name = 'This room is not available for the selected dates.'
@@ -854,7 +851,7 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
             <select
               ref={fieldRefs.room_name}
               value={form.room_name}
-              disabled={!canCheckAvailability}
+              disabled={!canCheckAvailability || roomAvailability.loading || Boolean(roomAvailability.error)}
               onChange={(event) => updateField('room_name', event.target.value)}
               className={`h-10 w-full rounded-lg border px-3 text-sm text-text-primary shadow-sm focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 ${errorClass(Boolean(errors.room_name))}`}
               aria-invalid={Boolean(errors.room_name)}
@@ -863,7 +860,7 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
               {canCheckAvailability && availableRooms.length === 0 ? <option value="">No rooms available</option> : null}
               {canCheckAvailability && availableRooms.map((room) => (
                 <option key={room.id || room.room_name} value={room.room_name}>
-                  {room.room_name} · {formatMoney(room.price_per_night)} / night
+                  {room.room_number ? `${room.room_number} · ` : ''}{room.room_name} · {formatMoney(room.price_per_night)} / night
                 </option>
               ))}
             </select>
@@ -871,7 +868,7 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
           </div>
         </div>
 
-        {canCheckAvailability ? (
+        {roomAvailability.loading || roomAvailability.error ? <p role="status" className="text-sm text-amber-800">{roomAvailability.error || 'Checking room availability…'}</p> : canCheckAvailability ? (
           availableRooms.length > 0 ? (
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
               {availableRooms.length} room{availableRooms.length === 1 ? '' : 's'} available for {formatDate(form.check_in_date)} to {formatDate(form.check_out_date)}. Same-day turnover is allowed from the checkout date.
@@ -930,7 +927,7 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
 
         <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={!canCheckAvailability || availableRooms.length === 0}>Save Booking</Button>
+          <Button type="submit" disabled={!canCheckAvailability || roomAvailability.loading || Boolean(roomAvailability.error) || availableRooms.length === 0}>Save Booking</Button>
         </div>
       </form>
     </Modal>
@@ -966,6 +963,7 @@ function EditGroupBookingModal({ booking, rooms, onClose, onSave }) {
   const [warning, setWarning] = useState('')
   const [availability, setAvailability] = useState({})
   const [checkingAvailability, setCheckingAvailability] = useState(false)
+  const [availabilityError, setAvailabilityError] = useState('')
   const earliestCheckOut = addDaysToInputDate(form.check_in_date, 1)
   const nights = getNights(form.check_in_date, form.check_out_date)
   const selectedRooms = form.rooms.filter((room) => room.selected)
@@ -976,12 +974,14 @@ function EditGroupBookingModal({ booking, rooms, onClose, onSave }) {
     if (!form.check_in_date || !form.check_out_date || form.check_out_date <= form.check_in_date) return undefined
     let active = true
     setCheckingAvailability(true)
+    setAvailabilityError('')
+    setAvailability({})
     checkGroupRoomAvailability(booking.booking_group_id, form.check_in_date, form.check_out_date)
       .then((result) => {
         if (!active) return
         setAvailability(Object.fromEntries(result.map((room) => [Number(room.room_id), Boolean(room.available)])))
       })
-      .catch((error) => { if (active) setWarning(error.message || 'Unable to check room availability.') })
+      .catch((error) => { if (active) { setAvailabilityError(error.message || 'Unable to check room availability.'); setWarning(error.message || 'Unable to check room availability.') } })
       .finally(() => { if (active) setCheckingAvailability(false) })
     return () => { active = false }
   }, [booking.booking_group_id, form.check_in_date, form.check_out_date])
@@ -1007,7 +1007,7 @@ function EditGroupBookingModal({ booking, rooms, onClose, onSave }) {
     const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())
     const chosenRooms = form.rooms.filter((room) => room.selected)
     const invalidRoom = chosenRooms.find((room) => Number(room.guests) < 1 || Number(room.guests) > Number(room.capacity || 0))
-    const unavailableRoom = chosenRooms.find((room) => availability[room.room_id] === false)
+    const unavailableRoom = chosenRooms.find((room) => availability[room.room_id] !== true)
     const message = !form.full_name.trim() ? 'Guest name is required.'
       : !emailValid ? 'Please enter a valid email address.'
       : !form.phone.trim() ? 'Phone number is required.'
@@ -1036,7 +1036,7 @@ function EditGroupBookingModal({ booking, rooms, onClose, onSave }) {
       <div className="rounded-xl border border-border p-4">
         <div className="mb-4 flex items-center justify-between gap-3"><div><h3 className="font-bold text-text-primary">Rooms and guest allocation</h3><p className="mt-1 text-xs text-text-secondary">Add or remove rooms, then allocate exactly {form.total_guests || 0} guests.</p></div><span className="text-xs font-semibold text-text-secondary">{checkingAvailability ? 'Checking availability…' : `${allocatedGuests}/${form.total_guests || 0} allocated`}</span></div>
         <div className="grid gap-3 md:grid-cols-2">{form.rooms.map((room) => {
-          const isAvailable = availability[room.room_id] !== false
+          const isAvailable = availability[room.room_id] === true
           return <div key={room.room_id} className={`rounded-xl border p-4 ${room.selected ? 'border-blue-300 bg-blue-50/50' : 'border-border bg-slate-50'}`}>
             <div className="flex items-start justify-between gap-3">
               <div><p className="font-semibold text-text-primary">{room.room_name}</p><p className="text-xs text-text-secondary">Maximum {room.capacity} guests · {formatMoney(room.price_per_night)}/night</p><p className={`mt-1 text-xs font-semibold ${isAvailable ? 'text-emerald-700' : 'text-red-600'}`}>{isAvailable ? 'Available' : 'Unavailable for these dates'}</p></div>
@@ -1048,7 +1048,7 @@ function EditGroupBookingModal({ booking, rooms, onClose, onSave }) {
       </div>
       <div><Label>Message / special request</Label><textarea rows={3} value={form.message} onChange={(event) => updateField('message', event.target.value)} className="w-full rounded-lg border border-border px-3 py-2 text-sm" /></div>
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Estimated group total: <strong>{formatMoney(estimatedTotal)}</strong> · {nights} night{nights === 1 ? '' : 's'} · {selectedRooms.length} room{selectedRooms.length === 1 ? '' : 's'}</div>
-      <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" disabled={checkingAvailability}>Save Group Changes</Button></div>
+      <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" disabled={checkingAvailability || Boolean(availabilityError)}>Save Group Changes</Button></div>
     </form>
   </Modal>
 }
@@ -1086,10 +1086,8 @@ function EditBookingModal({ booking, rooms, bookings, onClose, onSave }) {
     staying_guest_email: useRef(null),
   }
 
-  const unavailableRoomNames = useMemo(
-    () => getUnavailableRoomNames(form.check_in_date, form.check_out_date, bookings, booking.id),
-    [form.check_in_date, form.check_out_date, bookings, booking.id]
-  )
+  const roomAvailability = useRoomAvailability(form.check_in_date, form.check_out_date, booking.id)
+  const unavailableRoomNames = roomAvailability.unavailableNames
   const selectedRoom = getRoom(0, form.room_name, rooms)
   const selectedRoomCapacity = Math.max(1, Number(selectedRoom?.capacity || 1))
   const earliestCheckOut = addDaysToInputDate(form.check_in_date, 1) || addDaysToInputDate(earliestCheckIn, 1)
@@ -1139,7 +1137,8 @@ function EditBookingModal({ booking, rooms, bookings, onClose, onSave }) {
     if (form.check_in_date && form.check_in_date < earliestCheckIn) nextErrors.check_in_date = 'Check-in must be after today.'
     if (form.check_in_date && form.check_out_date && form.check_out_date <= form.check_in_date) nextErrors.check_out_date = 'Check-out must be after check-in.'
     if (selectedRoom && Number(form.guests) > selectedRoomCapacity) nextErrors.guests = `This room allows a maximum of ${selectedRoomCapacity} guests.`
-    if (unavailableRoomNames.has(String(form.room_name || '').trim().toLowerCase())) nextErrors.room_name = 'This room is already booked for the selected dates.'
+    if (roomAvailability.loading || roomAvailability.error) nextErrors.room_name = roomAvailability.error || 'Wait for the availability check to finish.'
+    if (!roomAvailability.availableNames.has(String(form.room_name || '').trim().toLowerCase())) nextErrors.room_name = 'This room is already booked for the selected dates.'
 
     setErrors(nextErrors)
     const first = Object.keys(nextErrors)[0]
@@ -1198,11 +1197,12 @@ function EditBookingModal({ booking, rooms, bookings, onClose, onSave }) {
             <Label>Room *</Label>
             <select ref={fieldRefs.room_name} value={form.room_name} onChange={(event) => updateField('room_name', event.target.value)} className={`h-10 w-full rounded-lg border px-3 text-sm shadow-sm focus:outline-none focus:ring-2 ${errorClass(Boolean(errors.room_name))}`}>
               {rooms.map((room) => {
-                const unavailable = unavailableRoomNames.has(String(room.room_name || '').trim().toLowerCase())
+                const unavailable = roomAvailability.loading || !roomAvailability.availableNames.has(String(room.room_name || '').trim().toLowerCase())
                 return <option key={room.id || room.room_name} value={room.room_name} disabled={unavailable}>{room.room_name}{unavailable ? ' — unavailable' : ''}</option>
               })}
             </select>
-            <FieldError message={errors.room_name} />
+            <FieldError message={errors.room_name || roomAvailability.error} />
+            {roomAvailability.loading && <p className="text-xs text-text-secondary">Checking availability…</p>}
           </div>
           <div className="space-y-2 md:col-span-2">
             <Label>Message / special request</Label>
@@ -1256,7 +1256,7 @@ function EditBookingModal({ booking, rooms, bookings, onClose, onSave }) {
 
         <div className="flex justify-end gap-3">
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="submit">Save Booking Changes</Button>
+          <Button type="submit" disabled={roomAvailability.loading || Boolean(roomAvailability.error)}>Save Booking Changes</Button>
         </div>
       </form>
     </Modal>
@@ -1403,7 +1403,7 @@ export default function Bookings() {
   const [focusedBookingNo, setFocusedBookingNo] = useState('')
   const [flashBookingNo, setFlashBookingNo] = useState('')
   const [bookings, setBookings] = useState(initialBookings)
-  const [rooms, setRooms] = useState(bookingRooms)
+  const [rooms, setRooms] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [bookingStatusFilter, setBookingStatusFilter] = useState('all')
@@ -1429,9 +1429,9 @@ export default function Bookings() {
     try {
       const data = await listRooms()
       const normalizedRooms = data.map(normalizeRoom).filter((room) => room.room_name)
-      if (normalizedRooms.length > 0) setRooms(normalizedRooms)
+      setRooms(normalizedRooms)
     } catch {
-      setRooms(bookingRooms)
+      setRooms([])
     }
   }
 

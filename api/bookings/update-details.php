@@ -7,6 +7,7 @@ ob_start();
 
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../calendar/ics-helper.php';
+require_once __DIR__ . '/booking-expiry-helper.php';
 require_once __DIR__ . '/../mail/email-helper.php';
 require_once __DIR__ . '/booking-audit-helper.php';
 require_once __DIR__ . '/../offers/offer-pricing-helper.php';
@@ -125,8 +126,7 @@ try {
         "SELECT id FROM bookings
          WHERE id <> :id
            AND room_name = :room_name
-           AND status IN ('Pending', 'Confirmed', 'Checked In')
-           AND COALESCE(payment_status, '') NOT IN ('Failed', 'Cancelled', 'Refunded')
+           " . active_booking_conflict_sql() . "
            AND :check_in < check_out_date
            AND :check_out > check_in_date
          LIMIT 1"
@@ -134,6 +134,7 @@ try {
     $conflictStmt->execute([
         ':id' => $id,
         ':room_name' => $roomName,
+        ':hold_cutoff' => booking_hold_cutoff_datetime(),
         ':check_in' => $checkInDate,
         ':check_out' => $checkOutDate,
     ]);

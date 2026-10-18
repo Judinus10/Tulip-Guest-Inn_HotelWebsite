@@ -9,7 +9,7 @@ export async function fetchPublicRooms(params: Record<string, string> = {}): Pro
   });
 
   const suffix = search.toString() ? `?${search.toString()}` : '';
-  const rooms = await requestJson<BackendRoom[]>(`/rooms/public-list.php${suffix}`);
+  const rooms = await requestJson<BackendRoom[]>(`/rooms/public-list.php${suffix}`, { cache: 'no-store' });
   return Array.isArray(rooms) ? rooms.map(normalizeRoom) : [];
 }
 

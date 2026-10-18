@@ -34,6 +34,7 @@ import { optimizeRoomImages } from '@/utils/imageProcessing'
 
 const emptyForm = {
   room_name: '',
+  room_number: '',
   booking_ical_url: '',
   room_type: 'Ground Floor',
   room_category: 'standard',
@@ -454,11 +455,46 @@ function Toast({ toast, onClose }) {
   )
 }
 
+function RoomVideoPreview({ file, savedUrl, onRemove, disabled }) {
+  const [preview, setPreview] = useState({ file: null, url: '' })
+
+  useEffect(() => {
+    if (!file) {
+      setPreview({ file: null, url: '' })
+      return
+    }
+    const url = URL.createObjectURL(file)
+    setPreview({ file, url })
+    return () => URL.revokeObjectURL(url)
+  }, [file])
+
+  const src = file ? (preview.file === file ? preview.url : '') : savedUrl
+  if (!src) return null
+
+  return (
+    <div className="mt-5 space-y-3 rounded-xl border border-border bg-slate-50 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-text-primary">Room video preview</p>
+          <p className="truncate text-xs text-text-secondary">{file ? file.name : 'Uploaded room video'}</p>
+        </div>
+        <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={onRemove} aria-label="Remove room video" className="shrink-0 text-red-600">
+          <Trash2 className="h-4 w-4" />Remove
+        </Button>
+      </div>
+      <video key={src} src={src} controls playsInline preload="metadata" className="max-h-80 w-full rounded-lg bg-black">
+        Your browser cannot play this video.
+      </video>
+    </div>
+  )
+}
+
 function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExistingImage }) {
   const [form, setForm] = useState(() => room || emptyForm)
   const [errors, setErrors] = useState({})
   const [selectedFiles, setSelectedFiles] = useState([])
   const [selectedVideo, setSelectedVideo] = useState(null)
+  const videoInputRef = useRef(null)
   const [removeVideo, setRemoveVideo] = useState(false)
   const [deletingImageId, setDeletingImageId] = useState(null)
   const [isProcessingImages, setIsProcessingImages] = useState(false)
@@ -558,6 +594,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
 
     const nextErrors = {}
     if (form.booking_ical_url?.trim() && !/^https:\/\/(ical|admin)\.booking\.com\//i.test(form.booking_ical_url.trim())) nextErrors.booking_ical_url = 'Enter a Booking.com iCal URL.'
+    if (!String(form.room_number || '').trim()) nextErrors.room_number = 'Room number is required.'
     if (!form.room_name.trim()) nextErrors.room_name = 'Room name is required.'
     if (!form.room_type.trim()) nextErrors.room_type = 'Room type is required.'
     if (!form.room_category.trim()) nextErrors.room_category = 'Room category is required.'
@@ -612,6 +649,12 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
         <form onSubmit={handleSubmit} className="max-h-[calc(92vh-81px)] overflow-y-auto p-6">
           {submitError && <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{submitError}</div>}
           <div className="grid gap-5 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="room_number">Room No.</Label>
+              <Input id="room_number" maxLength={30} value={form.room_number || ''} onChange={(e) => updateField('room_number', e.target.value)} placeholder="Ex: 101 or GF-01" />
+              {errors.room_number && <p className="text-xs font-medium text-red-600">{errors.room_number}</p>}
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="room_name">Room name</Label>
               <Input id="room_name" value={form.room_name} onChange={(e) => updateField('room_name', e.target.value)} placeholder="Ex: Ground Floor Room 1" />
@@ -717,7 +760,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
               <Label htmlFor="room_video">Room video (optional, one per room)</Label>
               <div className="flex items-center gap-3 rounded-lg border border-dashed border-border bg-slate-50 px-3 py-2">
                 <Video className="h-5 w-5 text-primary-600" />
-                <Input id="room_video" type="file" accept="video/mp4,video/webm" disabled={isSubmitting}
+                <Input ref={videoInputRef} id="room_video" type="file" accept="video/mp4,video/webm" disabled={isSubmitting}
                   onChange={(event) => {
                     const file = event.target.files?.[0] || null
                     if (file && (file.size > 100 * 1024 * 1024 || !['video/mp4', 'video/webm'].includes(file.type))) {
@@ -732,12 +775,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
               </div>
               {errors.video && <p className="text-xs text-red-600">{errors.video}</p>}
               {selectedVideo && <p className="text-xs text-text-secondary">Selected: {selectedVideo.name} (replaces existing video)</p>}
-              {isEdit && room?.video_url && !removeVideo && !selectedVideo && (
-                <div className="space-y-2">
-                  <video src={room.video_url} controls preload="metadata" className="max-h-48 w-full rounded-lg bg-black" />
-                  <button type="button" className="text-sm font-medium text-red-600" onClick={() => setRemoveVideo(true)}>Remove existing video</button>
-                </div>
-              )}
+              {(selectedVideo || (room?.video_url && !removeVideo)) && <p className="text-xs text-text-secondary">Play the video in the room media preview below.</p>}
               {removeVideo && <p className="text-xs text-text-secondary">Existing video will be removed when saved. <button type="button" className="underline" onClick={() => setRemoveVideo(false)}>Undo</button></p>}
             </div>
 
@@ -787,11 +825,11 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
             </div>
           </div>
 
-          {(isEdit || selectedFiles.length > 0) && (
+          {(isEdit || selectedFiles.length > 0 || selectedVideo) && (
             <div className="mt-6 border-t border-border pt-5">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-text-primary">Room image preview</p>
+                  <p className="text-sm font-semibold text-text-primary">Room media preview</p>
                   <p className="text-xs text-text-secondary">
                     Use the arrows or thumbnails to review photos. Use the delete button to remove a specific image.
                   </p>
@@ -821,6 +859,21 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
                 />
               )}
               {errors.images && <p className="mt-3 text-xs font-medium text-red-600">{errors.images}</p>}
+              {(selectedVideo || (room?.video_url && !removeVideo)) && (
+                <RoomVideoPreview
+                  file={selectedVideo}
+                  savedUrl={!removeVideo ? room?.video_url : ''}
+                  disabled={isSubmitting}
+                  onRemove={() => {
+                    if (selectedVideo) {
+                      setSelectedVideo(null)
+                      if (videoInputRef.current) videoInputRef.current.value = ''
+                    } else {
+                      setRemoveVideo(true)
+                    }
+                  }}
+                />
+              )}
             </div>
           )}
 
@@ -1009,7 +1062,7 @@ export default function Rooms() {
     const term = search.trim().toLowerCase()
 
     return enrichedRooms.filter((room) => {
-      const matchesSearch = !term || room.room_name.toLowerCase().includes(term) || room.room_type.toLowerCase().includes(term) || String(room.room_category || '').toLowerCase().includes(term)
+      const matchesSearch = !term || (room.room_name.toLowerCase().includes(term) || String(room.room_number || '').toLowerCase().includes(term)) || room.room_type.toLowerCase().includes(term) || String(room.room_category || '').toLowerCase().includes(term)
       const matchesStatus = statusFilter === 'All' || room.status === statusFilter
       const matchesType = typeFilter === 'All' || room.room_type === typeFilter
       return matchesSearch && matchesStatus && matchesType
@@ -1048,6 +1101,7 @@ export default function Rooms() {
     const payload = new FormData()
     if (formMode === 'edit') payload.append('id', selectedRoom.id)
     payload.append('room_name', form.room_name)
+    payload.append('room_number', form.room_number)
     payload.append('booking_ical_url', form.booking_ical_url || '')
     payload.append('description', form.description)
     payload.append('max_guests', form.capacity)
@@ -1158,6 +1212,7 @@ export default function Rooms() {
           <table className="w-full min-w-[780px] text-left text-sm md:min-w-[980px]">
             <thead className="sticky top-0 z-10 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-text-secondary">
               <tr>
+                <th className="px-5 py-4">Room No.</th>
                 <th className="px-5 py-4">Room</th>
                 <th className="px-5 py-4">Type</th>
                 <th className="px-5 py-4">Price / Night</th>
@@ -1170,6 +1225,7 @@ export default function Rooms() {
             <tbody className="divide-y divide-border">
               {filteredRooms.map((room) => (
                 <tr key={room.id} className="transition hover:bg-slate-50/80">
+                  <td className="px-5 py-4 font-semibold text-text-primary">{room.room_number || '—'}</td>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
                       <RoomImage src={room.image} name={room.room_name} />
