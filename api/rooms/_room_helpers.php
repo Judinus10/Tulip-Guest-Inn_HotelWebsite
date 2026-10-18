@@ -49,7 +49,7 @@ function room_number_input(PDO $pdo, array $data, int $roomId = 0): string
     }
     $number = trim((string) ($data['room_number'] ?? ''));
     if ($number === '') {
-        throw new InvalidArgumentException('Room number is missing from the submitted form. Refresh the page and enter the room number again.');
+        throw new InvalidArgumentException('Enter a room number and try again.');
     }
     if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9 ._\/-]{0,29}$/D', $number)) {
         throw new InvalidArgumentException('Enter a room number of up to 30 letters, numbers, spaces, dots, hyphens, underscores or slashes.');
@@ -374,13 +374,15 @@ function room_input_data(): array
         $multiplier = ['k' => 1024, 'm' => 1048576, 'g' => 1073741824][$unit] ?? 1;
         $postMaxBytes = (float) $postMax * $multiplier;
         if ($postMaxBytes > 0 && (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > $postMaxBytes) {
-            json_response(false, 'The room images and video exceed PHP post_max_size (' . $postMax . '). Use smaller files or increase post_max_size in php.ini and restart Apache.', 413);
+            error_log('Room upload exceeds PHP post_max_size (' . $postMax . '), request bytes=' . (int) ($_SERVER['CONTENT_LENGTH'] ?? 0));
+            json_response(false, 'The selected photos and video are too large to upload together. Choose smaller files or contact support.', 413);
         }
         foreach ($_FILES as $upload) {
             $errors = (array) ($upload['error'] ?? []);
             array_walk_recursive($errors, static function ($error): void {
                 if (in_array((int) $error, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
-                    json_response(false, 'A room image or video exceeds the upload size limit. Use a smaller file or increase upload_max_filesize in php.ini and restart Apache.', 413);
+                    error_log('Room upload exceeds PHP upload_max_filesize (' . ini_get('upload_max_filesize') . ')');
+                    json_response(false, 'One of the selected files is too large to upload. Choose a smaller file or contact support.', 413);
                 }
             });
         }

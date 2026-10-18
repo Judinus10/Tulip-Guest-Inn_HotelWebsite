@@ -55,9 +55,11 @@ try {
     json_response(false, $e->getMessage(), 422);
 } catch (RoomVideoProcessingException $e) {
     if ($preparedVideo !== null && is_file($preparedVideo)) @unlink($preparedVideo);
-    json_response(false, $e->getMessage(), 422);
+    error_log('Room video upload failed: ' . $e->getMessage());
+    json_response(false, $e->userMessage(), 422);
 } catch (Throwable $e) {
     if ($preparedVideo !== null && is_file($preparedVideo)) @unlink($preparedVideo);
     if ($e instanceof PDOException && (int) ($e->errorInfo[1] ?? 0) === 1062) json_response(false, 'Room number or slug already exists. Use a unique value.', 422);
-    json_response(false, 'Unable to create room.', 500, ['error' => APP_ENV === 'local' ? $e->getMessage() : null]);
+    error_log('Room create failed: ' . $e->getMessage());
+    json_response(false, 'We could not save the room. Please try again or contact support.', 500);
 }

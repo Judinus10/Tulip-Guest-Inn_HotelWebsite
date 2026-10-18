@@ -1,7 +1,20 @@
 <?php
 declare(strict_types=1);
 
-class RoomVideoProcessingException extends RuntimeException {}
+class RoomVideoProcessingException extends RuntimeException
+{
+    public function userMessage(): string
+    {
+        $message = $this->getMessage();
+        if (str_contains($message, '100 MB')) return 'Choose a video smaller than 100 MB.';
+        if (str_contains($message, 'Only MP4 and WebM')) return 'Choose an MP4 or WebM video.';
+        if (str_contains($message, 'two minutes and 4K')) return 'Choose a video no longer than two minutes, with a resolution up to 4K.';
+        if (str_contains($message, 'Another video is processing')) return 'Another video is being uploaded. Please wait a moment and try again.';
+        if (str_contains($message, 'timed out')) return 'The video took too long to upload. Please try a smaller or shorter video.';
+        if (str_contains($message, 'size limit') || str_contains($message, '50 MB')) return 'This video is too large to save. Please try a smaller video.';
+        return 'We could not upload this video. Please try again or contact support.';
+    }
+}
 
 function media_binary(string $setting, string $program): string
 {
