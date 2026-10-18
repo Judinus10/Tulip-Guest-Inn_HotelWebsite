@@ -10,7 +10,7 @@ try {
  $file=$_FILES['file']??null;
  $kind=$_POST['kind']??'image';
  if(!is_array($file)) throw new InvalidArgumentException('Select a valid file.');
- if(($file['error']??1)!==UPLOAD_ERR_OK) throw new RuntimeException('Video upload failed. The server may limit upload size. Compress the video to 50 MB or less and try again.');
+ if(($file['error']??1)!==UPLOAD_ERR_OK) throw new RuntimeException('Video upload failed. The server may limit upload size. Use a valid MP4 or WebM video under 100 MB and try again.');
  if(!is_uploaded_file($file['tmp_name'])) throw new InvalidArgumentException('Select a valid file.');
  if(!in_array($kind,['image','video'],true)) throw new InvalidArgumentException('Invalid media type.');
  $max=$kind==='video'?104857600:12582912;
@@ -31,4 +31,4 @@ try {
  json_response(true,'Uploaded.',200,['data'=>['url'=>public_upload_url($filename,'hero')]]);
 } catch(InvalidArgumentException $e){json_response(false,$e->getMessage(),422);
 } catch(RuntimeException $e){error_log('Hero upload: '.$e->getMessage());json_response(false,$e->getMessage(),422);
-} catch(Throwable $e){error_log('Hero upload: '.$e->getMessage());json_response(false,'Upload failed. Compress the video to 50 MB or less and try again.',500);}
+} catch(Throwable $e){error_log('Hero upload: '.$e->getMessage());json_response(false,'Upload failed. Use a valid MP4 or WebM video under 100 MB and try again.',500);}
