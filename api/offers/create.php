@@ -31,6 +31,7 @@ try {
     }
 
     offer_validate_dates($startDate, $endDate);
+    $status = offer_effective_status(['status'=>$status, 'start_date'=>$startDate, 'end_date'=>$endDate]);
 
     $imagePath = offer_upload_image('image') ?? offer_storable_image_path($_POST['image_path'] ?? '');
     $discountLabel = offer_format_discount_label($discountType, $discountValue);

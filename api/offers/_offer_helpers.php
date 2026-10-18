@@ -84,21 +84,34 @@ function offer_bootstrap(bool $requireAuth = true): PDO
     return $pdo;
 }
 
-/** The date check also runs in price and public reads, so cron is not required. */
+/** Recalculate the complete schedule, including reactivation after date edits.
+ * Dates use the application timezone set by config.php; the end date is inclusive.
+ * Inactive is the administrator override and is never enabled by this routine.
+ */
 function offer_sync_expired(PDO $pdo): void
 {
-    $stmt = $pdo->prepare("UPDATE offers SET status = 'expired' WHERE status IN ('active', 'upcoming') AND end_date < :today");
-    $stmt->execute([':today' => date('Y-m-d')]);
+    $today = date('Y-m-d');
+    $stmt = $pdo->prepare("UPDATE offers
+        SET status = CASE
+            WHEN end_date IS NOT NULL AND end_date < :end_today THEN 'expired'
+            WHEN start_date IS NOT NULL AND start_date > :start_today THEN 'upcoming'
+            ELSE 'active' END
+        WHERE status IN ('active', 'upcoming', 'expired')
+          AND status <> CASE
+            WHEN end_date IS NOT NULL AND end_date < :end_changed THEN 'expired'
+            WHEN start_date IS NOT NULL AND start_date > :start_changed THEN 'upcoming'
+            ELSE 'active' END");
+    // Each placeholder is unique for native PDO MySQL prepares.
+    $stmt->execute([':end_today'=>$today, ':start_today'=>$today, ':end_changed'=>$today, ':start_changed'=>$today]);
 }
 
-function offer_effective_status(array $row): string
+function offer_effective_status(array $row, ?string $today = null): string
 {
-    $status = offer_valid_status((string) ($row['status'] ?? 'active'));
-    if ($status === 'inactive') return 'inactive';
-    $today = date('Y-m-d');
+    if (offer_valid_status((string)($row['status'] ?? 'active')) === 'inactive') return 'inactive';
+    $today ??= date('Y-m-d');
     if (!empty($row['end_date']) && $row['end_date'] < $today) return 'expired';
     if (!empty($row['start_date']) && $row['start_date'] > $today) return 'upcoming';
-    return $status === 'expired' ? 'expired' : 'active';
+    return 'active';
 }
 
 function offer_json(array $data, int $code = 200): void {
@@ -113,6 +126,7 @@ function offer_clean(?string $value, int $maxLength = 1000): string
 
 function offer_valid_status(string $status): string
 {
+    $status = strtolower(trim($status));
     return in_array($status, ['active', 'inactive', 'expired', 'upcoming'], true) ? $status : 'active';
 }
 

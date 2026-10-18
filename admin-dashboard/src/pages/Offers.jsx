@@ -145,7 +145,7 @@ function Modal({ title, description, children, onClose, size = 'max-w-2xl' }) {
 }
 
 function OfferFormModal({ mode, offer, onClose, onSubmit }) {
-  const [form, setForm] = useState(() => (offer ? { ...offer } : { ...emptyForm }))
+  const [form, setForm] = useState(() => (offer ? { ...offer, status: offer.status === 'inactive' ? 'inactive' : 'active' } : { ...emptyForm }))
   const [errors, setErrors] = useState({})
   const [processingImage, setProcessingImage] = useState(false)
 
@@ -380,20 +380,18 @@ function OfferFormModal({ mode, offer, onClose, onSubmit }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="status">Status</Label>
+            <Label htmlFor="status">Availability</Label>
             <select
               id="status"
               value={form.status}
               onChange={(event) => updateField('status', event.target.value)}
               className="h-11 w-full rounded-xl border border-border bg-white px-4 text-sm text-text-primary shadow-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
             >
-              {offerStatuses.map((status) => (
-                <option key={status} value={status}>
-                  {titleCase(status)}
-                </option>
-              ))}
+              <option value="active">Enabled — status follows dates</option>
+              <option value="inactive">Inactive — hidden from guests</option>
             </select>
             {errors.status ? <p className="text-xs font-medium text-red-600">{errors.status}</p> : null}
+            <p className="text-xs leading-5 text-text-secondary">Enabled offers become Upcoming before the start date, Active through the end date, then Expired. Changing the dates recalculates the status. Inactive offers stay hidden.</p>
           </div>
 
           <div className="space-y-3 md:col-span-2">
@@ -644,6 +642,23 @@ export default function Offers() {
   useEffect(() => {
     loadOffers()
   }, [])
+
+  useEffect(() => {
+    if (formMode || viewOffer || deleteOffer) return undefined
+    let active = true
+    let running = false
+    const refreshSchedule = async () => {
+      if (document.hidden || running) return
+      running = true
+      try { const rows = await fetchOffers(); if (active) setOffers(rows) }
+      catch { /* Retain the last successful list during transient failures. */ }
+      finally { running = false }
+    }
+    const timer = window.setInterval(refreshSchedule, 60000)
+    window.addEventListener('focus', refreshSchedule)
+    document.addEventListener('visibilitychange', refreshSchedule)
+    return () => { active = false; window.clearInterval(timer); window.removeEventListener('focus', refreshSchedule); document.removeEventListener('visibilitychange', refreshSchedule) }
+  }, [formMode, viewOffer, deleteOffer])
 
   const summary = useMemo(() => {
     return {

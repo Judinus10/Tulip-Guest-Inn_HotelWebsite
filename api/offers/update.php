@@ -41,6 +41,7 @@ try {
     }
 
     offer_validate_dates($startDate, $endDate);
+    $status = offer_effective_status(['status'=>$status, 'start_date'=>$startDate, 'end_date'=>$endDate]);
 
     $uploadedImage = offer_upload_image('image');
     $imagePath = $uploadedImage ?? offer_storable_image_path($_POST['image_path'] ?? $existing['image_path'] ?? '');
