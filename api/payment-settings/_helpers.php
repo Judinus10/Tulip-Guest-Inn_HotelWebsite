@@ -19,7 +19,9 @@ function encrypt_payment_secret(string $secret): string {
     return base64_encode($nonce . $tag . $cipher);
 }
 function payment_public_row(array $row): array {
-    return ['pay_on_arrival' => (bool)$row['pay_on_arrival'], 'payhere_enabled' => (bool)$row['payhere_enabled'], 'environment' => $row['environment'], 'merchant_id' => $row['merchant_id'], 'secret_configured' => !empty($row['encrypted_secret'])];
+    $runtime = payment_runtime();
+    $ready = (bool) $runtime['payhere_enabled'];
+    return ['pay_on_arrival' => (bool)$row['pay_on_arrival'], 'payhere_enabled' => (bool)$row['payhere_enabled'], 'environment' => $row['environment'], 'merchant_id' => $row['merchant_id'], 'secret_configured' => !empty($row['encrypted_secret']), 'public_online_ready' => $ready, 'readiness_message' => !$row['payhere_enabled'] ? 'Online payment is disabled in saved settings.' : ($ready ? 'Online payment is available to public bookings.' : 'Online payment is saved but unavailable. Check merchant credentials and TULIP_PAYMENT_ENCRYPTION_KEY on this server.')];
 }
 function require_payment_owner(): array {
     $admin = require_admin_auth();

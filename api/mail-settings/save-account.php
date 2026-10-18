@@ -40,6 +40,7 @@ try {
         if (!$existing) json_response(false, 'The selected mail account no longer exists.', 404);
     }
     if (!$existing && $password === '') json_response(false, 'Enter the mailbox password before saving this account.', 422, ['field' => 'password']);
+    if (!$existing && (int) $pdo->query('SELECT COUNT(*) FROM mail_accounts')->fetchColumn() >= 3) json_response(false, 'You can configure up to three SMTP accounts.', 422);
 
     $encrypted = $password !== '' ? encrypt_mail_secret($password) : (string) $existing['encrypted_password'];
     $credentialsChanged = !$existing || $password !== '' || $username !== (string) $existing['smtp_username'] || $host !== (string) $existing['smtp_host'] || $port !== (int) $existing['smtp_port'] || $secure !== (string) $existing['smtp_encryption'];

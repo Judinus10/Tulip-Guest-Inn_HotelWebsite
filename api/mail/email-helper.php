@@ -83,9 +83,15 @@ function email_sender_for_type(string $emailType, string $relatedType = ''): arr
 function send_html_email(string $to, string $subject, string $htmlBody, ?string $replyTo = null, ?string $fromEmailOverride = null, ?string $fromNameOverride = null, ?string $mailFunction = null): bool
 {
     try {
+        $smtpProfile = null;
+        if ($mailFunction !== null && isset(MAIL_FUNCTIONS[$mailFunction])) {
+            $smtpProfile = database_mail_profile(get_db_connection(), $mailFunction);
+        }
         try {
-            $providerResult = send_via_active_provider(get_db_connection(), $to, $subject, $htmlBody, $replyTo);
-            if ($providerResult !== null) return $providerResult;
+            if ($smtpProfile === null) {
+                $providerResult = send_via_active_provider(get_db_connection(), $to, $subject, $htmlBody, $replyTo);
+                if ($providerResult !== null) return $providerResult;
+            }
         } catch (Throwable $providerError) {
             error_log('Active mail provider failed: ' . $providerError->getMessage());
             throw $providerError;
@@ -103,15 +109,6 @@ function send_html_email(string $to, string $subject, string $htmlBody, ?string 
         $fromName = $fromNameOverride !== null && trim($fromNameOverride) !== ''
             ? trim($fromNameOverride)
             : (defined('FROM_NAME') ? trim((string) FROM_NAME) : 'Tulip Guest Inn');
-
-        $smtpProfile = null;
-        if ($mailFunction !== null && isset(MAIL_FUNCTIONS[$mailFunction])) {
-            try {
-                $smtpProfile = database_mail_profile(get_db_connection(), $mailFunction);
-            } catch (Throwable $databaseMailError) {
-                error_log('Database mail profile unavailable for ' . $mailFunction . ': ' . $databaseMailError->getMessage());
-            }
-        }
 
         if ($smtpProfile !== null) {
             $fromEmail = (string) $smtpProfile['from_email'];

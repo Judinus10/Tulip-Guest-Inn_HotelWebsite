@@ -88,17 +88,17 @@ function MicrosoftGraphPanel({ config, busy, onSave, onTest }) {
 
       <div className="border-t bg-white p-5">
         <div className="flex items-start gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600"><ShieldCheck className="h-5 w-5" /></div><div><h3 className="text-lg font-semibold text-slate-900">Connection Diagnostics</h3><p className="mt-1 text-sm text-slate-500">Send a diagnostics validation email to ensure host credentials and secure handshake connections are fully verified.</p></div></div>
-        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end"><div className="flex-1 space-y-2"><Label>Diagnostics Test Destination</Label><Input type="email" value={form.test_destination} onChange={(e) => update('test_destination', e.target.value)} placeholder="e.g. validation@tulipguestinn.com" /></div><Button type="button" disabled={busy} className="bg-emerald-600 hover:bg-emerald-700" onClick={() => onTest('microsoft_graph', form.test_destination)}><Send className="h-4 w-4" />Test Connection</Button></div>
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end"><div className="flex-1 space-y-2"><Label>Diagnostics Test Destination</Label><Input type="email" value={form.test_destination} onChange={(e) => update('test_destination', e.target.value)} placeholder="e.g. validation@tulipguestinn.com" /></div><Button type="button" disabled={busy} className="bg-emerald-600 hover:bg-emerald-700" onClick={() => onTest('microsoft_graph', form.test_destination)}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{busy ? 'Sending...' : 'Test Connection'}</Button></div>
       </div>
     </div>
   )
 }
 
-function ConnectionDiagnostics({ value, onChange, onTest, placeholder = 'e.g. validation@tulipguestinn.com' }) {
+function ConnectionDiagnostics({ value, onChange, onTest, busy, placeholder = 'e.g. validation@tulipguestinn.com' }) {
   return (
     <div className="border-t bg-white p-5">
       <div className="flex items-start gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600"><ShieldCheck className="h-5 w-5" /></div><div><h3 className="text-lg font-semibold text-slate-900">Connection Diagnostics</h3><p className="mt-1 text-sm text-slate-500">Send a diagnostics validation email to ensure host credentials and secure handshake connections are fully verified.</p></div></div>
-      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end"><div className="flex-1 space-y-2"><Label>Diagnostics Test Destination</Label><Input type="email" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} /></div><Button type="button" className="bg-emerald-600 hover:bg-emerald-700" onClick={onTest}><Send className="h-4 w-4" />Test Connection</Button></div>
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end"><div className="flex-1 space-y-2"><Label>Diagnostics Test Destination</Label><Input type="email" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} /></div><Button type="button" disabled={busy} className="bg-emerald-600 hover:bg-emerald-700" onClick={onTest}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{busy ? 'Sending...' : 'Test Connection'}</Button></div>
     </div>
   )
 }
@@ -121,7 +121,7 @@ function SmtpConfigurationPanel({ config, busy, onSave, onTest }) {
         <div className="space-y-2"><Label>Sender Name</Label><Input value={form.sender_name} onChange={(e) => update('sender_name', e.target.value)} /></div>
       </div>
       <div className="flex flex-col gap-3 border-t bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div className="text-sm text-slate-500">Connection Status: <ConnectionState config={config} /></div><Button type="button" disabled={busy} onClick={save}><Save className="h-4 w-4" />Save SMTP Settings</Button></div>
-      <ConnectionDiagnostics value={form.test_destination} onChange={(value) => update('test_destination', value)} onTest={() => onTest('server', form.test_destination)} />
+      <ConnectionDiagnostics value={form.test_destination} onChange={(value) => update('test_destination', value)} onTest={() => onTest('server', form.test_destination)} busy={busy} />
     </div>
   )
 }
@@ -141,7 +141,7 @@ function GoogleConfigurationPanel({ config, busy, onSave, onTest }) {
         <div className="space-y-2 md:col-span-2"><Label>Gmail Sender Address</Label><Input type="email" value={form.email_address} onChange={(e) => update('email_address', e.target.value)} placeholder="e.g. bookings@gmail.com" /></div>
       </div>
       <div className="flex flex-col gap-3 border-t bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div className="text-sm text-slate-500">Connection Status: <ConnectionState config={config} /></div><Button type="button" disabled={busy} onClick={save}>Authorize Google Account</Button></div>
-      <ConnectionDiagnostics value={form.test_destination} onChange={(value) => update('test_destination', value)} onTest={() => onTest('google', form.test_destination)} />
+      <ConnectionDiagnostics value={form.test_destination} onChange={(value) => update('test_destination', value)} onTest={() => onTest('google', form.test_destination)} busy={busy} />
     </div>
   )
 }
@@ -209,7 +209,7 @@ function BusinessLinksModal({ links, busy, onClose, onSave, onToggle, onDelete }
 
 export default function MailSettings() {
   const [activeTab, setActiveTab] = useState('delivery')
-  const [deliveryChannel, setDeliveryChannel] = useState('microsoft_graph')
+  const [deliveryChannel, setDeliveryChannel] = useState(null)
   const [data, setData] = useState({ accounts: [], functions: [], routes: [], providers: [] })
   const [routes, setRoutes] = useState([])
   const [notificationMode, setNotificationMode] = useState('default')
@@ -225,7 +225,7 @@ export default function MailSettings() {
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type })
-    window.setTimeout(() => setToast({ message: '', type: 'success' }), 4500)
+    window.setTimeout(() => setToast(current => current.message === message ? { message: '', type: 'success' } : current), 9000)
   }
 
   const load = async () => {
@@ -233,6 +233,7 @@ export default function MailSettings() {
     try {
       const [result, links] = await Promise.all([fetchMailSettings(), fetchBusinessLinks()])
       setData(result)
+      setDeliveryChannel(current => current || result.providers?.find(item => item.is_active && item.connection_status === 'connected')?.provider || 'server')
       setRoutes(result.routes || [])
       setNotificationMode(result.notification_mode || 'default')
       const grouped = {}
@@ -304,8 +305,8 @@ export default function MailSettings() {
 
   const saveRoutes = async () => {
     setBusy(true)
-    try { const payload = await saveMailRoutes(routes); showToast(payload.message); await load() }
-    catch (error) { showToast(error.message || 'Routing rules could not be saved.', 'error') }
+    try { const payload = await saveMailRoutes(routes); showToast(payload.message); await load(); return true }
+    catch (error) { showToast(error.message || 'Routing rules could not be saved.', 'error'); return false }
     finally { setBusy(false) }
   }
 
@@ -381,9 +382,19 @@ export default function MailSettings() {
         {deliveryChannel === 'microsoft_graph' && <MicrosoftGraphPanel config={providerConfig('microsoft_graph')} busy={busy} onSave={saveProvider} onTest={testProvider} />}
       </div>}
 
+      {activeTab === 'delivery' && <SectionCard>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h2 className="text-lg font-semibold text-slate-900">SMTP sender accounts ({data.accounts.length}/3)</h2><p className="mt-1 text-sm text-slate-600">Up to three sender identities can share one host with separate passwords. Assign each to booking, contact, payment or other mail below.</p></div>
+          <Button type="button" disabled={busy || data.accounts.length >= 3} onClick={() => setEditing(emptyAccount)}><Plus className="h-4 w-4" />Add SMTP Account</Button>
+        </div>
+        <p className="mt-3 text-sm text-slate-700">Current default: <strong>{data.providers.find(item => item.is_active && item.connection_status === 'connected')?.provider === 'microsoft_graph' ? 'Outlook' : data.providers.find(item => item.is_active && item.connection_status === 'connected')?.provider === 'google' ? 'Google Mailbox' : data.providers.find(item => item.is_active && item.connection_status === 'connected')?.provider === 'server' ? 'SMTP Server' : 'Server SMTP configuration'}</strong>. A tested function sender below takes priority for its assigned emails.</p>
+        <div className="mt-5 space-y-3">{data.accounts.map(account => <div key={account.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 p-4"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><strong className="text-sm text-slate-900">{account.account_name}</strong><StatusBadge account={account} /></div><p className="mt-1 text-sm text-slate-600">{account.email_address} · {account.smtp_host}</p><p className="mt-1 text-xs text-slate-500">{account.functions.length ? `Assigned: ${account.functions.join(', ')}` : 'No mail functions assigned yet'}</p></div><Button type="button" variant="outline" disabled={busy} onClick={() => setEditing(account)}>Edit</Button><Button type="button" variant="outline" disabled={busy} onClick={() => testAccount(account)}>{busy ? 'Sending...' : 'Test Mail'}</Button><Button type="button" variant="outline" disabled={busy || account.connection_status !== 'connected'} onClick={() => toggleAccount(account)}>{account.is_enabled ? 'Disable' : 'Enable'}</Button><Button type="button" variant="outline" disabled={busy} onClick={() => removeAccount(account)}><Trash2 className="h-4 w-4" />Delete</Button></div>)}</div>
+      </SectionCard>}
+
       {activeTab === 'routing' && <SectionCard>
         <div className="space-y-4 p-1">
-          <div><h2 className="text-lg font-semibold text-slate-900">Email Notification Routing</h2><p className="mt-1 text-sm text-slate-500">Choose who receives hotel notifications. Existing SMTP settings and customer confirmations remain unchanged.</p></div>
+          <div><h2 className="text-lg font-semibold text-slate-900">Email Notification Routing</h2><p className="mt-1 text-sm text-slate-500">Sender accounts determine who sends each message. Recipient addresses below determine who receives hotel notifications. Guest confirmations go to the guest's booking email.</p></div>
+          <div className="grid gap-3 md:grid-cols-2">{routes.map(route => <label key={route.function_key} className="space-y-1 text-sm text-slate-700"><span className="font-medium">{data.functions.find(item => item.key === route.function_key)?.label || route.function_key} sender</span><select className="w-full rounded-lg border border-slate-200 bg-white p-2" value={route.sender_account_id || ''} onChange={event => updateRoute(route.function_key, 'sender_account_id', event.target.value ? Number(event.target.value) : null)}><option value="">Default mail provider</option>{connectedAccounts.map(account => <option key={account.id} value={account.id}>{account.account_name} ({account.email_address})</option>)}</select></label>)}</div>
           <div className="flex flex-wrap gap-5 text-sm">
             <label className="flex items-center gap-2"><input type="radio" name="notificationMode" checked={notificationMode === 'default'} onChange={() => setNotificationMode('default')} />Default: one email per function</label>
             <label className="flex items-center gap-2"><input type="radio" name="notificationMode" checked={notificationMode === 'custom'} onChange={() => setNotificationMode('custom')} />Custom: multiple functions per email</label>
@@ -407,7 +418,7 @@ export default function MailSettings() {
               <Button type="button" variant="outline" onClick={() => setNotificationRecipients((current) => [...current, { email_address: '', functions: [] }])}><Plus className="h-4 w-4" />Add Recipient</Button>
             </div>
           )}
-          <div className="flex justify-end"><Button type="button" disabled={busy || loading} onClick={async () => { if (notificationMode === 'default') { await saveRoutes(); await saveNotificationAssignments() } else await saveNotificationAssignments() }}><Save className="h-4 w-4" />Save Notification Routing</Button></div>
+          <div className="flex justify-end"><Button type="button" disabled={busy || loading} onClick={async () => { if (await saveRoutes()) await saveNotificationAssignments() }}><Save className="h-4 w-4" />Save Senders and Recipients</Button></div>
         </div>
       </SectionCard>}
 

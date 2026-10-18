@@ -212,9 +212,6 @@ export default function Login() {
                   />
                   Remember me
                 </label>
-                <button type="button" className="text-sm font-medium text-blue-700 hover:text-blue-800">
-                  Forgot password?
-                </button>
               </div>
 
               <Button type="submit" className="w-full" disabled={isSubmitting}>

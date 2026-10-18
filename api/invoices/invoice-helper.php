@@ -272,6 +272,9 @@ function build_invoice_data_for_booking(PDO $pdo, int $bookingId, array $payment
         'customer_name' => (string) ($booking['full_name'] ?? 'Guest'),
         'customer_email' => (string) ($booking['email'] ?? '-'),
         'customer_phone' => (string) ($booking['phone'] ?? '-'),
+        'guest_name' => !empty($booking['is_booking_for_other']) && !empty($booking['staying_guest_name']) ? (string) $booking['staying_guest_name'] : (string) ($booking['full_name'] ?? 'Guest'),
+        'guest_email' => !empty($booking['is_booking_for_other']) && !empty($booking['staying_guest_email']) ? (string) $booking['staying_guest_email'] : (string) ($booking['email'] ?? '-'),
+        'guest_phone' => !empty($booking['is_booking_for_other']) && !empty($booking['staying_guest_phone']) ? (string) $booking['staying_guest_phone'] : (string) ($booking['phone'] ?? '-'),
         'customer_address' => (string) ($booking['message'] ?? ''),
         'room_name' => (string) ($booking['room_name'] ?? '-'),
         'check_in_date' => (string) ($booking['check_in_date'] ?? ''),
@@ -331,6 +334,9 @@ function create_invoice_pdf_binary(array $invoice): string
     $customerName = (string) ($invoice['customer_name'] ?? 'Guest');
     $customerEmail = (string) ($invoice['customer_email'] ?? '-');
     $customerPhone = (string) ($invoice['customer_phone'] ?? '-');
+    $guestName = (string) ($invoice['guest_name'] ?? $customerName);
+    $guestEmail = (string) ($invoice['guest_email'] ?? $customerEmail);
+    $guestPhone = (string) ($invoice['guest_phone'] ?? $customerPhone);
     $roomName = (string) ($invoice['room_name'] ?? '-');
     $guests = max(1, (int) ($invoice['guests'] ?? 1));
     $nights = max(1, (int) ($invoice['nights'] ?? 1));
@@ -396,10 +402,15 @@ function create_invoice_pdf_binary(array $invoice): string
     pdf_add_rect($content, 38, 395, 519, 184, $line, null, 0.7);
     pdf_add_text($content, 52, 553, 'BOOKING DETAILS', 13, 'F2', $navy);
     // Keep the downloaded bill independent from local/remote room-image paths.
-    pdf_add_wrapped_text($content, 52, 516, $roomName, 17, 480, 19, 'F2', $navy, 2);
+    pdf_add_wrapped_text($content, 52, 516, $roomName, 14, 242, 17, 'F2', $navy, 2);
+    pdf_add_line($content, 304, 470, 304, 564, $line, 0.7);
+    pdf_add_text($content, 318, 553, 'GUEST DETAILS', 11, 'F2', $navy);
+    pdf_add_wrapped_text($content, 318, 533, $guestName, 10, 220, 12, 'F2', $navy, 2);
+    pdf_add_wrapped_text($content, 318, 508, $guestEmail, 9, 220, 11, 'F1', $navy, 2);
+    pdf_add_wrapped_text($content, 318, 482, $guestPhone, 9, 220, 11, 'F1', $navy, 1);
     pdf_add_text($content, 52, 480, $guests . ' ' . ($guests === 1 ? 'Guest' : 'Guests'), 10, 'F1', $navy);
-    pdf_add_text($content, 222, 480, $rooms . ' ' . ($rooms === 1 ? 'Room' : 'Rooms'), 10, 'F1', $navy);
-    pdf_add_text($content, 390, 480, $nights . ' ' . ($nights === 1 ? 'Night' : 'Nights'), 10, 'F1', $navy);
+    pdf_add_text($content, 135, 480, $rooms . ' ' . ($rooms === 1 ? 'Room' : 'Rooms'), 10, 'F1', $navy);
+    pdf_add_text($content, 220, 480, $nights . ' ' . ($nights === 1 ? 'Night' : 'Nights'), 10, 'F1', $navy);
     pdf_add_line($content, 52, 460, 542, 460, $gold, 0.7);
     pdf_add_text($content, 52, 438, 'Check-in', 9, 'F2', $navy);
     pdf_add_text($content, 52, 419, $checkIn, 10, 'F1', $navy);

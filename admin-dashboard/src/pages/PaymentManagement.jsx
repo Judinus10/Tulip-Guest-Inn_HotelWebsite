@@ -60,6 +60,7 @@ export default function PaymentManagement() {
 
   const reset = () => { setSettings({ ...savedSettings }); setSecret(''); setPassword(''); setError(''); setMessage('') }
   const status = (enabled) => <span className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{enabled ? 'Enabled' : 'Disabled'}</span>
+  const hasUnsavedChanges = settings.pay_on_arrival !== savedSettings.pay_on_arrival || settings.payhere_enabled !== savedSettings.payhere_enabled || settings.environment !== savedSettings.environment || settings.merchant_id !== savedSettings.merchant_id || Boolean(secret)
 
   return <div className="mx-auto max-w-[1450px] space-y-5 pb-12">
     <div className="flex flex-wrap items-start justify-between gap-3 px-1">
@@ -106,7 +107,7 @@ export default function PaymentManagement() {
           </section>
         </div>
         <aside className="space-y-4">
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h3 className="mb-4 flex items-center gap-2 text-base font-bold text-slate-900"><CreditCard className="h-5 w-5 text-blue-600" /> Payment Status</h3><div className="space-y-2">{[['Pay on Arrival',settings.pay_on_arrival],['Pay Online (PayHere)',settings.payhere_enabled]].map(([label,enabled]) => <div key={label} className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 px-3 py-3 text-sm"><span className="font-medium text-slate-700">{label}</span>{status(enabled)}</div>)}</div><p className="mt-3 text-xs text-slate-400">Statuses shown reflect unsaved changes until you save.</p></section>
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h3 className="mb-4 flex items-center gap-2 text-base font-bold text-slate-900"><CreditCard className="h-5 w-5 text-blue-600" /> Payment Status</h3><div className="space-y-2">{[['Pay on Arrival',settings.pay_on_arrival],['Pay Online (PayHere)',settings.payhere_enabled]].map(([label,enabled]) => <div key={label} className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 px-3 py-3 text-sm"><span className="font-medium text-slate-700">{label}</span>{status(enabled)}</div>)}</div><p className="mt-3 text-xs text-slate-600">{hasUnsavedChanges ? 'Unsaved changes. Enter your password and Save Settings to apply them.' : savedSettings.readiness_message || 'Checking saved payment settings.'}</p></section>
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <label htmlFor="payment-admin-password" className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900"><LockKeyhole className="h-5 w-5 text-blue-600" /> Confirm Admin Password</label>
             <p className="mb-3 text-xs leading-5 text-slate-500">Enter your admin password to securely save payment settings.</p>

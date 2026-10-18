@@ -32,7 +32,7 @@ try {
     $mail->setFrom((string) $account['email_address'], (string) $account['from_name']);
     $mail->addAddress($recipient);
     $mail->Subject = 'Tulip Guest Inn mail connection test';
-    $mail->Body = 'This message confirms that the Office 365 mail account is connected to the Tulip Guest Inn admin system.';
+    $mail->Body = 'This message confirms that the SMTP account is connected to the Tulip Guest Inn admin system.';
     $mail->send();
 
     $pdo->prepare("UPDATE mail_accounts SET connection_status='connected',is_enabled=1,last_tested_at=NOW(),last_test_message='Connection and test email succeeded.' WHERE id=:id")->execute([':id'=>$id]);
@@ -43,5 +43,5 @@ try {
         $pdo->prepare("UPDATE mail_accounts SET connection_status='failed',is_enabled=0,last_tested_at=NOW(),last_test_message=:message WHERE id=:id")->execute([':message'=>mb_substr($e->getMessage(),0,500), ':id'=>$id]);
     }
     error_log('Mail account test failed: ' . $e->getMessage());
-    json_response(false, 'Office 365 rejected the connection. Confirm the email, password, SMTP AUTH permission and port 587 TLS settings.', 422, ['error_code'=>'MAIL_CONNECTION_FAILED']);
+    json_response(false, 'SMTP test failed. Check the sender address, username, password, host, port and encryption; consult server logs for details.', 422, ['error_code'=>'MAIL_CONNECTION_FAILED']);
 }

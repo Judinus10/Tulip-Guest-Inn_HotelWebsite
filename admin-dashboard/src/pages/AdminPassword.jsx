@@ -5,6 +5,57 @@ import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
 import { useToastState } from '@/context/ToastContext'
+import { useAuth } from '@/context/AuthContext'
+
+function ChangeAdminEmail() {
+  const { user } = useAuth()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [otp, setOtp] = useState('')
+  const [token, setToken] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+  const endpoint = buildApiUrl('/auth/change-email.php')
+
+  const send = async (event) => {
+    event.preventDefault()
+    setBusy(true); setError(''); setMessage('')
+    try {
+      const response = await apiFetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'request', new_email: email, current_password: password }) })
+      const result = await readJsonResponse(response)
+      setToken(result.data.request_token)
+      setMessage('Verification code sent to your new email. It expires in 10 minutes.')
+    } catch (err) { setError(err.message || 'Unable to send the code.') }
+    finally { setBusy(false) }
+  }
+
+  const verify = async (event) => {
+    event.preventDefault()
+    setBusy(true); setError(''); setMessage('')
+    try {
+      const response = await apiFetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'verify', request_token: token, otp, current_password: password }) })
+      await readJsonResponse(response)
+      setToken(''); setOtp(''); setPassword('')
+      setMessage('Email changed. Use the new address next time you sign in. Other sessions were signed out.')
+    } catch (err) { setError(err.message || 'Unable to verify the code.') }
+    finally { setBusy(false) }
+  }
+
+  return <SectionCard>
+    <h2 className="text-lg font-semibold text-text-primary">Change Admin Email</h2>
+    <p className="mt-1 text-sm text-text-secondary">Current email: {user?.email || 'Admin account'}. Confirm your password and verify the new address.</p>
+    <form onSubmit={token ? verify : send} className="mt-5 max-w-2xl space-y-4">
+      <div className="space-y-2"><Label htmlFor="admin_new_email">New Email</Label><Input id="admin_new_email" type="email" required maxLength={190} autoComplete="email" value={email} onChange={e => { setEmail(e.target.value); setToken('') }} /></div>
+      <div className="space-y-2"><Label htmlFor="admin_email_password">Current Password</Label><Input id="admin_email_password" type="password" required autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} /></div>
+      {token && <div className="space-y-2"><Label htmlFor="admin_email_code">Code sent to {email}</Label><Input id="admin_email_code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} /></div>}
+      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+      {message && <p role="status" className="text-sm text-emerald-700">{message}</p>}
+      <Button type="submit" disabled={busy}>{busy ? 'Please wait...' : token ? 'Verify and Change Email' : 'Send Verification Code'}</Button>
+      {token && <button type="button" onClick={() => { setToken(''); setOtp('') }} className="ml-4 text-sm text-blue-700">Start again</button>}
+    </form>
+  </SectionCard>
+}
 
 function Toast({ message, type = 'success', onClose }) {
   if (!message) return null
@@ -360,6 +411,8 @@ export default function AdminPassword() {
           </Button>
         </form>
       </SectionCard>
+
+      <ChangeAdminEmail />
 
       {otpModalOpen && (
         <OtpModal
