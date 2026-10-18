@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { MapPin, Clock } from 'lucide-react';
+import { MapPin, Navigation } from 'lucide-react';
 import type { Attraction } from '../../data/attractions';
 
 interface AttractionCardProps {
@@ -37,16 +37,22 @@ export default function AttractionCard({ attraction, index = 0 }: AttractionCard
         <h3 className="font-serif text-xl font-light text-dark mb-2">{attraction.name}</h3>
         <div className="w-8 h-[1px] bg-gold mb-4" />
         <p className="text-sm text-gray-500 leading-relaxed mb-5">{attraction.description}</p>
-        <div className="flex items-center gap-5 pt-4 border-t border-border">
-          <div className="flex items-center gap-1.5 text-gray-400">
-            <MapPin size={13} className="text-gold" />
-            <span className="text-xs">{attraction.distance}</span>
+        {(attraction.location || attraction.distance) && (
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-4 border-t border-border">
+            {attraction.location && (
+              <div className="flex min-w-0 items-center gap-1.5 text-gray-400">
+                <MapPin size={13} className="text-gold shrink-0" aria-hidden="true" />
+                <span className="text-xs break-words" aria-label="Location">{attraction.location}</span>
+              </div>
+            )}
+            {attraction.distance && (
+              <div className="flex min-w-0 items-center gap-1.5 text-gray-400">
+                <Navigation size={13} className="text-gold shrink-0" aria-hidden="true" />
+                <span className="text-xs break-words" aria-label="Distance">{attraction.distance}</span>
+              </div>
+            )}
           </div>
-          <div className="flex items-center gap-1.5 text-gray-400">
-            <Clock size={13} className="text-gold" />
-            <span className="text-xs">{attraction.duration}</span>
-          </div>
-        </div>
+        )}
       </div>
     </motion.div>
   );

@@ -3,7 +3,6 @@ import {
   Edit,
   Eye,
   ImagePlus,
-  Clock,
   MapPin,
   Plus,
   Search,
@@ -45,7 +44,6 @@ const emptyForm = {
   category: 'Culture',
   location: '',
   distance: '',
-  duration: '',
   description: '',
   image_path: '',
   image_file: null,
@@ -86,8 +84,7 @@ export default function Experience() {
           item.title.toLowerCase().includes(query) ||
           item.description.toLowerCase().includes(query) ||
           item.location.toLowerCase().includes(query) ||
-          item.distance.toLowerCase().includes(query) ||
-          item.duration.toLowerCase().includes(query)
+          item.distance.toLowerCase().includes(query)
         )
       })
       .filter((item) => categoryFilter === 'all' || item.category === categoryFilter)
@@ -142,7 +139,6 @@ export default function Experience() {
         ...emptyForm,
         ...item,
         distance: item.distance || '',
-        duration: item.duration || '',
         location: item.location || '',
         description: item.description || '',
         image_file: null,
@@ -180,6 +176,7 @@ export default function Experience() {
     event.preventDefault()
 
     if (!modal.form.title.trim()) return setError('Title is required.')
+    if (!modal.form.location.trim()) return setError('Location is required.')
     if (!modal.form.category.trim()) return setError('Category is required.')
     if (!modal.form.description.trim()) return setError('Description is required.')
 
@@ -372,13 +369,6 @@ export default function Experience() {
                   </p>
                 ) : null}
 
-                {item.duration ? (
-                  <p className="mt-2 flex items-center gap-1.5 text-sm text-text-secondary">
-                    <Clock className="h-4 w-4 shrink-0" />
-                    <span>{item.duration}</span>
-                  </p>
-                ) : null}
-
                 <p className="mt-3 line-clamp-3 text-sm leading-6 text-text-secondary">
                   {item.description}
                 </p>
@@ -447,8 +437,11 @@ export default function Experience() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Location optional</Label>
+                  <Label htmlFor="experience-location">Location *</Label>
                   <Input
+                    id="experience-location"
+                    required
+                    maxLength={180}
                     value={modal.form.location}
                     onChange={(event) => updateForm('location', event.target.value)}
                     placeholder="Jaffna"
@@ -461,15 +454,6 @@ export default function Experience() {
                     value={modal.form.distance}
                     onChange={(e) => updateForm('distance', e.target.value)}
                     placeholder="5 km"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Time</Label>
-                  <Input
-                    value={modal.form.duration}
-                    onChange={(event) => updateForm('duration', event.target.value)}
-                    placeholder="5 min drive"
                   />
                 </div>
 

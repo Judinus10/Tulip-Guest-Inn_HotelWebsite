@@ -104,10 +104,6 @@ function experience_ensure_schema(PDO $pdo): void
     if (!isset($columns['distance'])) {
         $pdo->exec("ALTER TABLE experience_items ADD COLUMN distance VARCHAR(100) NULL AFTER location");
     }
-
-    if (!isset($columns['duration'])) {
-        $pdo->exec("ALTER TABLE experience_items ADD COLUMN duration VARCHAR(100) NULL AFTER distance");
-    }
 }
 
 function experience_normalize(array $row): array
@@ -118,7 +114,6 @@ function experience_normalize(array $row): array
         'category' => (string) $row['category'],
         'location' => (string) ($row['location'] ?? ''),
         'distance' => (string) ($row['distance'] ?? ''),
-        'duration' => (string) ($row['duration'] ?? ''),
         'description' => (string) $row['description'],
         'image_path' => experience_image_url($row['image_path'] ?? ''),
         'stored_path' => (string) ($row['image_path'] ?? ''),

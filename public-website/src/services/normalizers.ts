@@ -115,7 +115,7 @@ export function normalizeAttraction(item: BackendExperienceItem, index: number):
     description: asString(item.description),
     longDescription: asString(item.description),
     distance: asString(item.distance, 'Nearby'),
-    duration: asString(item.duration, asString(item.time, asString(item.location, 'Explore'))),
+    location: asString(item.location),
     image: asString(item.image_path, fallbackAttractionImage),
     category: asString(item.category, 'Experience'),
   };

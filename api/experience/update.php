@@ -15,7 +15,6 @@ try {
     $category = clean_string($_POST['category'] ?? '', 100);
     $location = clean_string($_POST['location'] ?? '', 180);
     $distance = clean_string($_POST['distance'] ?? '', 100);
-    $duration = clean_string($_POST['duration'] ?? '', 100);
     $description = clean_string($_POST['description'] ?? '', 5000);
     $status = $_POST['status'] ?? 'active';
     if (!in_array($status, ['active','inactive'], true)) experience_json(['success'=>false,'message'=>'Invalid status.'], 422);
@@ -26,6 +25,10 @@ try {
             'success' => false,
             'message' => 'Invalid experience item ID.',
         ], 400);
+    }
+
+    if ($location === '') {
+        experience_json(['success' => false, 'message' => 'Location is required.'], 422);
     }
 
     if ($title === '' || $category === '' || $description === '') {
@@ -56,7 +59,6 @@ try {
             category = :category,
             location = :location,
             distance = :distance,
-            duration = :duration,
             description = :description,
             image_path = :image_path,
             status = :status,
@@ -70,7 +72,6 @@ try {
         ':category' => $category,
         ':location' => $location,
         ':distance' => $distance,
-        ':duration' => $duration,
         ':description' => $description,
         ':image_path' => $imagePath,
         ':status' => $status,
