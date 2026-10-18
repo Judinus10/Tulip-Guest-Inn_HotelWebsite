@@ -1,25 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AlertCircle, Building2, CheckCircle2, Cloud, Edit3, Users, ExternalLink, KeyRound, Link2, Loader2, LockKeyhole, Mail, Plus, Save, Send, Server, Settings2, ShieldCheck, Trash2, X } from 'lucide-react'
 import { PageHeader, SectionCard } from '@/components/ui/page-header'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Input, Label } from '@/components/ui/input'
-import { deleteMailAccount, fetchMailSettings, saveMailAccount, saveMailProvider, saveMailRoutes, saveNotificationRouting, testMailAccount, testMailProvider, toggleMailAccount } from '@/services/mailSettingsApi'
+import { fetchSharedSmtp, updateSharedSmtp, fetchMailSettings, saveMailProvider, saveMailRoutes, saveNotificationRouting, testMailProvider } from '@/services/mailSettingsApi'
 import { deleteBusinessLink, fetchBusinessLinks, saveBusinessLink, toggleBusinessLink } from '@/services/businessLinksApi'
-
-const emptyAccount = {
-  id: 0,
-  account_name: '',
-  provider: 'custom',
-  email_address: '',
-  smtp_username: '',
-  password: '',
-  from_name: 'Tulip Guest Inn',
-  smtp_host: 'smtp.office365.com',
-  smtp_port: 587,
-  smtp_encryption: 'tls',
-  functions: [],
-}
 
 const emptyGraphAccount = {
   app_password: '',
@@ -103,27 +89,38 @@ function ConnectionDiagnostics({ value, onChange, onTest, busy, placeholder = 'e
   )
 }
 
-function SmtpConfigurationPanel({ config, busy, onSave, onTest }) {
-  const [form, setForm] = useState({ host: '', port: 587, encryption: 'tls', username: '', password: '', sender_email: '', sender_name: 'Tulip Guest Inn', test_destination: '' })
-  const update = (key, value) => setForm((current) => ({ ...current, [key]: value }))
-  useEffect(() => setForm((current) => ({ ...current, host: config?.smtp_host || '', port: config?.smtp_port || 587, encryption: config?.smtp_encryption || 'tls', username: config?.smtp_username || '', sender_email: config?.sender_email || '', sender_name: config?.sender_name || 'Tulip Guest Inn', password: '' })), [config])
-  const save = () => onSave({ provider: 'server', sender_email: form.sender_email, sender_name: form.sender_name, smtp_host: form.host, smtp_port: form.port, smtp_encryption: form.encryption, smtp_username: form.username, password: form.password })
-  return (
-    <div className="overflow-hidden rounded-2xl border border-violet-200 bg-white shadow-sm">
-      <div className="border-b border-violet-100 px-5 py-5"><div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-700"><Server className="h-5 w-5" /></div><h2 className="text-xl font-semibold text-slate-900">SMTP Server Configuration</h2></div><div className="mt-4 flex items-start gap-2 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><p><strong>SMTP Server note:</strong> Enter the outgoing mail server credentials supplied by your hosting or email provider.</p></div></div>
-      <div className="grid gap-5 p-5 md:grid-cols-2">
-        <div className="space-y-2 md:col-span-2"><Label>SMTP Host</Label><Input value={form.host} onChange={(e) => update('host', e.target.value)} placeholder="e.g. mail.tulipguestinn.com" /></div>
-        <div className="space-y-2"><Label>Port</Label><Input type="number" value={form.port} onChange={(e) => update('port', Number(e.target.value))} /></div>
-        <div className="space-y-2"><Label>Encryption</Label><select value={form.encryption} onChange={(e) => update('encryption', e.target.value)} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"><option value="tls">TLS</option><option value="ssl">SSL</option><option value="none">None</option></select></div>
-        <div className="space-y-2"><Label>SMTP Username</Label><Input value={form.username} onChange={(e) => update('username', e.target.value)} placeholder="Full mailbox address" /></div>
-        <div className="space-y-2"><Label>SMTP Password</Label><Input type="password" autoComplete="new-password" value={form.password} onChange={(e) => update('password', e.target.value)} placeholder="Mailbox or app password" /></div>
-        <div className="space-y-2"><Label>Sender Address</Label><Input type="email" value={form.sender_email} onChange={(e) => update('sender_email', e.target.value)} placeholder="info@tulipguestinn.com" /></div>
-        <div className="space-y-2"><Label>Sender Name</Label><Input value={form.sender_name} onChange={(e) => update('sender_name', e.target.value)} /></div>
-      </div>
-      <div className="flex flex-col gap-3 border-t bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div className="text-sm text-slate-500">Connection Status: <ConnectionState config={config} /></div><Button type="button" disabled={busy} onClick={save}><Save className="h-4 w-4" />Save SMTP Settings</Button></div>
-      <ConnectionDiagnostics value={form.test_destination} onChange={(value) => update('test_destination', value)} onTest={() => onTest('server', form.test_destination)} busy={busy} />
+function SmtpConfigurationPanel({ config, busy, onAction }) {
+  const [form, setForm] = useState(null)
+  const [destinations, setDestinations] = useState({})
+  const [dirty, setDirty] = useState(false)
+  useEffect(() => {
+    if (!config) return
+    setForm({ ...config, senders: Object.fromEntries(['booking', 'contact', 'admin'].map(role => [role, { ...config.senders?.[role], password: '' }])) })
+    setDirty(false)
+  }, [config])
+  if (!form) return <SectionCard>Loading SMTP settings…</SectionCard>
+  const update = (key, value) => { setForm(current => ({ ...current, [key]: value })); setDirty(true) }
+  const updateSender = (role, key, value) => { setForm(current => ({ ...current, senders: { ...current.senders, [role]: { ...current.senders[role], [key]: value } } })); setDirty(true) }
+  const ready = ['booking', 'contact', 'admin'].every(role => form.senders[role].connection_status === 'connected')
+  return <div className="overflow-hidden rounded-2xl border border-violet-200 bg-white shadow-sm">
+    <div className="border-b p-5"><h2 className="text-xl font-semibold text-slate-900">SMTP Server Configuration</h2><p className="mt-2 text-sm text-slate-500">One server, three sender mailboxes. Each mailbox uses its email address as the SMTP username.</p></div>
+    <div className="grid gap-5 p-5 md:grid-cols-2">
+      <div className="space-y-2 md:col-span-2"><Label>SMTP Host</Label><Input value={form.smtp_host} onChange={e => update('smtp_host', e.target.value)} placeholder="mail.tulipguestinn.com" /></div>
+      <div className="space-y-2"><Label>Port</Label><Input type="number" min="1" max="65535" value={form.smtp_port} onChange={e => update('smtp_port', Number(e.target.value))} /></div>
+      <div className="space-y-2"><Label>Encryption</Label><select className="h-10 w-full rounded-lg border px-3" value={form.smtp_encryption} onChange={e => update('smtp_encryption', e.target.value)}><option value="tls">TLS</option><option value="ssl">SSL</option><option value="none">None</option></select></div>
+      <div className="space-y-2 md:col-span-2"><Label>Sender Name</Label><Input value={form.sender_name} onChange={e => update('sender_name', e.target.value)} /></div>
     </div>
-  )
+    <div className="space-y-4 px-5 pb-5">{[['booking', 'Booking emails', 'Bookings and payment messages'], ['contact', 'Contact emails', 'Contact enquiries and customer confirmations'], ['admin', 'Admin / system emails', 'System alerts, security emails and stay reminders']].map(([role, title, description]) => {
+      const sender = form.senders[role]
+      return <div key={role} className="rounded-xl border border-slate-200 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold text-slate-900">{title}</h3><StatusBadge account={{ connection_status: dirty ? 'untested' : sender.connection_status, is_enabled: true }} /></div>
+        <p className="mt-1 text-xs text-slate-500">{description}</p>
+        <div className="mt-4 grid gap-4 md:grid-cols-2"><div className="space-y-2"><Label>Sender Email</Label><Input type="email" value={sender.email || ''} onChange={e => updateSender(role, 'email', e.target.value)} /></div><div className="space-y-2"><Label>Mailbox Password</Label><Input type="password" autoComplete="new-password" value={sender.password} onChange={e => updateSender(role, 'password', e.target.value)} placeholder={sender.has_password ? 'Leave blank to keep saved password' : 'Mailbox or app password'} /></div></div>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end"><div className="flex-1 space-y-2"><Label>Test Destination</Label><Input type="email" value={destinations[role] || ''} placeholder="recipient@example.com" onChange={e => setDestinations(current => ({ ...current, [role]: e.target.value }))} /></div><Button type="button" variant="outline" disabled={busy || dirty || !destinations[role]} onClick={() => onAction({ action: 'test', role, recipient_email: destinations[role] })}><Send className="h-4 w-4" />Test Connection</Button></div>
+      </div>
+    })}</div>
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-slate-50 p-5"><p className="text-xs text-slate-500">Save changes before testing. The current active settings stay in use until you activate these verified settings.</p><div className="flex flex-wrap gap-3"><Button disabled={busy} onClick={() => onAction({ ...form, action: 'save' })}><Save className="h-4 w-4" />Save SMTP Settings</Button><Button variant="outline" disabled={busy || dirty || !ready} onClick={() => onAction({ action: 'activate' })}>Activate SMTP</Button></div></div>
+  </div>
 }
 
 function GoogleConfigurationPanel({ config, busy, onSave, onTest }) {
@@ -142,43 +139,6 @@ function GoogleConfigurationPanel({ config, busy, onSave, onTest }) {
       </div>
       <div className="flex flex-col gap-3 border-t bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div className="text-sm text-slate-500">Connection Status: <ConnectionState config={config} /></div><Button type="button" disabled={busy} onClick={save}>Authorize Google Account</Button></div>
       <ConnectionDiagnostics value={form.test_destination} onChange={(value) => update('test_destination', value)} onTest={() => onTest('google', form.test_destination)} busy={busy} />
-    </div>
-  )
-}
-
-function AccountModal({ account, functions, busy, onClose, onSave }) {
-  const [form, setForm] = useState({ ...emptyAccount, ...account, password: '' })
-  const update = (key, value) => setForm((current) => ({ ...current, [key]: value }))
-  const toggleFunction = (key) => update('functions', form.functions.includes(key) ? form.functions.filter((item) => item !== key) : [...form.functions, key])
-
-  return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 px-3 py-5 backdrop-blur-sm" onMouseDown={onClose}>
-      <form className="max-h-full w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl" onSubmit={(event) => { event.preventDefault(); onSave(form) }} onMouseDown={(event) => event.stopPropagation()}>
-        <div className="sticky top-0 z-10 flex items-start justify-between border-b bg-white px-5 py-4">
-          <div><h2 className="text-xl font-semibold text-slate-900">{form.id ? 'Edit SMTP Account' : 'Add SMTP Account'}</h2><p className="mt-1 text-sm text-slate-500">Credentials are encrypted by the PHP backend and are never returned to this page.</p></div>
-          <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X className="h-5 w-5" /></button>
-        </div>
-
-        <div className="grid gap-5 p-5 sm:grid-cols-2">
-          <div className="space-y-2"><Label>Account name</Label><Input value={form.account_name} onChange={(e) => update('account_name', e.target.value)} placeholder="Tulip Booking Mail" /></div>
-          <div className="space-y-2"><Label>Provider</Label><select value={form.provider} onChange={(e) => update('provider', e.target.value)} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"><option value="custom">Custom SMTP</option><option value="office365">Office 365 SMTP (legacy)</option></select></div>
-          <div className="space-y-2"><Label>Sender email</Label><Input type="email" value={form.email_address} onChange={(e) => { update('email_address', e.target.value); if (!form.smtp_username) update('smtp_username', e.target.value) }} placeholder="bookings@tulipguestinn.com" /></div>
-          <div className="space-y-2"><Label>Sender name</Label><Input value={form.from_name} onChange={(e) => update('from_name', e.target.value)} /></div>
-          <div className="space-y-2"><Label>SMTP username</Label><Input value={form.smtp_username} onChange={(e) => update('smtp_username', e.target.value)} placeholder="Usually the full email address" /></div>
-          <div className="space-y-2"><Label>{form.id ? 'New password (leave blank to keep current)' : 'Mailbox password'}</Label><Input type="password" autoComplete="new-password" value={form.password} onChange={(e) => update('password', e.target.value)} /></div>
-          <div className="space-y-2"><Label>SMTP host</Label><Input value={form.smtp_host} disabled={form.provider === 'office365'} onChange={(e) => update('smtp_host', e.target.value)} /></div>
-          <div className="grid grid-cols-2 gap-3"><div className="space-y-2"><Label>Port</Label><Input type="number" value={form.smtp_port} disabled={form.provider === 'office365'} onChange={(e) => update('smtp_port', Number(e.target.value))} /></div><div className="space-y-2"><Label>Encryption</Label><select value={form.smtp_encryption} disabled={form.provider === 'office365'} onChange={(e) => update('smtp_encryption', e.target.value)} className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm"><option value="tls">TLS</option><option value="ssl">SSL</option><option value="none">None</option></select></div></div>
-
-          <div className="space-y-3 sm:col-span-2">
-            <div><Label>Assigned mail functions</Label><p className="mt-1 text-xs text-slate-500">Selecting a function makes this account its sender. One function can have only one active sender.</p></div>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {functions.map((item) => <label key={item.key} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-3 text-sm ${form.functions.includes(item.key) ? 'border-blue-500 bg-blue-50 text-blue-800' : 'border-slate-200'}`}><input type="checkbox" checked={form.functions.includes(item.key)} onChange={() => toggleFunction(item.key)} />{item.label}</label>)}
-            </div>
-          </div>
-        </div>
-
-        <div className="sticky bottom-0 flex justify-end gap-3 border-t bg-white px-5 py-4"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" disabled={busy}>{busy && <Loader2 className="h-4 w-4 animate-spin" />}Save Account</Button></div>
-      </form>
     </div>
   )
 }
@@ -211,17 +171,16 @@ export default function MailSettings() {
   const [activeTab, setActiveTab] = useState('delivery')
   const [deliveryChannel, setDeliveryChannel] = useState(null)
   const [data, setData] = useState({ accounts: [], functions: [], routes: [], providers: [] })
+  const [sharedSmtp, setSharedSmtp] = useState(null)
   const [routes, setRoutes] = useState([])
   const [notificationMode, setNotificationMode] = useState('default')
   const [notificationRecipients, setNotificationRecipients] = useState([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
-  const [editing, setEditing] = useState(null)
   const [businessLinks, setBusinessLinks] = useState([])
   const [selectedBusinessLink, setSelectedBusinessLink] = useState('')
   const [managingLinks, setManagingLinks] = useState(false)
   const [toast, setToast] = useState({ message: '', type: 'success' })
-  const connectedAccounts = useMemo(() => data.accounts.filter((account) => account.is_enabled && account.connection_status === 'connected'), [data.accounts])
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type })
@@ -231,7 +190,8 @@ export default function MailSettings() {
   const load = async () => {
     setLoading(true)
     try {
-      const [result, links] = await Promise.all([fetchMailSettings(), fetchBusinessLinks()])
+      const [result, links, smtp] = await Promise.all([fetchMailSettings(), fetchBusinessLinks(), fetchSharedSmtp()])
+      setSharedSmtp(smtp)
       setData(result)
       setDeliveryChannel(current => current || result.providers?.find(item => item.is_active && item.connection_status === 'connected')?.provider || 'server')
       setRoutes(result.routes || [])
@@ -250,6 +210,13 @@ export default function MailSettings() {
 
   useEffect(() => { load() }, [])
 
+  const smtpAction = async (body) => {
+    setBusy(true)
+    try { const result = await updateSharedSmtp(body); showToast(result.message); await load() }
+    catch (error) { showToast(error.message || 'SMTP request failed.', 'error'); if (body.action === 'test') await load() }
+    finally { setBusy(false) }
+  }
+  const activeProvider = data.providers.find(item => item.is_active && item.connection_status === 'connected')?.provider
   const providerConfig = (provider) => data.providers?.find((item) => item.provider === provider)
 
   const saveProvider = async (form) => {
@@ -266,46 +233,11 @@ export default function MailSettings() {
     finally { setBusy(false) }
   }
 
-  const saveAccount = async (form) => {
-    setBusy(true)
-    try {
-      const payload = await saveMailAccount(form)
-      setEditing(null)
-      showToast(payload.message || 'Mail account saved. Test it before use.')
-      await load()
-    } catch (error) { showToast(error.message || 'Mail account could not be saved.', 'error') }
-    finally { setBusy(false) }
-  }
-
-  const testAccount = async (account) => {
-    const recipient = window.prompt('Send the connection test to:', account.email_address)
-    if (recipient === null) return
-    setBusy(true)
-    try { const payload = await testMailAccount(account.id, recipient); showToast(payload.message); await load() }
-    catch (error) { showToast(error.message || 'Connection test failed.', 'error'); await load() }
-    finally { setBusy(false) }
-  }
-
-  const removeAccount = async (account) => {
-    if (!window.confirm(`Delete ${account.email_address}? Its assigned functions will have no database sender until another account is selected.`)) return
-    setBusy(true)
-    try { const payload = await deleteMailAccount(account.id); showToast(payload.message); await load() }
-    catch (error) { showToast(error.message || 'Account could not be deleted.', 'error') }
-    finally { setBusy(false) }
-  }
-
-  const toggleAccount = async (account) => {
-    setBusy(true)
-    try { const payload = await toggleMailAccount(account.id, !account.is_enabled); showToast(payload.message); await load() }
-    catch (error) { showToast(error.message || 'Account status could not be changed.', 'error') }
-    finally { setBusy(false) }
-  }
-
   const updateRoute = (key, field, value) => setRoutes((current) => current.map((route) => route.function_key === key ? { ...route, [field]: value } : route))
 
   const saveRoutes = async () => {
     setBusy(true)
-    try { const payload = await saveMailRoutes(routes); showToast(payload.message); await load(); return true }
+    try { const payload = await saveMailRoutes(routes.map(route => ({ ...route, sender_account_id: null }))); showToast(payload.message); await load(); return true }
     catch (error) { showToast(error.message || 'Routing rules could not be saved.', 'error'); return false }
     finally { setBusy(false) }
   }
@@ -371,30 +303,18 @@ export default function MailSettings() {
         <SectionCard>
           <div className="mb-5"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Delivery channels</p><h2 className="mt-1 text-lg font-semibold text-slate-900">Choose a mail service</h2></div>
           <div className="space-y-3">
-            <button type="button" onClick={() => setDeliveryChannel('server')} className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition ${deliveryChannel === 'server' ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'}`}><Server className="mt-0.5 h-5 w-5 text-slate-600" /><span><strong className="block text-sm text-slate-900">SMTP Server</strong><span className="mt-1 block text-xs text-slate-500">Custom mail server delivery</span></span></button>
-            <button type="button" onClick={() => setDeliveryChannel('google')} className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition ${deliveryChannel === 'google' ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'}`}><Mail className="mt-0.5 h-5 w-5 text-slate-600" /><span><strong className="block text-sm text-slate-900">Google Mailbox</strong><span className="mt-1 block text-xs text-slate-500">Connect via Gmail OAuth / App Pass</span></span></button>
-            <button type="button" onClick={() => setDeliveryChannel('microsoft_graph')} className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition ${deliveryChannel === 'microsoft_graph' ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'}`}><Cloud className={`mt-0.5 h-5 w-5 ${deliveryChannel === 'microsoft_graph' ? 'text-violet-600' : 'text-slate-500'}`} /><span className="flex-1"><span className="flex items-center justify-between gap-2"><strong className="block text-sm text-slate-900">Outlook Mailbox</strong><span className="h-2 w-2 rounded-full bg-violet-500" /></span><span className="mt-1 block text-xs text-slate-500">Connect via Office 365 Exchange</span></span></button>
+            {[['server', 'SMTP Server', 'Custom mail server delivery', Server], ['google', 'Google Mailbox', 'Connect via Gmail', Mail], ['microsoft_graph', 'Outlook Mailbox', 'Connect via Office 365 Exchange', Cloud]].map(([id, title, description, Icon]) => <button key={id} type="button" onClick={() => setDeliveryChannel(id)} className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition ${deliveryChannel === id ? 'border-violet-500 bg-violet-50' : 'border-slate-200 hover:border-slate-300'}`}><Icon className="mt-0.5 h-5 w-5 text-slate-600" /><span className="flex-1"><span className="flex flex-wrap items-center justify-between gap-2"><strong className="text-sm text-slate-900">{title}</strong>{activeProvider === id && <span className="flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700"><span className="h-2 w-2 rounded-full bg-emerald-500" />Active</span>}</span><span className="mt-1 block text-xs text-slate-500">{description}</span></span></button>)}
           </div>
         </SectionCard>
 
-        {deliveryChannel === 'server' && <SmtpConfigurationPanel config={providerConfig('server')} busy={busy} onSave={saveProvider} onTest={testProvider} />}
+        {deliveryChannel === 'server' && <SmtpConfigurationPanel config={sharedSmtp} busy={busy} onAction={smtpAction} />}
         {deliveryChannel === 'google' && <GoogleConfigurationPanel config={providerConfig('google')} busy={busy} onSave={saveProvider} onTest={testProvider} />}
         {deliveryChannel === 'microsoft_graph' && <MicrosoftGraphPanel config={providerConfig('microsoft_graph')} busy={busy} onSave={saveProvider} onTest={testProvider} />}
       </div>}
 
-      {activeTab === 'delivery' && <SectionCard>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div><h2 className="text-lg font-semibold text-slate-900">SMTP sender accounts ({data.accounts.length}/3)</h2><p className="mt-1 text-sm text-slate-600">Up to three sender identities can share one host with separate passwords. Assign each to booking, contact, payment or other mail below.</p></div>
-          <Button type="button" disabled={busy || data.accounts.length >= 3} onClick={() => setEditing(emptyAccount)}><Plus className="h-4 w-4" />Add SMTP Account</Button>
-        </div>
-        <p className="mt-3 text-sm text-slate-700">Current default: <strong>{data.providers.find(item => item.is_active && item.connection_status === 'connected')?.provider === 'microsoft_graph' ? 'Outlook' : data.providers.find(item => item.is_active && item.connection_status === 'connected')?.provider === 'google' ? 'Google Mailbox' : data.providers.find(item => item.is_active && item.connection_status === 'connected')?.provider === 'server' ? 'SMTP Server' : 'Server SMTP configuration'}</strong>. A tested function sender below takes priority for its assigned emails.</p>
-        <div className="mt-5 space-y-3">{data.accounts.map(account => <div key={account.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 p-4"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><strong className="text-sm text-slate-900">{account.account_name}</strong><StatusBadge account={account} /></div><p className="mt-1 text-sm text-slate-600">{account.email_address} · {account.smtp_host}</p><p className="mt-1 text-xs text-slate-500">{account.functions.length ? `Assigned: ${account.functions.join(', ')}` : 'No mail functions assigned yet'}</p></div><Button type="button" variant="outline" disabled={busy} onClick={() => setEditing(account)}>Edit</Button><Button type="button" variant="outline" disabled={busy} onClick={() => testAccount(account)}>{busy ? 'Sending...' : 'Test Mail'}</Button><Button type="button" variant="outline" disabled={busy || account.connection_status !== 'connected'} onClick={() => toggleAccount(account)}>{account.is_enabled ? 'Disable' : 'Enable'}</Button><Button type="button" variant="outline" disabled={busy} onClick={() => removeAccount(account)}><Trash2 className="h-4 w-4" />Delete</Button></div>)}</div>
-      </SectionCard>}
-
       {activeTab === 'routing' && <SectionCard>
         <div className="space-y-4 p-1">
-          <div><h2 className="text-lg font-semibold text-slate-900">Email Notification Routing</h2><p className="mt-1 text-sm text-slate-500">Sender accounts determine who sends each message. Recipient addresses below determine who receives hotel notifications. Guest confirmations go to the guest's booking email.</p></div>
-          <div className="grid gap-3 md:grid-cols-2">{routes.map(route => <label key={route.function_key} className="space-y-1 text-sm text-slate-700"><span className="font-medium">{data.functions.find(item => item.key === route.function_key)?.label || route.function_key} sender</span><select className="w-full rounded-lg border border-slate-200 bg-white p-2" value={route.sender_account_id || ''} onChange={event => updateRoute(route.function_key, 'sender_account_id', event.target.value ? Number(event.target.value) : null)}><option value="">Default mail provider</option>{connectedAccounts.map(account => <option key={account.id} value={account.id}>{account.account_name} ({account.email_address})</option>)}</select></label>)}</div>
+          <div><h2 className="text-lg font-semibold text-slate-900">Email Notification Routing</h2><p className="mt-1 text-sm text-slate-500">The active delivery channel determines the sender. SMTP uses its booking, contact and admin mailboxes. Recipient addresses below determine who receives hotel notifications. Guest confirmations go to the guest's booking email.</p></div>
           <div className="flex flex-wrap gap-5 text-sm">
             <label className="flex items-center gap-2"><input type="radio" name="notificationMode" checked={notificationMode === 'default'} onChange={() => setNotificationMode('default')} />Default: one email per function</label>
             <label className="flex items-center gap-2"><input type="radio" name="notificationMode" checked={notificationMode === 'custom'} onChange={() => setNotificationMode('custom')} />Custom: multiple functions per email</label>
@@ -418,11 +338,10 @@ export default function MailSettings() {
               <Button type="button" variant="outline" onClick={() => setNotificationRecipients((current) => [...current, { email_address: '', functions: [] }])}><Plus className="h-4 w-4" />Add Recipient</Button>
             </div>
           )}
-          <div className="flex justify-end"><Button type="button" disabled={busy || loading} onClick={async () => { if (await saveRoutes()) await saveNotificationAssignments() }}><Save className="h-4 w-4" />Save Senders and Recipients</Button></div>
+          <div className="flex justify-end"><Button type="button" disabled={busy || loading} onClick={async () => { if (await saveRoutes()) await saveNotificationAssignments() }}><Save className="h-4 w-4" />Save Notification Recipients</Button></div>
         </div>
       </SectionCard>}
 
-      {editing && <AccountModal account={editing} functions={data.functions} busy={busy} onClose={() => setEditing(null)} onSave={saveAccount} />}
       {managingLinks && <BusinessLinksModal links={businessLinks} busy={busy} onClose={() => setManagingLinks(false)} onSave={saveLink} onToggle={toggleLink} onDelete={removeLink} />}
     </div>
   )

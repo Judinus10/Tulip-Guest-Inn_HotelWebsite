@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/_mail_settings_helpers.php';
+require_once __DIR__ . '/shared-smtp-helper.php';
 
 const MAIL_PROVIDERS = ['server', 'google', 'microsoft_graph'];
 
@@ -76,11 +77,11 @@ function active_provider_setting(PDO $pdo): ?array
     return $row ?: null;
 }
 
-function provider_http_request(string $url, array $options): array
+function provider_http_request(string $url, array $options, int $timeout = 30): array
 {
     if (!function_exists('curl_init')) throw new RuntimeException('The server cURL extension is required for OAuth mail delivery.');
     $ch = curl_init($url);
-    curl_setopt_array($ch, $options + [CURLOPT_RETURNTRANSFER => true, CURLOPT_CONNECTTIMEOUT => 10, CURLOPT_TIMEOUT => 30]);
+    curl_setopt_array($ch, $options + [CURLOPT_RETURNTRANSFER => true, CURLOPT_CONNECTTIMEOUT => min(10, $timeout), CURLOPT_TIMEOUT => $timeout]);
     $body = curl_exec($ch);
     $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
     $error = curl_error($ch);
@@ -89,7 +90,7 @@ function provider_http_request(string $url, array $options): array
     return [$status, (string) $body];
 }
 
-function microsoft_graph_access_token(array $config): string
+function microsoft_graph_access_token(array $config, int $timeout = 30): string
 {
     $tenant = trim((string) ($config['tenant_id'] ?? ''));
     if ($tenant === '') throw new RuntimeException('Enter the Microsoft Tenant ID in the Office 365 settings.');
@@ -100,7 +101,7 @@ function microsoft_graph_access_token(array $config): string
         CURLOPT_POST => true,
         CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
         CURLOPT_POSTFIELDS => http_build_query(['client_id'=>$clientId, 'client_secret'=>$secret, 'scope'=>'https://graph.microsoft.com/.default', 'grant_type'=>'client_credentials']),
-    ]);
+    ], $timeout);
     $json = json_decode($body, true);
     if ($status < 200 || $status >= 300 || empty($json['access_token'])) throw new RuntimeException('Microsoft rejected the Azure credentials. Check the tenant, client ID, client secret and Graph permissions.');
     return (string) $json['access_token'];
@@ -138,29 +139,30 @@ function provider_graph_message(string $to, string $subject, string $html, ?stri
     return $message;
 }
 
-function send_via_microsoft_graph(array $config, string $to, string $subject, string $html, ?string $replyTo = null): bool
+function send_via_microsoft_graph(array $config, string $to, string $subject, string $html, ?string $replyTo = null, int $timeout = 30): bool
 {
     $sender = trim((string) ($config['sender_email'] ?? ''));
     if (!filter_var($sender, FILTER_VALIDATE_EMAIL)) throw new RuntimeException('The Office 365 sender address is invalid.');
-    $token = microsoft_graph_access_token($config);
+    $token = microsoft_graph_access_token($config, $timeout);
     $payload = ['message' => provider_graph_message($to, $subject, $html, $replyTo), 'saveToSentItems' => true];
     [$status, $body] = provider_http_request('https://graph.microsoft.com/v1.0/users/' . rawurlencode($sender) . '/sendMail', [
         CURLOPT_POST => true,
         CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $token, 'Content-Type: application/json'],
         CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_SLASHES),
-    ]);
+    ], $timeout);
     if ($status !== 202) throw new RuntimeException('Microsoft Graph rejected the email request (HTTP ' . $status . ').');
     return true;
 }
 
-function send_via_provider_smtp(array $config, string $to, string $subject, string $html, ?string $replyTo = null): bool
+function send_via_provider_smtp(array $config, string $to, string $subject, string $html, ?string $replyTo = null, int $timeout = 30): bool
 {
     if (!class_exists(\PHPMailer\PHPMailer\PHPMailer::class)) throw new RuntimeException('The server mail library is unavailable.');
     $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
     $mail->isSMTP();
     $mail->Host = (string) $config['smtp_host'];
     $mail->SMTPAuth = true;
-    $mail->Timeout = 30;
+    $mail->Timeout = max(5, min(30, $timeout));
+    $mail->getSMTPInstance()->Timelimit = $mail->Timeout;
     $mail->Username = (string) $config['smtp_username'];
     $mail->Password = decrypt_mail_secret((string) $config['encrypted_password']);
     $mail->Port = (int) $config['smtp_port'];
@@ -181,12 +183,20 @@ function send_via_provider_smtp(array $config, string $to, string $subject, stri
 }
 
 /** Returns null when no database-managed provider is active. */
-function send_via_active_provider(PDO $pdo, string $to, string $subject, string $html, ?string $replyTo = null): ?bool
+function send_via_active_provider(PDO $pdo, string $to, string $subject, string $html, ?string $replyTo = null, ?string $mailFunction = null, int $timeout = 30): ?bool
 {
     $config = active_provider_setting($pdo);
-    if (!$config) return null;
-    if ((string) $config['provider'] === 'microsoft_graph' && !empty($config['oauth_client_id']) && !empty($config['encrypted_client_secret'])) {
-        return send_via_microsoft_graph($config, $to, $subject, $html, $replyTo);
+    if (!$config) {
+        if (shared_smtp_active($pdo) !== null) throw new RuntimeException('Choose and activate a tested mail provider before sending.');
+        return null;
     }
-    return send_via_provider_smtp($config, $to, $subject, $html, $replyTo);
+    if ($config['provider'] === 'server' && ($shared = shared_smtp_active($pdo)) !== null) {
+        $role = shared_smtp_role($mailFunction);
+        if (($shared['senders'][$role]['connection_status'] ?? '') !== 'connected') throw new RuntimeException('The SMTP sender requires a successful connection test.');
+        return send_via_provider_smtp(shared_smtp_sender($shared,$role),$to,$subject,$html,$replyTo,$timeout);
+    }
+    if ((string) $config['provider'] === 'microsoft_graph' && !empty($config['oauth_client_id']) && !empty($config['encrypted_client_secret'])) {
+        return send_via_microsoft_graph($config, $to, $subject, $html, $replyTo, $timeout);
+    }
+    return send_via_provider_smtp($config, $to, $subject, $html, $replyTo, $timeout);
 }

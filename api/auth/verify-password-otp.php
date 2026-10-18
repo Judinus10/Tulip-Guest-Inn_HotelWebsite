@@ -70,11 +70,12 @@ try {
     $pdo = get_db_connection();
     ensure_admin_password_otp_table($pdo);
 
+    $pdo->beginTransaction();
     $otpStmt = $pdo->prepare(
         'SELECT id, otp_hash, expires_at_epoch, used_at, attempts
          FROM admin_password_otps_v2
          WHERE request_token = :request_token AND admin_user_id = :admin_user_id
-         LIMIT 1'
+         LIMIT 1 FOR UPDATE'
     );
     $otpStmt->execute([
         ':request_token' => $requestToken,
@@ -86,21 +87,24 @@ try {
         json_response(false, 'OTP request is no longer valid. Start again.', 410);
     }
 
-    if ((int) $otpRow['expires_at_epoch'] < time()) {
+    if ((int) $otpRow['expires_at_epoch'] <= time()) {
         $expire = $pdo->prepare('UPDATE admin_password_otps_v2 SET used_at = NOW(), updated_at = NOW() WHERE id = :id');
         $expire->execute([':id' => (int) $otpRow['id']]);
+        $pdo->commit();
         json_response(false, 'OTP expired. Resend OTP and try again.', 410);
     }
 
     if ((int) $otpRow['attempts'] >= 5) {
         $lock = $pdo->prepare('UPDATE admin_password_otps_v2 SET used_at = NOW(), updated_at = NOW() WHERE id = :id');
         $lock->execute([':id' => (int) $otpRow['id']]);
+        $pdo->commit();
         json_response(false, 'Too many incorrect OTP attempts. Start again.', 429);
     }
 
     if (!password_verify($otp, (string) $otpRow['otp_hash'])) {
         $attempt = $pdo->prepare('UPDATE admin_password_otps_v2 SET attempts = attempts + 1, updated_at = NOW() WHERE id = :id');
         $attempt->execute([':id' => (int) $otpRow['id']]);
+        $pdo->commit();
         json_response(false, 'Invalid OTP.', 422);
     }
 
@@ -111,8 +115,6 @@ try {
     if (!is_string($currentHash) || $currentHash === '' || !password_verify($currentPassword, $currentHash)) {
         json_response(false, 'Current password is incorrect.', 422);
     }
-
-    $pdo->beginTransaction();
 
     $updatePassword = $pdo->prepare('UPDATE admin_users SET password_hash = :password_hash, updated_at = NOW() WHERE id = :id');
     $updatePassword->execute([

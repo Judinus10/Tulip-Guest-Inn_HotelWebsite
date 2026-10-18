@@ -80,21 +80,15 @@ function email_sender_for_type(string $emailType, string $relatedType = ''): arr
     return [email_env_address('FROM_EMAIL'), email_env_name('FROM_NAME')];
 }
 
-function send_html_email(string $to, string $subject, string $htmlBody, ?string $replyTo = null, ?string $fromEmailOverride = null, ?string $fromNameOverride = null, ?string $mailFunction = null): bool
+function send_html_email(string $to, string $subject, string $htmlBody, ?string $replyTo = null, ?string $fromEmailOverride = null, ?string $fromNameOverride = null, ?string $mailFunction = null, int $transportTimeout = 30): bool
 {
     try {
         $smtpProfile = null;
+        $pdo = get_db_connection();
+        $providerResult = send_via_active_provider($pdo, $to, $subject, $htmlBody, $replyTo, $mailFunction, $transportTimeout);
+        if ($providerResult !== null) return $providerResult;
         if ($mailFunction !== null && isset(MAIL_FUNCTIONS[$mailFunction])) {
-            $smtpProfile = database_mail_profile(get_db_connection(), $mailFunction);
-        }
-        try {
-            if ($smtpProfile === null) {
-                $providerResult = send_via_active_provider(get_db_connection(), $to, $subject, $htmlBody, $replyTo);
-                if ($providerResult !== null) return $providerResult;
-            }
-        } catch (Throwable $providerError) {
-            error_log('Active mail provider failed: ' . $providerError->getMessage());
-            throw $providerError;
+            $smtpProfile = database_mail_profile($pdo, $mailFunction);
         }
         if (!class_exists(\PHPMailer\PHPMailer\PHPMailer::class)) {
             error_log('PHPMailer class not found. Check vendor/autoload.php path.');
@@ -141,7 +135,8 @@ function send_html_email(string $to, string $subject, string $htmlBody, ?string 
         $mail->Host = $smtpHost;
         $mail->SMTPAuth = true;
         // Prevent public/notification requests from hanging for a full PHP timeout when SMTP is slow.
-        $mail->Timeout = 30;
+        $mail->Timeout = max(5, min(30, $transportTimeout));
+        $mail->getSMTPInstance()->Timelimit = $mail->Timeout;
         $mail->SMTPKeepAlive = false;
         $mail->Username = $smtpUser;
         $mail->Password = $smtpPass;

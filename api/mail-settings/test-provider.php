@@ -9,6 +9,7 @@ try {
     $pdo = get_db_connection();
     $data = read_request_data();
     $provider = strtolower(clean_string($data['provider'] ?? '', 40));
+    if ($provider === 'server' && shared_smtp_load($pdo) !== null) json_response(false, 'Use the shared SMTP settings and individual sender tests.', 422);
     $recipient = strtolower(clean_string($data['recipient_email'] ?? '', 190));
     if (!in_array($provider, MAIL_PROVIDERS, true)) json_response(false, 'Select a supported mail provider.', 422);
     $config = provider_setting($pdo, $provider);

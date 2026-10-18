@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
-require_once __DIR__ . '/../mail/email-helper.php';
+require_once __DIR__ . '/_verification-helper.php';
 
 apply_cors_headers();
 
@@ -81,18 +81,16 @@ try {
 
     $otp = (string) random_int(100000, 999999);
     $requestToken = bin2hex(random_bytes(32));
-    $expiresAtEpoch = time() + 60;
 
-    $subject = 'Admin password OTP - Tulip Guest Inn';
-    $message = otp_email_html('Admin password OTP', $otp, 1);
-
-    $sent = send_html_email($recipientEmail, $subject, $message);
+    $otpHash = password_hash($otp, PASSWORD_DEFAULT);
+    $sent = send_admin_verification_code($recipientEmail, 'Admin password OTP', $otp);
 
     if (!$sent) {
         error_log('Admin password resend OTP email failed for admin user ID ' . (int) $admin['id'] . ' to ' . $recipientEmail);
         json_response(false, 'Unable to resend OTP right now.', 500);
     }
 
+    $expiresAtEpoch = time() + ADMIN_VERIFICATION_TTL;
     $pdo->beginTransaction();
 
     $invalidate = $pdo->prepare(
@@ -111,7 +109,7 @@ try {
     $insert->execute([
         ':admin_user_id' => (int) $admin['id'],
         ':request_token' => $requestToken,
-        ':otp_hash' => password_hash($otp, PASSWORD_DEFAULT),
+        ':otp_hash' => $otpHash,
         ':expires_at_epoch' => $expiresAtEpoch,
     ]);
 
@@ -120,7 +118,7 @@ try {
     json_response(true, 'New OTP sent to admin email.', 200, [
         'data' => [
             'request_token' => $requestToken,
-            'expires_in' => 60,
+            'expires_in' => max(0, $expiresAtEpoch - time()),
             'email' => $recipientEmail,
         ],
     ]);

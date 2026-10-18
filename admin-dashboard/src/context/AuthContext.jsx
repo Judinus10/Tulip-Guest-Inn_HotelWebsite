@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { clearLegacyAuthStorage, getCookie } from '@/utils/auth'
 import { loginAdmin, logoutAdmin, verifyAdminSession } from '@/services/authApi'
 
@@ -13,7 +13,8 @@ export function AuthProvider({ children }) {
 
     async function restoreSession() {
       clearLegacyAuthStorage()
-      const verifiedUser = await verifyAdminSession()
+      let verifiedUser = null
+      try { verifiedUser = await verifyAdminSession() } catch { /* Login stays available if the API is unreachable. */ }
 
       if (cancelled) return
 
@@ -26,6 +27,21 @@ export function AuthProvider({ children }) {
     return () => {
       cancelled = true
     }
+  }, [])
+
+  const updateUser = useCallback((patch) => {
+    setUser(current => current ? { ...current, ...patch } : current)
+    try { localStorage.setItem('tulip-account-updated', String(Date.now())) } catch { /* Storage can be disabled. */ }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    const refresh = async (event) => {
+      if (event.key !== 'tulip-account-updated') return
+      try { const current = await verifyAdminSession(); if (active) setUser(current) } catch { /* Retain the last verified profile on network failure. */ }
+    }
+    window.addEventListener('storage', refresh)
+    return () => { active = false; window.removeEventListener('storage', refresh) }
   }, [])
 
   const login = async ({ email, password, rememberMe }) => {
@@ -49,8 +65,9 @@ export function AuthProvider({ children }) {
       isAuthenticated: Boolean(user),
       login,
       logout,
+      updateUser,
     }),
-    [user, initializing]
+    [user, initializing, updateUser]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
