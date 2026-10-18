@@ -7,9 +7,9 @@ Options -Indexes
   RewriteCond %{HTTPS} !=on
   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=302,L]
 
-  # Admin is deployed at /admin. React handles valid routes, authentication,
+  # Admin is deployed at /managementconsole. React handles valid routes, authentication,
   # and redirects unknown admin routes to the public website.
-  RewriteBase /admin/
+  RewriteBase /managementconsole/
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d

@@ -7,8 +7,8 @@ import { fileURLToPath } from 'url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig(({ command }) => ({
-  // Local Vite runs at /. Production builds are deployed under /admin/.
-  base: command === 'build' ? '/admin/' : '/',
+  // Local Vite runs at /. Production builds are deployed under /managementconsole/.
+  base: command === 'build' ? '/managementconsole/' : '/',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input, Label } from '@/components/ui/input'
 import { fetchPayments, updateCombinedStatusByBooking } from '@/services/paymentsApi'
+import { buildApiUrl } from '@/services/apiClient'
 import { exportCsv, exportExcel, exportPdf } from '@/utils/exportData'
 
 const PAGE_SIZE = 6
@@ -153,7 +154,7 @@ function Toast({ message, type, onClose }) {
 }
 
 function ActionsDropdown({ payment, onView, onEdit }) {
-  const invoiceDownloadUrl = payment.invoice_number ? `/api/invoices/download.php?id=${payment.booking_id}` : ''
+  const invoiceDownloadUrl = payment.invoice_number ? buildApiUrl(`/invoices/download.php?id=${payment.booking_id}`) : ''
 
   return (
     <Dropdown className="flex justify-end" contentClassName="w-52 py-1" trigger={<Button type="button" variant="outline" size="sm"><MoreVertical className="h-4 w-4" />Actions</Button>}>
@@ -225,7 +226,7 @@ function formatStayDate(value) {
 function PaymentDetailsModal({ payment, onClose }) {
   if (!payment) return null
 
-  const invoiceDownloadUrl = payment.invoice_number ? `/api/invoices/download.php?id=${payment.booking_id}` : ''
+  const invoiceDownloadUrl = payment.invoice_number ? buildApiUrl(`/invoices/download.php?id=${payment.booking_id}`) : ''
   const guestCount = Number(payment.guests || payment.total_guests || payment.adults || 0)
   const guestText = guestCount > 0 ? `${guestCount} guest${guestCount === 1 ? '' : 's'}` : '-'
   const nights = Number(payment.total_nights || payment.nights || 0)

@@ -17,11 +17,11 @@ import { Dropdown, DropdownItem } from '@/components/ui/dropdown'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { apiFetch } from '@/services/apiClient'
+import { API_BASE_URL, apiFetch } from '@/services/apiClient'
 import { exportCsv, exportExcel, exportPdf } from '@/utils/exportData'
 import { useToastState } from '@/context/ToastContext'
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
+
 
 const inquiryTypes = [
   'All Types',

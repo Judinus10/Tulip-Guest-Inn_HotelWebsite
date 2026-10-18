@@ -1,8 +1,8 @@
 import { clearLegacyAuthStorage, getCookie } from '@/utils/auth'
 
-const localApiBaseUrl = import.meta.env.DEV ? 'http://localhost/project_Tulip/api' : ''
+const localApiBaseUrl = import.meta.env.DEV ? 'http://localhost/project_Tulip%20-%20Copy/api' : ''
 
-export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || localApiBaseUrl).replace(/\/$/, '')
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || localApiBaseUrl || '/api').replace(/\/$/, '')
 
 export function buildApiUrl(path) {
   const normalizedPath = String(path || '').startsWith('/') ? path : `/${path}`
@@ -33,7 +33,7 @@ export async function apiFetch(url, options = {}) {
   if (response.status === 401) {
     clearLegacyAuthStorage()
     if (!window.location.pathname.includes('/login')) {
-      window.location.href = '/login'
+      window.location.href = `${import.meta.env.BASE_URL}login`
     }
   }
 
