@@ -21,7 +21,7 @@ import { Input } from '@/components/ui/input'
 import { Dropdown } from '@/components/ui/dropdown'
 import { useToastState } from '@/context/ToastContext'
 
-import { fetchNotificationActivities, getNotificationNavigation, markNotificationActivityRead } from '@/services/notificationsApi'
+import { applyStoredReadStatus, fetchNotificationActivities, getNotificationNavigation, markNotificationActivityRead } from '@/services/notificationsApi'
 
 const typeVariants = {
   Booking: 'default',
@@ -145,6 +145,19 @@ export default function Notifications() {
 
   useEffect(() => {
     loadActivities()
+  }, [])
+
+  useEffect(() => {
+    const syncReadStatus = () => {
+      setActivities((current) => applyStoredReadStatus(current))
+      setSelectedActivity((current) => current ? applyStoredReadStatus([current])[0] : current)
+    }
+    window.addEventListener('notification-read-changed', syncReadStatus)
+    window.addEventListener('storage', syncReadStatus)
+    return () => {
+      window.removeEventListener('notification-read-changed', syncReadStatus)
+      window.removeEventListener('storage', syncReadStatus)
+    }
   }, [])
 
   const stats = useMemo(

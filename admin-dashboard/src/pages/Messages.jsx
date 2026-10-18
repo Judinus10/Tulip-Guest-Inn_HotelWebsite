@@ -257,6 +257,7 @@ export default function Messages() {
       }
 
       setInquiries((result.data || []).map(normalizeInquiry))
+      window.dispatchEvent(new CustomEvent('contact-enquiries-loaded', { detail: result.data || [] }))
     } catch (error) {
       showToast(error.message || 'Could not load enquiries.')
     } finally {

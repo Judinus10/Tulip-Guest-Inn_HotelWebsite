@@ -11,6 +11,7 @@ import {
   LogOut,
   User,
   Settings,
+  Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,7 +19,7 @@ import { Dropdown, DropdownItem, DropdownLabel, DropdownSeparator } from '@/comp
 import { Badge } from '@/components/ui/badge'
 import { pageTitles, pageDescriptions } from '@/config/navigation'
 import { cn } from '@/lib/utils'
-import { fetchNotificationActivities, fetchTopbarSearchData, getNotificationNavigation, markNotificationActivityRead } from '@/services/notificationsApi'
+import { fetchNotificationActivities, fetchTopbarSearchData, getNotificationNavigation, dismissBellNotifications, filterBellNotifications, mergeContactNotifications } from '@/services/notificationsApi'
 
 function shortDate(value) {
   if (!value) return ''
@@ -130,13 +131,17 @@ export function TopNavbar({ collapsed, onMenuClick, onToggleCollapse }) {
   useEffect(() => {
     let active = true
     let loading = false
+    let enquiryRevision = 0
+    let latestEnquiries = []
 
     const load = async () => {
       if (loading) return
       loading = true
+      const revisionAtStart = enquiryRevision
       try {
         const data = await fetchNotificationActivities()
-        if (active) setNotifications(data)
+        const latest = revisionAtStart === enquiryRevision ? data : mergeContactNotifications(data, latestEnquiries)
+        if (active) setNotifications(filterBellNotifications(latest))
       } catch {
         // Keep the last successful notification state. The top bar must not flicker
         // just because one fast polling request failed.
@@ -149,11 +154,21 @@ export function TopNavbar({ collapsed, onMenuClick, onToggleCollapse }) {
       if (!document.hidden) load()
     }
 
+    const syncEnquiries = (event) => {
+      if (!Array.isArray(event.detail)) return
+      enquiryRevision += 1
+      latestEnquiries = event.detail
+      setNotifications((current) => filterBellNotifications(mergeContactNotifications(current, event.detail)))
+    }
+
     load()
 
     window.addEventListener('focus', load)
     window.addEventListener('pageshow', load)
     window.addEventListener('notification-read-changed', load)
+    window.addEventListener('storage', load)
+    window.addEventListener('notification-refresh', load)
+    window.addEventListener('contact-enquiries-loaded', syncEnquiries)
     document.addEventListener('visibilitychange', loadWhenVisible)
 
     // Booking notifications must be near-real-time while the admin panel is open.
@@ -167,13 +182,16 @@ export function TopNavbar({ collapsed, onMenuClick, onToggleCollapse }) {
       window.removeEventListener('focus', load)
       window.removeEventListener('pageshow', load)
       window.removeEventListener('notification-read-changed', load)
+      window.removeEventListener('storage', load)
+      window.removeEventListener('notification-refresh', load)
+      window.removeEventListener('contact-enquiries-loaded', syncEnquiries)
       document.removeEventListener('visibilitychange', loadWhenVisible)
     }
   }, [])
 
-  const unreadNotifications = notifications.filter((n) => n.status === 'New')
-  const unreadCount = unreadNotifications.length
-  const dropdownNotifications = unreadCount > 0 ? unreadNotifications : notifications.slice(0, 6)
+  const unreadCount = notifications.filter((n) => n.status === 'New').length
+  // Keep recent received messages visible even while other activities are unread.
+  const dropdownNotifications = notifications.slice(0, 6)
 
   const currentUser = user || {
     name: 'Hotel Administrator',
@@ -194,11 +212,11 @@ export function TopNavbar({ collapsed, onMenuClick, onToggleCollapse }) {
   }
 
   const handleNotificationClick = (notif, close) => {
-    markNotificationActivityRead(notif.id)
-    setNotifications((current) => current.map((item) => (item.id === notif.id ? { ...item, status: 'Viewed' } : item)))
+    dismissBellNotifications([notif])
+    setNotifications((current) => current.filter((item) => item.id !== notif.id))
 
     fetchNotificationActivities()
-      .then((data) => setNotifications(data))
+      .then((data) => setNotifications(filterBellNotifications(data)))
       .catch(() => {})
 
     close()
@@ -231,7 +249,7 @@ export function TopNavbar({ collapsed, onMenuClick, onToggleCollapse }) {
             align="right"
             contentClassName="w-80 max-w-[calc(100vw-2rem)]"
             trigger={
-              <Button variant="ghost" size="icon" className="relative" aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}>
+              <Button variant="ghost" size="icon" className="relative" aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`} onClick={() => window.dispatchEvent(new CustomEvent('notification-refresh'))}>
                 <Bell className="h-5 w-5" />
                 {unreadCount > 0 && (
                   <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-bold text-white">{unreadCount}</span>
@@ -243,11 +261,30 @@ export function TopNavbar({ collapsed, onMenuClick, onToggleCollapse }) {
               <>
                 <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
                   <p className="text-sm font-semibold text-slate-900">Notifications</p>
-                  {unreadCount > 0 && <Badge variant="default">{unreadCount} new</Badge>}
+                  <div className="flex items-center gap-2">
+                    {unreadCount > 0 && <Badge variant="default">{unreadCount} new</Badge>}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Clear all notifications"
+                      title="Clear all notifications"
+                      disabled={notifications.length === 0}
+                      onClick={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        dismissBellNotifications(notifications)
+                        setNotifications([])
+                      }}
+                      className="h-8 w-8 text-slate-500 hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="max-h-72 overflow-y-auto">
                   {dropdownNotifications.length === 0 ? (
-                    <p className="px-4 py-5 text-sm text-slate-500">No live notifications found.</p>
+                    <p className="px-4 py-5 text-sm text-slate-500">No notifications.</p>
                   ) : dropdownNotifications.map((notif) => (
                     <button
                       key={notif.id}

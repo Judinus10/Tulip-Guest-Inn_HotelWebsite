@@ -5,11 +5,12 @@ import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
 const CONTACT_API_URL = buildApiUrl('/contact/list_enquiries.php')
 
 const READ_NOTIFICATIONS_KEY = 'jebal_read_notifications'
+const DISMISSED_NOTIFICATIONS_KEY = 'tulip_dismissed_bell_notifications'
 
-function readStoredNotificationIds() {
+function readStoredNotificationIds(key = READ_NOTIFICATIONS_KEY) {
   if (typeof window === 'undefined') return new Set()
   try {
-    const value = window.localStorage.getItem(READ_NOTIFICATIONS_KEY)
+    const value = window.localStorage.getItem(key)
     const parsed = value ? JSON.parse(value) : []
     return new Set(Array.isArray(parsed) ? parsed : [])
   } catch {
@@ -25,9 +26,28 @@ export function markNotificationActivityRead(id) {
   window.dispatchEvent(new CustomEvent('notification-read-changed'))
 }
 
-function applyStoredReadStatus(activities) {
+export function filterBellNotifications(activities) {
+  const dismissed = readStoredNotificationIds(DISMISSED_NOTIFICATIONS_KEY)
+  const read = readStoredNotificationIds()
+  return activities.filter((activity) => activity.status !== 'Viewed' && !read.has(String(activity.id)) && !dismissed.has(String(activity.id)))
+}
+
+export function dismissBellNotifications(activities) {
+  if (typeof window === 'undefined' || !activities.length) return
+  const dismissed = readStoredNotificationIds(DISMISSED_NOTIFICATIONS_KEY)
+  const read = readStoredNotificationIds()
+  activities.forEach((activity) => {
+    dismissed.add(String(activity.id))
+    read.add(String(activity.id))
+  })
+  window.localStorage.setItem(DISMISSED_NOTIFICATIONS_KEY, JSON.stringify([...dismissed]))
+  window.localStorage.setItem(READ_NOTIFICATIONS_KEY, JSON.stringify([...read]))
+  window.dispatchEvent(new CustomEvent('notification-read-changed'))
+}
+
+export function applyStoredReadStatus(activities) {
   const ids = readStoredNotificationIds()
-  return activities.map((activity) => (ids.has(String(activity.id)) ? { ...activity, status: activity.status === 'Resolved' ? 'Resolved' : 'Viewed' } : activity))
+  return activities.map((activity) => (ids.has(String(activity.id)) ? { ...activity, status: 'Viewed' } : activity))
 }
 
 function notificationRouteState(activity) {
@@ -117,9 +137,10 @@ function normalizeInquiry(item) {
 }
 
 async function fetchEnquiries() {
-  const response = await apiFetch(CONTACT_API_URL, { headers: { Accept: 'application/json' } })
+  const response = await apiFetch(CONTACT_API_URL, { cache: 'no-store', headers: { Accept: 'application/json' } })
   const payload = await readJsonResponse(response)
-  return (payload.data || []).map(normalizeInquiry)
+  if (!Array.isArray(payload.data)) throw new Error('Could not load contact notifications.')
+  return payload.data.map(normalizeInquiry)
 }
 
 function makeActivity(activity) {
@@ -238,12 +259,12 @@ function activitiesFromEnquiries(enquiries) {
   return enquiries.map((item) => makeActivity({
     id: `contact-${item.id}`,
     type: 'Contact',
-    title: item.subject || 'New Contact Enquiry',
+    title: 'Contact Message Received',
     reference_id: item.inquiry_id,
     description: `${item.name}: ${item.message || item.email || 'Contact enquiry received.'}`,
     related_room: '-',
     related_booking: '-',
-    status: item.status === 'New' ? 'New' : item.status === 'Replied' ? 'Resolved' : 'Viewed',
+    status: String(item.status).trim().toLowerCase() === 'new' ? 'New' : String(item.status).trim().toLowerCase() === 'replied' ? 'Resolved' : 'Viewed',
     created_at: item.created_at,
     details: `Name: ${item.name}\nEmail: ${item.email || '-'}\nPhone: ${item.phone || '-'}\nSubject: ${item.subject}\nMessage: ${item.message || '-'}`,
     route: '/messages',
@@ -251,11 +272,20 @@ function activitiesFromEnquiries(enquiries) {
   }))
 }
 
+export function mergeContactNotifications(activities, enquiries) {
+  return applyStoredReadStatus([
+    ...activities.filter((activity) => activity.type !== 'Contact'),
+    ...activitiesFromEnquiries(enquiries.map(normalizeInquiry)),
+  ].sort((a, b) => (asDate(b.created_at)?.getTime() || 0) - (asDate(a.created_at)?.getTime() || 0)))
+}
+
 export async function fetchNotificationActivities() {
   const [bookings, payments, enquiries] = await Promise.all([
     fetchBookings().catch(() => []),
     fetchPayments().catch(() => []),
-    fetchEnquiries().catch(() => []),
+    // Do not replace received messages with an empty list on request failure.
+    // The bell preserves its previous successful list and retries on its next poll.
+    fetchEnquiries(),
   ])
 
   return applyStoredReadStatus([
