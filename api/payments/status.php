@@ -96,13 +96,14 @@ $token = clean_string($_GET['token'] ?? '', 1024);
 if ($bookingId < 1 || $orderId === '' || $token === '') {
     json_response(false, 'Booking ID, order ID, and token are required.', 422);
 }
+if (!legacy_public_tokens_allowed() && !verify_public_token($token, 'payment-status', ['booking_id' => $bookingId, 'order_id' => $orderId])) json_response(false, 'Invalid access token.', 403);
 // PayHere bills poll every 15 seconds and Cash bills every 7 minutes.
 // Allow normal bill monitoring without letting the endpoint run unrestricted.
 rate_limit_or_fail('payment_status_lookup', 120, 15);
 
 try {
     $pdo = get_db_connection();
-    expire_pending_bookings($pdo, $bookingId, true);
+    lock_booking_inventory($pdo);
 
     $stmt = $pdo->prepare(
         'SELECT
@@ -144,6 +145,10 @@ try {
     if (!$validToken) {
         json_response(false, 'Invalid bill access token.', 403);
     }
+
+    expire_pending_bookings($pdo, $bookingId, true);
+    $stmt->execute([':booking_id' => $bookingId, ':order_id' => $orderId]);
+    $record = $stmt->fetch() ?: $record;
 
     $paymentStatus = (string) ($record['gateway_payment_status'] ?: $record['payment_status'] ?: 'Payment Pending');
 
@@ -207,6 +212,7 @@ try {
     json_response(true, 'Payment status loaded.', 200, [
         'booking' => [
             'id' => $bookingId,
+            'booking_access_token' => booking_access_token($bookingId),
             'booking_no' => $groupBookingNo,
             'full_name' => (string) ($record['full_name'] ?? ''),
             'email' => (string) ($record['email'] ?? ''),

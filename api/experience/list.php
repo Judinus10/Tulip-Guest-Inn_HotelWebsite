@@ -2,6 +2,8 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/_experience_helpers.php';
+require_admin_auth();
+experience_require_method('GET');
 
 try {
     $pdo = experience_db();

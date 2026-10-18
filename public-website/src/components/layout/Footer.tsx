@@ -92,7 +92,7 @@ export default function Footer() {
           className="w-full h-full object-cover opacity-40"
           loading="lazy"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-dark" />
+        <div className="absolute inset-0 bg-linear-to-b from-transparent to-dark" />
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <p className="text-[10px] tracking-[0.35em] uppercase text-gold mb-3">Boutique Luxury</p>
           <h2 className="font-serif text-4xl lg:text-5xl text-white font-light text-center">

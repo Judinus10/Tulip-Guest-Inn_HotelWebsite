@@ -8,12 +8,9 @@ require_once __DIR__ . '/../helpers.php';
 // for example https://portal.jebalguesthouse.com calling https://jebalguesthouse.com/api.
 apply_cors_headers();
 
-function experience_json(array $data, int $code = 200): void
-{
-    http_response_code($code);
-    header('Content-Type: application/json');
-    echo json_encode($data);
-    exit;
+function experience_json(array $data, int $code = 200): void {
+    $success = (bool)($data['success'] ?? ($code < 400)); $message = (string)($data['message'] ?? '');
+    unset($data['success'], $data['message']); json_response($success, $message, $code, $data);
 }
 
 function experience_require_method(string $allowedMethod): void

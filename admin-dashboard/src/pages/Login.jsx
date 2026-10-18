@@ -16,7 +16,7 @@ export default function Login() {
   const location = useLocation()
   const { initializing, isAuthenticated, login } = useAuth()
 
-  const [email, setEmail] = useState('admin@jebalhomes.com')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(true)
   const [showPassword, setShowPassword] = useState(false)
@@ -108,7 +108,7 @@ export default function Login() {
           <p className="mb-4 inline-flex rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-medium text-blue-100 backdrop-blur">
             Secure administrator access
           </p>
-          <h2 className="text-4xl font-bold leading-tight tracking-tight">
+          <h2 className="text-4xl font-bold leading-tight tracking-tight text-white">
             Manage bookings, rooms, payments, and guests from one clean dashboard.
           </h2>
           <p className="mt-5 max-w-md text-sm leading-6 text-blue-100/80">
@@ -165,7 +165,7 @@ export default function Login() {
                       if (errors.email) setErrors((prev) => ({ ...prev, email: '' }))
                     }}
                     className="pl-9"
-                    placeholder="admin@jebalhomes.com"
+                    placeholder="Enter your administrator email"
                     autoComplete="email"
                     aria-invalid={Boolean(errors.email)}
                   />

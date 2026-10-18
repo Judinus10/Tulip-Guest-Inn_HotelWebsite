@@ -106,6 +106,8 @@ if ($guests > 20) {
     json_response(false, 'Please enter a valid number of guests.', 422);
 }
 
+protect_public_booking($data, $email, $phone, $checkInDate, $checkOutDate);
+
 $subtotalAmount = calculate_booking_amount($roomName, $checkInDate, $checkOutDate);
 $amount = $subtotalAmount;
 
@@ -118,6 +120,7 @@ $bookingCommitted = false;
 
 try {
     $pdo = get_db_connection();
+    lock_booking_inventory($pdo);
     offer_ensure_booking_snapshot_schema($pdo);
     $nights = max(1, (int) $checkIn->diff($checkOut)->days);
     $offerPrice = offer_best_price($pdo, $subtotalAmount, $checkInDate, $nights, 1, $guests);
@@ -133,7 +136,7 @@ try {
 
     $pdo->beginTransaction();
 
-    $roomStmt = $pdo->prepare("SELECT id, max_guests, status FROM rooms WHERE room_name = :room_name LIMIT 1");
+    $roomStmt = $pdo->prepare("SELECT id, max_guests, status FROM rooms WHERE room_name = :room_name LIMIT 1 FOR UPDATE");
     $roomStmt->execute([':room_name' => $roomName]);
     $room = $roomStmt->fetch();
 
@@ -288,6 +291,7 @@ try {
     }
 
     json_response(true, 'Booking inquiry submitted successfully.', 201, [
+        'booking_access_token' => booking_access_token($bookingId),
         'inquiry_id' => $bookingId,
         'booking_id' => $bookingId,
         'booking_no' => $bookingNumber,
@@ -298,6 +302,7 @@ try {
         'bill_url' => $cashBillUrl !== '' ? $cashBillUrl : null,
         'requires_online_checkout' => $isOnlinePayment,
         'data' => [
+                'booking_access_token' => booking_access_token($bookingId),
             'booking_id' => $bookingId,
             'booking_no' => $bookingNumber,
             'amount' => $amount,
@@ -385,6 +390,7 @@ try {
         }
 
         json_response(true, 'Booking request received successfully. Email delivery may be delayed.', 201, [
+        'booking_access_token' => booking_access_token($bookingId),
             'inquiry_id' => $bookingId,
             'booking_id' => $bookingId,
             'booking_no' => 'BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT),
@@ -395,6 +401,7 @@ try {
             'bill_url' => $recoveredBillUrl !== '' ? $recoveredBillUrl : null,
             'email_delayed' => true,
             'data' => [
+                'booking_access_token' => booking_access_token($bookingId),
                 'booking_id' => $bookingId,
                 'booking_no' => 'BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT),
                 'amount' => $amount,

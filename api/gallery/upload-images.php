@@ -29,7 +29,7 @@ try {
     if ($count === 0) json_response(false, 'Select at least one image.', 422);
     if ($count > 20) json_response(false, 'Upload no more than 20 images at once.', 422);
 
-    $saved = [];
+    $saved = []; $writtenFiles = [];
 
     $pdo->beginTransaction();
     gallery_move_sort_space($pdo, $folderId, $sortOrder);
@@ -60,6 +60,7 @@ try {
             'size' => $files['size'][$i] ?? 0,
         ], $uploadDir, 'gallery');
         $filename = $result['filename'];
+        $writtenFiles[] = $uploadDir . '/' . $filename;
 
         $insert->execute([
             ':folder_id' => $folderId,
@@ -77,6 +78,7 @@ try {
 
     json_response(true, 'Images uploaded successfully.', 201, ['data' => ['ids' => $saved]]);
 } catch (Throwable $e) {
+    foreach ($writtenFiles ?? [] as $written) if (is_file($written)) unlink($written);
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) $pdo->rollBack();
     error_log('Gallery upload error: ' . $e->getMessage());
     json_response(false, 'Unable to upload gallery images.', 500);

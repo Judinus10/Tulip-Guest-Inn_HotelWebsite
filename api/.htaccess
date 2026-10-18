@@ -7,7 +7,9 @@ LimitRequestBody 117440512
 </FilesMatch>
 
 <IfModule mod_rewrite.c>
-  RewriteEngine Off
+  RewriteEngine On
+  RewriteRule ^(tool|dev|tools|vendor|storage|mail/templates)(/|$) - [F,L]
+  RewriteRule (^|/)(_[^/]+|[^/]*(helper|config|db|video_processing))\.php$ - [F,L]
 </IfModule>
 
 <IfModule mod_headers.c>
@@ -15,9 +17,9 @@ LimitRequestBody 117440512
   Header always set Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'" env=!payhere_checkout
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "DENY"
-  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Referrer-Policy "no-referrer"
   Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
-  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+  Header always set Strict-Transport-Security "max-age=31536000"
 </IfModule>
 
 <IfModule mod_deflate.c>
@@ -32,3 +34,7 @@ LimitRequestBody 117440512
   ExpiresByType image/webp "access plus 6 months"
   ExpiresByType image/svg+xml "access plus 6 months"
 </IfModule>
+
+<FilesMatch "(?i)(\.(sql|zip|bak|log)$|^(composer|package)(-lock)?\.json$)">
+ Require all denied
+</FilesMatch>

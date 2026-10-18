@@ -1,40 +1,48 @@
 <?php
 declare(strict_types=1);
-/** Shared best-effort video optimization. Never silently publishes a large unoptimized video. */
-function optimize_uploaded_video(array $file, string $destinationBase): string {
-    $error = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
-    if ($error !== UPLOAD_ERR_OK) throw new RuntimeException('Video upload failed. The server may limit upload size. Compress your video to 50 MB or less and try again.');
-    $size = (int)($file['size'] ?? 0);
-    if ($size < 1 || $size > 100 * 1024 * 1024) throw new RuntimeException('Choose a video up to 100 MB. Compress larger videos and try again.');
-    $source = (string)($file['tmp_name'] ?? '');
-    if (!is_uploaded_file($source)) throw new RuntimeException('Invalid video upload.');
-    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($source);
-    $extensions = ['video/mp4'=>'mp4','video/webm'=>'webm'];
-    if (!isset($extensions[$mime])) throw new RuntimeException('Only MP4 and WebM videos are supported.');
-    $originalPath = $destinationBase . '.' . $extensions[$mime];
-    // Small videos need no re-encoding; avoid needless quality loss.
-    if ($size <= 50 * 1024 * 1024) {
-        if (!move_uploaded_file($source, $originalPath)) throw new RuntimeException('Unable to store video.');
-        return $originalPath;
-    }
-    // Large videos require FFmpeg and a host that allows process execution.
-    if (!function_exists('exec') || in_array('exec', array_map('trim', explode(',', (string)ini_get('disable_functions'))), true)) {
-        throw new RuntimeException('Automatic video compression is unavailable on this server. Please compress your video to 50 MB or less and try again.');
-    }
-    $ffmpeg = trim((string) (function_exists('jebal_env_value')
-        ? jebal_env_value('FFMPEG_BINARY', 'ffmpeg')
-        : (getenv('FFMPEG_BINARY') ?: 'ffmpeg')));
-    if ($ffmpeg === '' || preg_match('/[\r\n]/', $ffmpeg)) throw new RuntimeException('Video compression is not configured. Compress the video to 50 MB or less and try again.');
-    $output = $destinationBase . '.mp4';
-    $command = escapeshellarg($ffmpeg).' -nostdin -hide_banner -loglevel error -y -i '.escapeshellarg($source)
-        .' -map 0:v:0 -an -vf '.escapeshellarg('scale=w=1920:h=1080:force_original_aspect_ratio=decrease:force_divisible_by=2')
-        .' -c:v libx264 -preset veryfast -crf 28 -pix_fmt yuv420p -movflags +faststart '.escapeshellarg($output).' 2>&1';
-    $log=[];$status=1;
-    @exec($command, $log, $status);
-    clearstatcache(true, $output);
-    if ($status !== 0 || !is_file($output) || filesize($output) < 1 || filesize($output) > 100 * 1024 * 1024) {
-        @unlink($output);
-        throw new RuntimeException('Video compression failed or exceeded 100 MB. Please compress your video to 50 MB or less and try again.');
-    }
+/** Run media tools without a shell, under OS and wall-clock resource limits. */
+function run_media_process(array $command, int $seconds): string {
+    if (!function_exists('proc_open')) throw new RuntimeException('Secure media processing is unavailable.');
+    $limiter = (string)jebal_env_value('PRLIMIT_BINARY', '/usr/bin/prlimit');
+    if (!is_executable($limiter)) throw new RuntimeException('Secure media resource limiter is unavailable.');
+    $command = array_merge([$limiter, '--cpu=90', '--as=2147483648', '--fsize=53477376', '--'], $command);
+    $pipes = []; $process = proc_open($command, [0=>['pipe','r'],1=>['pipe','w'],2=>['pipe','w']], $pipes);
+    if (!is_resource($process)) throw new RuntimeException('Unable to start media processing.');
+    fclose($pipes[0]); stream_set_blocking($pipes[1], false); stream_set_blocking($pipes[2], false);
+    $start = microtime(true); $output = ''; $error = ''; $exit = -1;
+    try {
+        while (true) {
+            $output .= stream_get_contents($pipes[1]); $error .= stream_get_contents($pipes[2]);
+            $state = proc_get_status($process);
+            if (!$state['running']) { $exit = $state['exitcode']; break; }
+            if (microtime(true)-$start > $seconds || strlen($output)+strlen($error) > 1048576) { proc_terminate($process, 9); throw new RuntimeException('Media processing limit exceeded.'); }
+            usleep(20000);
+        }
+        $output .= stream_get_contents($pipes[1]);
+    } finally { fclose($pipes[1]); fclose($pipes[2]); proc_close($process); }
+    if ($exit !== 0) throw new RuntimeException('Invalid video or media processing failed.');
     return $output;
+}
+function optimize_uploaded_video(array $file, string $destinationBase): string {
+    $size = (int)($file['size'] ?? 0); $source = (string)($file['tmp_name'] ?? '');
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file($source) || $size < 1 || $size > 104857600) throw new RuntimeException('Choose a valid video up to 100 MB.');
+    if (!in_array((new finfo(FILEINFO_MIME_TYPE))->file($source), ['video/mp4','video/webm'], true)) throw new RuntimeException('Only MP4 and WebM are supported.');
+    check_media_budget(53477376);
+    // One encoder per host; fail promptly instead of accumulating PHP workers.
+    $lock = fopen(sys_get_temp_dir().'/tulip-media-'.hash('sha256', __DIR__).'.lock', 'c');
+    if (!$lock || !flock($lock, LOCK_EX|LOCK_NB)) { if ($lock) fclose($lock); throw new RuntimeException('Another video is processing. Please retry later.'); }
+    $output = $destinationBase.'.mp4';
+    try {
+        $probe = (string)jebal_env_value('FFPROBE_BINARY', 'ffprobe');
+        $info = json_decode(run_media_process([$probe,'-v','error','-show_streams','-show_format','-of','json',$source],10),true,512,JSON_THROW_ON_ERROR);
+        $videos = array_values(array_filter($info['streams'] ?? [], static fn($s) => ($s['codec_type'] ?? '') === 'video'));
+        $duration = (float)($info['format']['duration'] ?? 0);
+        if (count($videos)!==1 || $duration<=0 || $duration>120 || (int)($videos[0]['width']??0)*(int)($videos[0]['height']??0)>8294400) throw new RuntimeException('Video must be at most two minutes and 4K.');
+        $ffmpeg=(string)jebal_env_value('FFMPEG_BINARY','ffmpeg');
+        run_media_process([$ffmpeg,'-nostdin','-v','error','-threads','2','-filter_threads','1','-y','-i',$source,'-map','0:v:0','-an','-map_metadata','-1','-vf','scale=w=1920:h=1080:force_original_aspect_ratio=decrease:force_divisible_by=2','-c:v','libx264','-threads','2','-preset','veryfast','-crf','28','-pix_fmt','yuv420p','-movflags','+faststart',$output],100);
+        clearstatcache(true,$output);
+        if (!is_file($output) || filesize($output)<1 || filesize($output)>52428800) throw new RuntimeException('Processed video exceeds 50 MB.');
+        return $output;
+    } catch (Throwable $e) { if (is_file($output)) unlink($output); throw $e; }
+    finally { flock($lock,LOCK_UN); fclose($lock); }
 }

@@ -45,7 +45,7 @@ function deployment_env_text(array $values): string
 // Helpers can be loaded by local tests without invoking deployment.
 if (realpath((string) ($_SERVER['SCRIPT_FILENAME'] ?? '')) !== __FILE__) return;
 try {
-    $options = getopt('', ['source:', 'origin:', 'payment-key-source:']);
+    $options = getopt('', ['source:', 'origin:', 'payment-key-source:', 'base-path:']);
     if (!isset($options['source'], $options['origin'])) {
         throw new RuntimeException('Usage: php tools/prepare-production.php --source=.env_server --origin=https://your-host [--payment-key-source=".env copy"]');
     }
@@ -54,6 +54,9 @@ try {
     if (!$url || ($url['scheme'] ?? '') !== 'https' || empty($url['host'])
         || isset($url['user']) || isset($url['pass']) || isset($url['query']) || isset($url['fragment'])
         || !empty($url['path'])) throw new RuntimeException('Origin must be an HTTPS site origin with no path or credentials.');
+    $basePath = rtrim((string)($options['base-path'] ?? ''), '/');
+    if ($basePath !== '' && !preg_match('#^/[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*$#D', $basePath)) throw new RuntimeException('Invalid base path.');
+    $appUrl = $origin . $basePath;
     $source = realpath((string) $options['source']);
     if (!$source || !is_readable($source)) throw new RuntimeException('Source environment file is not readable.');
     $env = Dotenv\Dotenv::parse((string) file_get_contents($source));
@@ -96,9 +99,9 @@ try {
     if (empty($env['MAIL_CREDENTIAL_ENCRYPTION_KEY'])) $env['MAIL_CREDENTIAL_ENCRYPTION_KEY'] = bin2hex(random_bytes(32));
     $env = array_replace($env, [
         'APP_ENV' => 'production', 'APP_TIMEZONE' => 'Asia/Colombo',
-        'APP_BASE_URL' => $origin, 'FRONTEND_URL' => $origin, 'PUBLIC_APP_URL' => $origin,
-        'ADMIN_APP_URL' => $origin . '/admin', 'API_BASE_URL' => $origin . '/api',
-        'ASSET_BASE_URL' => $origin . '/api', 'ALLOWED_ORIGINS' => $origin,
+        'APP_BASE_URL' => $appUrl, 'FRONTEND_URL' => $appUrl, 'PUBLIC_APP_URL' => $appUrl,
+        'ADMIN_APP_URL' => $appUrl . '/admin', 'API_BASE_URL' => $appUrl . '/api',
+        'ASSET_BASE_URL' => $appUrl . '/api', 'ALLOWED_ORIGINS' => $origin,
         'ICS_TEST_MODE' => 'false', 'TEST_EMAIL_DEBUG' => 'false', 'TEST_EMAIL_TOOL_ENABLED' => 'false',
         'FFMPEG_BINARY' => $env['FFMPEG_BINARY'] ?? 'ffmpeg',
     ]);

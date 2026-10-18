@@ -37,6 +37,8 @@ function ensure_booking_audit_table(PDO $pdo): void
 
 function booking_audit_log(PDO $pdo, int $bookingId, string $eventType, string $eventTitle, string $eventMessage = '', array $metadata = []): void
 {
+    $metadata['actor_id'] = $GLOBALS['security_actor'] ?? null;
+    $metadata['request_id'] = security_request_id();
     if ($bookingId < 1 || trim($eventType) === '' || trim($eventTitle) === '') {
         return;
     }
@@ -69,6 +71,8 @@ function booking_audit_log(PDO $pdo, int $bookingId, string $eventType, string $
 
 function get_booking_audit_timeline(PDO $pdo, int $bookingId): array
 {
+    $metadata['actor_id'] = $GLOBALS['security_actor'] ?? null;
+    $metadata['request_id'] = security_request_id();
     if ($bookingId < 1) {
         return [];
     }

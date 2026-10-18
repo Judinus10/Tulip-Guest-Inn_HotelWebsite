@@ -140,7 +140,7 @@ export default function BookingBill() {
     setError('');
 
     try {
-      const checkout = await createCheckoutSession(booking.id);
+      const checkout = await createCheckoutSession(booking.id, booking.booking_access_token);
       window.location.href = checkout.checkout_url;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unable to restart payment checkout.';
@@ -168,7 +168,7 @@ export default function BookingBill() {
       <section className="relative h-[300px] overflow-hidden md:h-[335px] lg:h-[360px]">
         <img src={heroImage} alt="Billing and Payment" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-[#071923]/70" />
-        <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-b from-transparent to-[#faf8f4]" />
+        <div className="absolute inset-x-0 bottom-0 h-28 bg-linear-to-b from-transparent to-[#faf8f4]" />
         <div className="relative z-10 mx-auto flex h-full max-w-7xl flex-col items-center justify-center px-4 pt-16 text-center">
           <h1 className="font-serif text-[38px] font-light leading-none text-white drop-shadow md:text-[48px] lg:text-[54px]">
             Billing &amp; Payment

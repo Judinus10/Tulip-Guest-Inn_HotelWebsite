@@ -55,6 +55,8 @@ function cleanup_admin_password_otps_v2(PDO $pdo, int $adminId): void
 
 try {
     $admin = require_admin_auth();
+    rate_limit_subject('otp_request', (string)$admin['id'], 10, 30);
+    security_lock_account(get_db_connection(), (int)$admin['id']);
     $data = read_request_data();
 
     $currentPassword = (string) ($data['current_password'] ?? '');

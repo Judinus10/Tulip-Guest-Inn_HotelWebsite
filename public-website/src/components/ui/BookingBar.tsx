@@ -63,7 +63,7 @@ export default function BookingBar() {
   };
 
   const inputClass = (field: BookingBarField) =>
-    `bg-transparent text-sm text-dark outline-none cursor-pointer w-full transition-colors duration-200 ${
+    `bg-transparent text-sm text-dark outline-hidden cursor-pointer w-full transition-colors duration-200 ${
       invalidFields[field] ? 'booking-field-error' : ''
     }`;
 

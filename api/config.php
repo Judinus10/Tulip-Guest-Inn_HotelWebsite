@@ -24,7 +24,8 @@ if (!is_file($autoloadFile)) {
 require_once $autoloadFile;
 
 try {
-    $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+    $environmentDir = (string) ($_SERVER['TULIP_ENV_DIR'] ?? getenv('TULIP_ENV_DIR') ?: __DIR__);
+    $dotenv = Dotenv\Dotenv::createImmutable($environmentDir);
     $dotenv->load();
 } catch (Throwable $exception) {
     http_response_code(500);
@@ -226,6 +227,7 @@ if (APP_ENV === 'production') {
             exit('Required production configuration is missing.');
         }
     }
+    if (strlen(PUBLIC_TOKEN_SECRET) < 32 || preg_match('/change.?me|replace|placeholder/i', PUBLIC_TOKEN_SECRET)) { http_response_code(500); exit('A strong signing secret is required.'); }
     if (strtolower(DB_USER) === 'root') {
         http_response_code(500);
         exit('The production database user must not be root.');
@@ -241,8 +243,8 @@ if (APP_ENV === 'production') {
     ini_set('log_errors', '1');
     error_reporting(E_ALL);
 } else {
-    ini_set('display_errors', '1');
-    ini_set('display_startup_errors', '1');
+    ini_set('display_errors', APP_ENV === 'local' ? '1' : '0');
+    ini_set('display_startup_errors', APP_ENV === 'local' ? '1' : '0');
     ini_set('log_errors', '1');
     error_reporting(E_ALL);
 }

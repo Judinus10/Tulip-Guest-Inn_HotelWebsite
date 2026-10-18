@@ -57,6 +57,8 @@ if ($totalGuests < 2 || $totalGuests > 20 || count($requestedRooms) < 2) {
     json_response(false, 'A multi-room booking requires at least two rooms and a valid guest count.', 422);
 }
 
+protect_public_booking($data, $email, $phone, $checkInDate, $checkOutDate);
+
 $allocations = [];
 $allocationTotal = 0;
 foreach ($requestedRooms as $requestedRoom) {
@@ -82,6 +84,7 @@ $totalAmount = 0.0;
 $currency = PAYMENT_CURRENCY;
 try {
     $pdo = get_db_connection();
+    lock_booking_inventory($pdo);
     offer_ensure_booking_snapshot_schema($pdo);
     expire_pending_bookings($pdo, null, false);
 
@@ -100,7 +103,7 @@ try {
         "SELECT id, room_name, max_guests, base_price, currency, status
          FROM rooms
          WHERE id IN ({$placeholders})
-         ORDER BY sort_order ASC, id ASC
+         ORDER BY id ASC
          FOR UPDATE"
     );
     $roomStmt->execute($roomIds);
@@ -284,6 +287,7 @@ try {
     }
 
     json_response(true, 'Multi-room booking submitted successfully.', 201, [
+        'booking_access_token' => booking_access_token($primaryBookingId),
         'booking_id' => $primaryBookingId,
         'booking_no' => $bookingNumber,
         'booking_group_id' => $groupId,
@@ -334,6 +338,7 @@ try {
             ]);
 
             json_response(true, 'Multi-room booking submitted successfully.', 201, [
+        'booking_access_token' => booking_access_token($primaryBookingId),
                 'booking_id' => $primaryBookingId,
                 'booking_no' => $bookingNumber,
                 'booking_group_id' => $groupId,

@@ -1,3 +1,8 @@
+function spreadsheetText(value) {
+  const text = value == null ? '' : String(value)
+  return /^[\s\x00-\x1f]*[=+@-]|^[\t\r\n]/.test(text) ? "'" + text : text
+}
+
 function getExportDate() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -11,7 +16,7 @@ function cleanFileName(value) {
 }
 
 function escapeCsv(value) {
-  const text = value === null || value === undefined ? '' : String(value)
+  const text = spreadsheetText(value)
   return `"${text.replace(/"/g, '""')}"`
 }
 
@@ -61,11 +66,11 @@ export function exportExcel({ fileName, rows }) {
       <body>
         <table border="1">
           <thead>
-            <tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr>
+            <tr>${headers.map((header) => `<th>${escapeHtml(spreadsheetText(header))}</th>`).join('')}</tr>
           </thead>
           <tbody>
             ${rows
-              .map((row) => `<tr>${headers.map((header) => `<td>${escapeHtml(row[header])}</td>`).join('')}</tr>`)
+              .map((row) => `<tr>${headers.map((header) => `<td>${escapeHtml(spreadsheetText(row[header]))}</td>`).join('')}</tr>`)
               .join('')}
           </tbody>
         </table>
@@ -102,11 +107,11 @@ export function exportPdf({ title, rows }) {
         <p>Generated on ${escapeHtml(new Date().toLocaleString())}</p>
         <table>
           <thead>
-            <tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr>
+            <tr>${headers.map((header) => `<th>${escapeHtml(spreadsheetText(header))}</th>`).join('')}</tr>
           </thead>
           <tbody>
             ${rows
-              .map((row) => `<tr>${headers.map((header) => `<td>${escapeHtml(row[header])}</td>`).join('')}</tr>`)
+              .map((row) => `<tr>${headers.map((header) => `<td>${escapeHtml(spreadsheetText(row[header]))}</td>`).join('')}</tr>`)
               .join('')}
           </tbody>
         </table>

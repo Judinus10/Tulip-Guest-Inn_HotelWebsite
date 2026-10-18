@@ -6,6 +6,7 @@ require_once __DIR__ . '/../bookings/booking-expiry-helper.php';
 require_once __DIR__ . '/../calendar/ics-helper.php';
 
 apply_cors_headers();
+rate_limit_or_fail('public_rooms', 120, 15);
 
 function room_is_available_for_dates(PDO $pdo, int $roomId, string $roomName, string $checkInDate, string $checkOutDate): bool
 {

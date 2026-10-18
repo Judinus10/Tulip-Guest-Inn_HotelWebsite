@@ -234,7 +234,7 @@ export default function Booking() {
       }
 
       if (form.paymentMethod === 'PayHere') {
-        const checkout = await createCheckoutSession(bookingId);
+        const checkout = await createCheckoutSession(bookingId, booking.booking_access_token);
         if (!checkout.checkout_url) {
           throw new Error('Payment checkout could not start. Missing PayHere checkout URL.');
         }
@@ -319,7 +319,7 @@ export default function Booking() {
                           onChange={handleChange}
                           required
                           min={new Date().toISOString().split('T')[0]}
-                          className="w-full border border-border px-5 py-3.5 text-sm outline-none focus:border-gold transition-colors duration-200 bg-background"
+                          className="w-full border border-border px-5 py-3.5 text-sm outline-hidden focus:border-gold transition-colors duration-200 bg-background"
                         />
                       </div>
                       <div>
@@ -331,7 +331,7 @@ export default function Booking() {
                           onChange={handleChange}
                           required
                           min={form.checkIn || new Date().toISOString().split('T')[0]}
-                          className="w-full border border-border px-5 py-3.5 text-sm outline-none focus:border-gold transition-colors duration-200 bg-background"
+                          className="w-full border border-border px-5 py-3.5 text-sm outline-hidden focus:border-gold transition-colors duration-200 bg-background"
                         />
                       </div>
                       <div>
@@ -343,7 +343,7 @@ export default function Booking() {
                           name="guests"
                           value={form.guests}
                           onChange={handleChange}
-                          className="w-full border border-border px-5 py-3.5 text-sm outline-none focus:border-gold transition-colors duration-200 bg-background"
+                          className="w-full border border-border px-5 py-3.5 text-sm outline-hidden focus:border-gold transition-colors duration-200 bg-background"
                         >
                           {[1, 2, 3, 4, 5, 6].map((n) => (
                             <option key={n} value={n}>{n} {n === 1 ? 'Guest' : 'Guests'}</option>
@@ -359,7 +359,7 @@ export default function Booking() {
                           name="rooms"
                           value={form.rooms}
                           onChange={handleChange}
-                          className="w-full border border-border px-5 py-3.5 text-sm outline-none focus:border-gold transition-colors duration-200 bg-background"
+                          className="w-full border border-border px-5 py-3.5 text-sm outline-hidden focus:border-gold transition-colors duration-200 bg-background"
                         >
                           {[1, 2, 3, 4].map((n) => (
                             <option key={n} value={n}>{n} {n === 1 ? 'Room' : 'Rooms'}</option>
@@ -372,7 +372,7 @@ export default function Booking() {
                           name="roomType"
                           value={form.roomType}
                           onChange={handleChange}
-                          className="w-full border border-border px-5 py-3.5 text-sm outline-none focus:border-gold transition-colors duration-200 bg-background"
+                          className="w-full border border-border px-5 py-3.5 text-sm outline-hidden focus:border-gold transition-colors duration-200 bg-background"
                         >
                           {roomTypeOptions.map((opt) => (
                             <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -436,7 +436,7 @@ export default function Booking() {
                           onChange={handleChange}
                           required
                           placeholder="First name"
-                          className="w-full border border-border px-5 py-3.5 text-sm outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
+                          className="w-full border border-border px-5 py-3.5 text-sm outline-hidden focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
                         />
                       </div>
                       <div>
@@ -448,7 +448,7 @@ export default function Booking() {
                           onChange={handleChange}
                           required
                           placeholder="Last name"
-                          className="w-full border border-border px-5 py-3.5 text-sm outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
+                          className="w-full border border-border px-5 py-3.5 text-sm outline-hidden focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
                         />
                       </div>
                       <div>
@@ -460,7 +460,7 @@ export default function Booking() {
                           onChange={handleChange}
                           required
                           placeholder="your@email.com"
-                          className="w-full border border-border px-5 py-3.5 text-sm outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
+                          className="w-full border border-border px-5 py-3.5 text-sm outline-hidden focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
                         />
                       </div>
                       <div>
@@ -472,7 +472,7 @@ export default function Booking() {
                           onChange={handleChange}
                           required
                           placeholder="+xx xxx xxx xxxx"
-                          className="w-full border border-border px-5 py-3.5 text-sm outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
+                          className="w-full border border-border px-5 py-3.5 text-sm outline-hidden focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
                         />
                       </div>
                       <div className="md:col-span-2">
@@ -499,7 +499,7 @@ export default function Booking() {
                               onChange={handleChange}
                               required={form.isBookingForOther}
                               placeholder="Guest full name"
-                              className="w-full border border-border px-5 py-3.5 text-sm outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
+                              className="w-full border border-border px-5 py-3.5 text-sm outline-hidden focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
                             />
                           </div>
                           <div>
@@ -510,7 +510,7 @@ export default function Booking() {
                               value={form.stayingGuestPhone}
                               onChange={handleChange}
                               placeholder="Guest phone number"
-                              className="w-full border border-border px-5 py-3.5 text-sm outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
+                              className="w-full border border-border px-5 py-3.5 text-sm outline-hidden focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
                             />
                           </div>
                           <div className="md:col-span-2">
@@ -521,7 +521,7 @@ export default function Booking() {
                               value={form.stayingGuestEmail}
                               onChange={handleChange}
                               placeholder="guest@email.com"
-                              className="w-full border border-border px-5 py-3.5 text-sm outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
+                              className="w-full border border-border px-5 py-3.5 text-sm outline-hidden focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
                             />
                             <p className="mt-2 text-[10px] leading-relaxed text-gray-400">If provided, booking updates will also be emailed to the staying guest.</p>
                           </div>
@@ -533,7 +533,7 @@ export default function Booking() {
                               onChange={handleChange}
                               rows={3}
                               placeholder="Any note about the staying guest..."
-                              className="w-full border border-border px-5 py-3.5 text-sm outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400 resize-none"
+                              className="w-full border border-border px-5 py-3.5 text-sm outline-hidden focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400 resize-none"
                             />
                           </div>
                         </>
@@ -547,7 +547,7 @@ export default function Booking() {
                           value={form.nationality}
                           onChange={handleChange}
                           placeholder="Your nationality"
-                          className="w-full border border-border px-5 py-3.5 text-sm outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
+                          className="w-full border border-border px-5 py-3.5 text-sm outline-hidden focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
                         />
                       </div>
                       <div className="md:col-span-2">
@@ -558,7 +558,7 @@ export default function Booking() {
                           onChange={handleChange}
                           rows={4}
                           placeholder="Any special requirements, dietary needs or preferences..."
-                          className="w-full border border-border px-5 py-3.5 text-sm outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400 resize-none"
+                          className="w-full border border-border px-5 py-3.5 text-sm outline-hidden focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400 resize-none"
                         />
                       </div>
                     </div>

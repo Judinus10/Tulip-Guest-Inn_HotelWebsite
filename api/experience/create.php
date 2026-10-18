@@ -10,13 +10,14 @@ try {
     $pdo = experience_db();
     experience_ensure_schema($pdo);
 
-    $title = trim($_POST['title'] ?? '');
-    $category = trim($_POST['category'] ?? '');
-    $location = trim($_POST['location'] ?? '');
-    $distance = trim($_POST['distance'] ?? '');
-    $duration = trim($_POST['duration'] ?? '');
-    $description = trim($_POST['description'] ?? '');
+    $title = clean_string($_POST['title'] ?? '', 180);
+    $category = clean_string($_POST['category'] ?? '', 100);
+    $location = clean_string($_POST['location'] ?? '', 180);
+    $distance = clean_string($_POST['distance'] ?? '', 100);
+    $duration = clean_string($_POST['duration'] ?? '', 100);
+    $description = clean_string($_POST['description'] ?? '', 5000);
     $status = $_POST['status'] ?? 'active';
+    if (!in_array($status, ['active','inactive'], true)) experience_json(['success'=>false,'message'=>'Invalid status.'], 422);
     $sortOrder = (int) ($_POST['sort_order'] ?? 1);
 
     if ($title === '' || $category === '' || $description === '') {
@@ -52,6 +53,7 @@ try {
         'message' => 'Experience item created successfully.',
     ]);
 } catch (Throwable $e) {
+    if (!empty($imagePath)) experience_delete_file($imagePath);
     experience_json([
         'success' => false,
         'message' => $e->getMessage(),

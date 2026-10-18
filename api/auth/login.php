@@ -13,6 +13,7 @@ rate_limit_or_fail('admin_login', 6, 15);
 
 $data = read_request_data();
 $email = strtolower(clean_string($data['email'] ?? '', 190));
+rate_limit_subject('login_account', $email, 6, 15);
 $password = (string) ($data['password'] ?? '');
 $rememberMe = filter_var($data['remember_me'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
@@ -31,6 +32,7 @@ try {
     $user = $stmt->fetch();
 
     if (!$user || (int) $user['is_active'] !== 1 || !password_verify($password, $user['password_hash'])) {
+        security_audit('login', 'rejected');
         json_response(false, 'Invalid login details.', 401);
     }
 
@@ -56,6 +58,7 @@ try {
         ':expires_at' => $expiresAt,
     ]);
 
+    security_audit('login', 'succeeded', (int)$user['id']);
     $updateLogin = $pdo->prepare('UPDATE admin_users SET last_login_at = NOW(), updated_at = NOW() WHERE id = :id');
     $updateLogin->execute([':id' => $user['id']]);
 

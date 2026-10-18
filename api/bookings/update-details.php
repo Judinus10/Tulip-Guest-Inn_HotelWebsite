@@ -75,6 +75,7 @@ if ($guests > 20) {
 
 try {
     $pdo = get_db_connection();
+    lock_booking_inventory($pdo);
     offer_ensure_booking_snapshot_schema($pdo);
     ensure_booking_audit_table($pdo);
     // The ICS helper may create/upgrade its tables the first time it runs.
@@ -88,6 +89,7 @@ try {
     $bookingStmt = $pdo->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1 FOR UPDATE');
     $bookingStmt->execute([':id' => $id]);
     $booking = $bookingStmt->fetch();
+    if ($booking && booking_has_gateway_payment($pdo, $booking)) json_response(false, 'Bookings with gateway attempts cannot be repriced or reassigned. Cancel and create a new booking.', 409);
 
     if (!$booking) {
         $pdo->rollBack();

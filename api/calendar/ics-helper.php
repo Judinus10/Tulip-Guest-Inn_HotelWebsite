@@ -237,14 +237,9 @@ function parse_ics_events(string $body): array
     return $events;
 }
 
-function validate_ics_url(string $url): bool
-{
-    $parts = parse_url($url);
-    if (!$parts || strtolower((string) ($parts['scheme'] ?? '')) !== 'https' || empty($parts['host'])) {
-        return false;
-    }
-    $host = strtolower((string) $parts['host']);
-    return $host === 'admin.booking.com' || str_ends_with($host, '.booking.com');
+function validate_ics_url(string $url): bool {
+    $p = parse_url($url);
+    return is_array($p) && ($p['scheme'] ?? '') === 'https' && in_array(strtolower($p['host'] ?? ''), ['admin.booking.com', 'ical.booking.com'], true) && !isset($p['user']) && !isset($p['pass']) && !isset($p['fragment']) && (!isset($p['port']) || $p['port'] === 443);
 }
 
 function ics_test_mode_enabled(): bool
@@ -366,6 +361,7 @@ function sync_ics_room(PDO $pdo, array $map): array
     try {
         $events = parse_ics_events(fetch_ics((string) $map['import_url']));
         $seen = [];
+        lock_booking_inventory($pdo);
         $pdo->beginTransaction();
 
         $upsert = $pdo->prepare(

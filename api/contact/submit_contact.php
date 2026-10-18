@@ -13,6 +13,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 rate_limit_or_fail('submit_contact', 5, 15);
 
 $data = read_request_data();
+verify_bot_challenge($data, 'contact');
+rate_limit_subject('contact_email', strtolower((string)($data['email'] ?? '')), 5, 60);
 $name = clean_string($data['name'] ?? '', 150);
 $email = strtolower(clean_string($data['email'] ?? '', 190));
 $phone = clean_string($data['phone'] ?? '', 50);

@@ -90,13 +90,9 @@ try {
     $requestedPaymentStatusRaw = (string) ($data['payment_status'] ?? 'Payment Pending');
     $requestedPaymentStatusNormalized = strtolower(str_replace([' ', '-'], '_', trim($requestedPaymentStatusRaw)));
 
+    $rawBookingKey = strtolower(str_replace([' ', '-'], '_', trim((string)($data['booking_status'] ?? $data['status'] ?? 'Pending'))));
+    if (!in_array($rawBookingKey, ['pending','confirmed','checked_in','checkedin','checked_out','checkedout','cancelled','canceled','no_show','noshow'], true) || !in_array($requestedPaymentStatusNormalized, ['paid','payment_paid','pending','payment_pending','cancelled','canceled','refunded','no_pay','nopay','no_payment'], true)) json_response(false, 'Invalid status.', 422);
     $submittedPaymentMethod = admin_payment_method_for_db_unified($data['payment_method'] ?? 'Manual');
-    if ($bookingStatus !== 'Cancelled' && $submittedPaymentMethod === 'PayHere' && in_array($requestedPaymentStatusNormalized, ['paid', 'payment_paid'], true)) {
-        json_response(false, 'Paid status is locked. PayHere payments can only be marked Paid by the verified PayHere notify webhook.', 200, [
-            'severity' => 'warning',
-            'error_code' => 'PAYHERE_PAID_LOCKED',
-        ]);
-    }
 
     $paymentStatus = admin_payment_status_for_db_unified($requestedPaymentStatusRaw);
     $paymentMethod = $submittedPaymentMethod;
@@ -104,6 +100,7 @@ try {
     $remarks = clean_string($data['remarks'] ?? '', 1000);
 
     $pdo = get_db_connection();
+    lock_booking_inventory($pdo);
     if (ics_enabled()) ensure_ics_schema($pdo);
     $pdo->beginTransaction();
 
@@ -116,17 +113,25 @@ try {
         json_response(false, 'Booking was not found.', 404);
     }
 
+    $gateway = booking_has_gateway_payment($pdo, $booking);
+    if (!array_key_exists('booking_status', $data) && !array_key_exists('status', $data)) $bookingStatus = (string)$booking['status'];
+    if ($gateway) {
+        if ($bookingStatus === (string)$booking['status'] && (isset($data['payment_status']) || isset($data['payment_method']))) {
+            $pdo->rollBack(); json_response(false, 'Gateway payments can only be changed by verified notifications.', 409);
+        }
+        $paymentStatus = (string)$booking['payment_status']; $paymentMethod = 'PayHere';
+    } else { assert_manual_payment_allowed($pdo, $booking, $paymentMethod); }
     $oldBookingStatus = (string) ($booking['status'] ?? 'Pending');
     $oldPaymentStatus = (string) ($booking['payment_status'] ?? 'Payment Pending');
     $oldPaymentKey = strtolower(trim(preg_replace('/^payment\s+/i', '', $oldPaymentStatus) ?? $oldPaymentStatus));
     $oldPaymentKey = str_replace([' ', '-'], '_', $oldPaymentKey);
-    $refundRequired = false;
+    $refundRequired = $gateway && $bookingStatus === 'Cancelled' && $oldPaymentKey === 'paid';
 
     // Cancellation owns the payment outcome. Do not trust a contradictory
     // payment value submitted by the browser.
-    if ($bookingStatus === 'Cancelled') {
+    if ($bookingStatus === 'Cancelled' && !$gateway) {
         if ($oldPaymentKey === 'paid') {
-            $paymentStatus = 'Refunded';
+            $paymentStatus = $oldPaymentStatus;
             $refundRequired = true;
         } elseif ($oldPaymentKey === 'refunded') {
             $paymentStatus = 'Refunded';
@@ -189,7 +194,7 @@ try {
         ? array_sum(array_map(static fn(array $row): float => (float) $row['amount'], $groupRows))
         : (float) ($booking['amount'] ?? 0);
     $currency = (string) ($booking['currency'] ?? PAYMENT_CURRENCY);
-    $orderId = 'MANUAL-' . date('YmdHis') . '-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT);
+    $orderId = 'MANUAL-' . bin2hex(random_bytes(6)) . '-' . date('YmdHis') . '-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT);
     $gatewayResponse = json_encode([
         'source' => 'admin_combined_status_update',
         'updated_at' => date('Y-m-d H:i:s'),
@@ -204,31 +209,8 @@ try {
     $paymentStmt->execute([':booking_id' => $paymentBookingId]);
     $payment = $paymentStmt->fetch();
 
-    if ($payment) {
-        $updateSql = 'UPDATE payments
-             SET amount = :amount,
-                 currency = :currency,
-                 status = :status,
-                 method = :method,
-                 gateway_response = :gateway_response,
-                 updated_at = NOW()';
-        $params = [
-            ':amount' => $amount,
-            ':currency' => $currency,
-            ':status' => $paymentStatus,
-            ':method' => $paymentMethod,
-            ':gateway_response' => $gatewayResponse,
-            ':id' => (int) $payment['id'],
-        ];
-        if ($reference !== '') {
-            $updateSql .= ', payment_id = :payment_id';
-            $params[':payment_id'] = $reference;
-        }
-        $updateSql .= ' WHERE id = :id';
-        $updatePayment = $pdo->prepare($updateSql);
-        $updatePayment->execute($params);
-        $paymentId = (int) $payment['id'];
-    } else {
+    $paymentId = (int)($payment['id'] ?? 0);
+    if (!$gateway) {
         $insertPayment = $pdo->prepare(
             'INSERT INTO payments (booking_id, order_id, payment_id, amount, currency, status, method, gateway_response, created_at, updated_at)
              VALUES (:booking_id, :order_id, :payment_id, :amount, :currency, :status, :method, :gateway_response, NOW(), NOW())'
@@ -272,7 +254,7 @@ try {
             } elseif ($bookingChanged) {
                 if ($bookingStatus === 'Confirmed') {
                     send_booking_confirmed_email($pdo, $freshBooking);
-                } elseif ($bookingStatus === 'Cancelled') {
+                } elseif ($bookingStatus === 'Cancelled' && !$gateway) {
                     send_booking_cancelled_emails($pdo, $freshBooking);
                 } else {
                     send_booking_status_changed_email($pdo, $freshBooking, $oldBookingStatus, $bookingStatus);
@@ -289,7 +271,7 @@ try {
         ob_clean();
     }
     $responseMessage = $refundRequired
-        ? 'Booking cancelled and payment status changed to Refunded. Complete or verify the actual payment refund separately.'
+        ? 'Booking cancelled. Complete and verify any actual refund separately.'
         : 'Statuses updated successfully.';
 
     json_response(true, $responseMessage, 200, [

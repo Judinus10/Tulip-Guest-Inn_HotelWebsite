@@ -1,3 +1,4 @@
+import { getBotToken } from './botProtection';
 import { requestJson } from './apiClient';
 
 export type BookingFormPayload = {
@@ -55,6 +56,7 @@ export type PaymentHistoryItem = {
 export type BookingPaymentStatus = {
   id: number;
   booking_no: string;
+  booking_access_token: string;
   full_name: string;
   email: string;
   phone: string;
@@ -84,6 +86,7 @@ export type BookingPaymentStatus = {
 };
 
 export async function submitBookingRequest(payload: BookingFormPayload): Promise<{
+  booking_access_token: string;
   inquiry_id?: string;
   booking_id?: string | number;
   booking_no?: string;
@@ -96,7 +99,7 @@ export async function submitBookingRequest(payload: BookingFormPayload): Promise
 }> {
   return requestJson('/submit-booking.php', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, bot_token: await getBotToken('booking') }),
   });
 }
 
@@ -115,20 +118,21 @@ export type MultiRoomBookingPayload = {
 export async function submitMultiRoomBooking(payload: MultiRoomBookingPayload): Promise<{
   booking_id: number;
   booking_no: string;
+  booking_access_token: string;
   bill_url?: string | null;
   requires_online_checkout?: boolean;
 }> {
   return requestJson('/submit-multi-room-booking.php', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, bot_token: await getBotToken('booking') }),
   });
 }
 
 
-export async function createCheckoutSession(bookingId: string | number): Promise<CheckoutSession> {
+export async function createCheckoutSession(bookingId: string | number, bookingAccessToken: string): Promise<CheckoutSession> {
   return requestJson('/payments/create-checkout-session.php', {
     method: 'POST',
-    body: JSON.stringify({ booking_id: bookingId }),
+    body: JSON.stringify({ booking_id: bookingId, booking_access_token: bookingAccessToken }),
   });
 }
 

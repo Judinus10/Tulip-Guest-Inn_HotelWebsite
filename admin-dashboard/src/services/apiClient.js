@@ -1,6 +1,6 @@
 import { clearLegacyAuthStorage, getCookie } from '@/utils/auth'
 
-const localApiBaseUrl = 'http://localhost/HotelWebsite/api'
+const localApiBaseUrl = import.meta.env.DEV ? 'http://localhost/project_Tulip/api' : ''
 
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || localApiBaseUrl).replace(/\/$/, '')
 

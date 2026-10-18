@@ -36,6 +36,7 @@ function calendar_status_key(mixed $value): string
 
 try {
     $pdo = get_db_connection();
+    lock_booking_inventory($pdo);
     if (ics_enabled()) ensure_ics_schema($pdo);
     $pdo->beginTransaction();
 
@@ -111,13 +112,13 @@ try {
     $displayStatus = $displayMap[$status];
     $refundRequired = false;
 
-    if ($status === 'cancelled') {
+    $gateway = booking_has_gateway_payment($pdo, $booking);
+    if ($status === 'cancelled' && $gateway) $refundRequired = $paymentKey === 'paid';
+    if ($status === 'cancelled' && !$gateway) {
         if ($paymentKey === 'paid') {
             // This records the required financial outcome. The actual gateway
             // refund must still be completed/verified outside this endpoint.
-            $paymentStatus = 'Refunded';
-            $paymentKey = 'refunded';
-            $refundRequired = true;
+            $refundRequired = true; // Cancellation does not prove that money was refunded.
         } elseif ($paymentKey === 'refunded') {
             $paymentStatus = 'Refunded';
         } else {
@@ -138,7 +139,7 @@ try {
         $update->execute([':status' => $displayStatus, ':payment_status' => $paymentStatus, ':id' => $id]);
     }
 
-    if ($payment) {
+    if ($payment && !$gateway) {
         $paymentUpdate = $pdo->prepare('UPDATE payments SET status = :status, updated_at = NOW() WHERE id = :id');
         $paymentUpdate->execute([':status' => $paymentStatus, ':id' => (int) $payment['id']]);
     }
@@ -168,7 +169,7 @@ try {
     if (ob_get_level() > 0) ob_clean();
 
     if ($status === 'cancelled' && $refundRequired) {
-        $message = 'Booking cancelled and payment status changed to Refunded. Complete or verify the actual payment refund separately.';
+        $message = 'Booking cancelled. Complete and verify any actual refund separately.';
     } elseif ($refundRequired) {
         $message = 'Booking marked No Show. PayHere payment remains Paid; complete the real refund before marking it Refunded.';
     } else {

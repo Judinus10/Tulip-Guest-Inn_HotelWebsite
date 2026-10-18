@@ -10,6 +10,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../payment-settings/_helpers.php';
 require_once __DIR__ . '/../security/public-token-helper.php';
+require_once __DIR__ . '/../bookings/booking-expiry-helper.php';
 
 function redirect_error(string $message, int $statusCode = 400): void
 {
@@ -68,6 +69,8 @@ try {
         redirect_error('Invalid checkout token.', 403);
     }
 
+    $q = $pdo->prepare('SELECT * FROM bookings WHERE id = ?'); $q->execute([$bookingId]); $booking = $q->fetch();
+    if (!$booking || $booking['status'] !== 'Pending' || $booking['payment_status'] !== 'Payment Pending' || $payment['status'] !== 'Payment Pending' || booking_hold_is_expired($booking)) redirect_error('This checkout session is no longer active.', 409);
     $gatewayResponse = json_decode((string) ($payment['gateway_response'] ?? ''), true);
     $payload = is_array($gatewayResponse) && isset($gatewayResponse['checkout_payload']) && is_array($gatewayResponse['checkout_payload'])
         ? $gatewayResponse['checkout_payload']
@@ -81,6 +84,10 @@ try {
     ? 'https://www.payhere.lk/pay/checkout'
     : 'https://sandbox.payhere.lk/pay/checkout';
 
+    $nonce = base64_encode(random_bytes(24));
+    header("Content-Security-Policy: default-src 'none'; script-src 'nonce-{$nonce}'; base-uri 'none'; frame-ancestors 'none'; form-action https://www.payhere.lk https://sandbox.payhere.lk");
+    header('Cache-Control: no-store');
+    header('Referrer-Policy: no-referrer');
     header('Content-Type: text/html; charset=utf-8');
 } catch (Throwable $e) {
     error_log('PayHere redirect error: ' . $e->getMessage());
@@ -102,7 +109,7 @@ try {
         <?php endforeach; ?>
         <noscript><button type="submit">Continue to PayHere</button></noscript>
     </form>
-    <script>
+    <script nonce="<?= htmlspecialchars($nonce, ENT_QUOTES) ?>">
         document.getElementById('payhere-checkout-form').submit();
     </script>
 </body>

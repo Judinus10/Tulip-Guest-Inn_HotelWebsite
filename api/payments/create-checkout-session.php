@@ -121,12 +121,15 @@ if ($bookingId < 1) {
     json_response(false, 'Valid booking ID is required to start payment.', 422);
 }
 
+require_booking_capability($bookingId, $data['booking_access_token'] ?? null);
+
 if (payment_runtime()['merchant_id'] === '' || payment_runtime()['merchant_secret'] === '') {
     json_response(false, 'PayHere credentials are not configured on the backend.', 500);
 }
 
 try {
     $pdo = get_db_connection();
+    lock_booking_inventory($pdo);
     expire_pending_bookings($pdo, $bookingId, true);
     ensure_booking_audit_table($pdo);
     ensure_email_queue_table($pdo);

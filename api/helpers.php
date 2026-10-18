@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/security/hardening.php';
+security_enforce_transport();
 
 $rootAutoload = __DIR__ . '/../vendor/autoload.php';
 $apiAutoload = __DIR__ . '/vendor/autoload.php';
@@ -20,11 +22,13 @@ function apply_security_headers(): void
     header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
     header('X-Content-Type-Options: nosniff');
     header('X-Frame-Options: DENY');
-    header('Referrer-Policy: strict-origin-when-cross-origin');
+    header('Referrer-Policy: no-referrer');
+    header('Cache-Control: no-store, private');
+    header('X-Request-ID: ' . security_request_id());
     header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
 
-    if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
-        header('Strict-Transport-Security: max-age=31536000; includeSubDomains; preload');
+    if (is_https_request()) {
+        header('Strict-Transport-Security: max-age=31536000');
     }
 }
 
@@ -43,7 +47,8 @@ function get_configured_cors_origins(): array
 
     foreach (['FRONTEND_URL', 'PUBLIC_APP_URL', 'APP_BASE_URL', 'ADMIN_APP_URL'] as $constantName) {
         if (defined($constantName) && trim((string) constant($constantName)) !== '') {
-            $origins[] = (string) constant($constantName);
+            $parts = parse_url((string)constant($constantName));
+            if (isset($parts['scheme'], $parts['host'])) $origins[] = $parts['scheme'] . '://' . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : '');
         }
     }
 
@@ -114,6 +119,13 @@ function apply_cors_headers(): void
 
 function json_response(bool $success, string $message, int $statusCode = 200, array $extra = []): void
 {
+    $GLOBALS['security_outcome'] = $success ? 'succeeded' : 'rejected';
+    if (in_array($statusCode, [401, 403], true)) { try { security_audit('access_denied', 'rejected', $GLOBALS['security_actor'] ?? null); } catch (Throwable $e) { error_log('Denied request audit unavailable'); } }
+    if (APP_ENV !== 'local') {
+        unset($extra['error'], $extra['debug'], $extra['trace']);
+        if ($statusCode >= 500) $message = 'Unable to complete the request. Reference: ' . security_request_id();
+    }
+    header('Cache-Control: no-store, private');
     // JSON endpoints must never include PHP notices/warnings or output from an
     // included library. A single character before the JSON body makes
     // response.json() fail even when the database transaction succeeded.
@@ -137,10 +149,14 @@ function json_response(bool $success, string $message, int $statusCode = 200, ar
 function read_request_data(): array
 {
     enforce_request_body_limit();
-    $raw = file_get_contents('php://input');
+    $limit = defined('MAX_REQUEST_BODY_BYTES') ? MAX_REQUEST_BODY_BYTES : 1048576;
+    $raw = file_get_contents('php://input', false, null, 0, $limit + 1);
+    if (strlen($raw ?: '') > $limit) json_response(false, 'Request body is too large.', 413);
     $data = json_decode($raw ?: '', true);
 
     if (is_array($data)) {
+        $GLOBALS['security_target'] = array_intersect_key($data, array_flip(['id', 'booking_id', 'payment_id']));
+        if (isset($data['id'])) $GLOBALS['security_target']['target_id'] = (int) $data['id'];
         return $data;
     }
 
@@ -206,6 +222,7 @@ function legacy_public_tokens_allowed(): bool
 
 function secure_image_upload(array $file, string $targetDir, string $filenamePrefix): array
 {
+    check_media_budget((int)($file['size'] ?? 0));
     if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
         throw new RuntimeException('Image upload failed.');
     }
@@ -305,34 +322,32 @@ function is_valid_date(string $date): bool
 
 function get_client_ip(): string
 {
+    if (trusted_proxy_request()) {
+        $real = trim((string) ($_SERVER['HTTP_X_REAL_IP'] ?? ''));
+        if (filter_var($real, FILTER_VALIDATE_IP)) return $real;
+    }
     return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
 }
 
-function rate_limit_or_fail(string $action, int $maxAttempts = PUBLIC_RATE_LIMIT_MAX, int $windowMinutes = PUBLIC_RATE_LIMIT_WINDOW_MINUTES): void
+function rate_limit_or_fail(string $action, int $maxAttempts = PUBLIC_RATE_LIMIT_MAX, int $windowMinutes = PUBLIC_RATE_LIMIT_WINDOW_MINUTES, ?string $subjectIp = null): void
 {
     $pdo = get_db_connection();
-    $ip = get_client_ip();
-    $windowStart = (new DateTimeImmutable('-' . $windowMinutes . ' minutes'))->format('Y-m-d H:i:s');
-
-    $delete = $pdo->prepare('DELETE FROM rate_limits WHERE created_at < :window_start');
-    $delete->execute([':window_start' => $windowStart]);
-
-    $count = $pdo->prepare('SELECT COUNT(*) FROM rate_limits WHERE ip_address = :ip_address AND action = :action AND created_at >= :window_start');
-    $count->execute([
-        ':ip_address' => $ip,
-        ':action' => $action,
-        ':window_start' => $windowStart,
-    ]);
-
-    if ((int) $count->fetchColumn() >= $maxAttempts) {
-        json_response(false, 'Too many attempts. Please try again later.', 429);
-    }
-
-    $insert = $pdo->prepare('INSERT INTO rate_limits (ip_address, action, created_at) VALUES (:ip_address, :action, NOW())');
-    $insert->execute([
-        ':ip_address' => $ip,
-        ':action' => $action,
-    ]);
+    $ip = $subjectIp ?? get_client_ip();
+    $action = substr($action, 0, 100);
+    $windowStart = (new DateTimeImmutable('-' . max(1, $windowMinutes) . ' minutes'))->format('Y-m-d H:i:s');
+    $key = 'rl_' . substr(hash('sha256', DB_NAME . '|' . $ip . '|' . $action), 0, 60);
+    $lock = $pdo->prepare('SELECT GET_LOCK(?, 3)'); $lock->execute([$key]);
+    if ((int) $lock->fetchColumn() !== 1) json_response(false, 'Too many concurrent requests. Please retry.', 429);
+    $limited = false;
+    try {
+        $delete = $pdo->prepare('DELETE FROM rate_limits WHERE action = ? AND ip_address = ? AND created_at < ?');
+        $delete->execute([$action, $ip, $windowStart]);
+        $count = $pdo->prepare('SELECT COUNT(*) FROM rate_limits WHERE ip_address = ? AND action = ? AND created_at >= ?');
+        $count->execute([$ip, $action, $windowStart]);
+        $limited = (int) $count->fetchColumn() >= max(1, $maxAttempts);
+        if (!$limited) $pdo->prepare('INSERT INTO rate_limits (ip_address, action, created_at) VALUES (?, ?, NOW())')->execute([$ip, $action]);
+    } finally { $pdo->prepare('SELECT RELEASE_LOCK(?)')->execute([$key]); }
+    if ($limited) { header('Retry-After: ' . ($windowMinutes * 60)); json_response(false, 'Too many attempts. Please try again later.', 429); }
 }
 
 function is_https_request(): bool
@@ -341,7 +356,7 @@ function is_https_request(): bool
         return true;
     }
 
-    return strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
+    return trusted_proxy_request() && strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
 }
 
 function admin_session_cookie_name(): string
@@ -483,6 +498,9 @@ function require_admin_auth(): array
         clear_admin_auth_cookies();
         json_response(false, 'Invalid or expired session.', 401);
     }
+
+    if (!in_array((string) $session['role'], ['admin', 'super_admin'], true)) json_response(false, 'Administrator role required.', 403);
+    security_track_admin($session);
 
     $touch = $pdo->prepare('UPDATE admin_sessions SET last_used_at = NOW() WHERE id = :id');
     $touch->execute([':id' => $session['session_id']]);

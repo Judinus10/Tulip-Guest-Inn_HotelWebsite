@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/_room_helpers.php';
 apply_cors_headers();
+rate_limit_or_fail('public_rooms', 120, 15);
 try {
     $pdo = get_db_connection();
     ensure_rooms_schema($pdo);
@@ -16,7 +17,7 @@ try {
         $stmt->execute([':slug' => $id]);
     }
     $room = $stmt->fetch();
-    if (!$room) json_response(false, 'Room not found.', 404);
+    if (!$room || ($room['status'] ?? '') !== 'Available') json_response(false, 'Room not found.', 404);
     $images = fetch_room_images($pdo, [(int) $room['id']]);
     $assignments = fetch_room_amenity_assignments($pdo, [(int) $room['id']]);
     $payload = normalize_room(

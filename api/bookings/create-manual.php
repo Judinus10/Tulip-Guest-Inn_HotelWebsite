@@ -45,6 +45,9 @@ $statusMap = [
     'no_payment' => 'No Pay',
 ];
 $paymentStatus = $statusMap[$statusKey] ?? 'Payment Pending';
+if (!isset($statusMap[$statusKey]) || !in_array($paymentMethod, ['Cash','Manual','Bank Transfer','Card','No Pay','Other'], true)) json_response(false, 'Invalid manual payment status or method.', 422);
+if (!isset($statusMap[$statusKey])) json_response(false, 'Invalid payment status.', 422);
+if (!in_array($paymentMethod, ['Cash', 'Manual', 'Bank Transfer', 'Card', 'No Pay', 'Other'], true)) json_response(false, 'Manual bookings require an offline payment method. PayHere results must come from verified checkout notifications.', 422);
 
 if ($fullName === '' || $email === '' || $phone === '' || $roomName === '' || $checkInDate === '' || $checkOutDate === '' || $guests < 1) {
     json_response(false, 'Please fill in all required fields.', 422);
@@ -95,6 +98,7 @@ if ($guests > 20) {
 
 try {
     $pdo = get_db_connection();
+    lock_booking_inventory($pdo);
     $pdo->beginTransaction();
 
     $roomStmt = $pdo->prepare('SELECT id, room_name, max_guests, status FROM rooms WHERE room_name = :room_name LIMIT 1 FOR UPDATE');

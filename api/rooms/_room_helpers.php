@@ -41,11 +41,12 @@ function ensure_room_ical_column(PDO $pdo): void
 
 function save_room_ical_url(PDO $pdo, int $roomId, string $url): void
 {
+    require_calendar_permission($pdo, $roomId, $url);
     $url = trim($url);
     if ($url !== '') {
         $parts = parse_url($url);
         $host = strtolower((string) ($parts['host'] ?? ''));
-        if (!$parts || ($parts['scheme'] ?? '') !== 'https' || !($host === 'ical.booking.com' || $host === 'admin.booking.com')) {
+        if (!$parts || isset($parts['user']) || isset($parts['pass']) || isset($parts['fragment']) || (isset($parts['port']) && $parts['port'] !== 443) || ($parts['scheme'] ?? '') !== 'https' || !($host === 'ical.booking.com' || $host === 'admin.booking.com')) {
             throw new InvalidArgumentException('Enter a valid Booking.com iCal export URL.');
         }
         $check = $pdo->prepare('SELECT id FROM rooms WHERE booking_ical_url = :url AND id <> :id LIMIT 1');
@@ -184,7 +185,7 @@ function fetch_room_amenity_assignments(PDO $pdo, array $roomIds): array
     return $grouped;
 }
 
-function normalize_room(array $room, array $images = [], array $amenityRecords = [], array $amenityCatalog = []): array
+function normalize_room(array $room, array $images = [], array $amenityRecords = [], array $amenityCatalog = [], bool $includePrivate = false): array
 {
     $legacyAmenities = decode_amenities($room['amenities'] ?? '[]');
     $amenities = $amenityCatalog !== []
@@ -240,7 +241,7 @@ function normalize_room(array $room, array $images = [], array $amenityRecords =
         'show_unavailable_amenities' => !empty($room['show_unavailable_amenities']),
         'status' => (string) ($room['status'] ?? 'Available'),
         'sort_order' => (int) ($room['sort_order'] ?? 0),
-        'booking_ical_url' => (string) ($room['booking_ical_url'] ?? ''),
+        ...($includePrivate ? ['booking_ical_url' => (string) ($room['booking_ical_url'] ?? '')] : []),
         'video_url' => !empty($room['video_path']) ? rooms_upload_url($room['video_path']) : null,
         'images' => $imageUrls,
         'main_image' => $imageUrls[0] ?? $fallbackImage,
@@ -271,7 +272,7 @@ function get_room_payload(PDO $pdo, bool $publicOnly = false): array
             $room,
             $images[(int) $room['id']] ?? [],
             $amenities[(int) $room['id']] ?? [],
-            $catalog
+            $catalog, !$publicOnly
         ),
         $rooms
     );
@@ -288,6 +289,7 @@ function save_room_images(PDO $pdo, int $roomId, array $files): void
     }
 
     $names = is_array($files['name']) ? $files['name'] : [$files['name']];
+    if (count($names) > 20) throw new RuntimeException('Upload no more than 20 images at once.');
     $tmpNames = is_array($files['tmp_name']) ? $files['tmp_name'] : [$files['tmp_name']];
     $errors = is_array($files['error']) ? $files['error'] : [$files['error']];
 
@@ -314,12 +316,13 @@ function save_room_images(PDO $pdo, int $roomId, array $files): void
         $relativePath = 'uploads/rooms/' . $filename;
         $sortOrder++;
         $insert = $pdo->prepare('INSERT INTO room_images (room_id, image_path, is_main, sort_order) VALUES (:room_id, :image_path, :is_main, :sort_order)');
-        $insert->execute([
+        try { $insert->execute([
             ':room_id' => $roomId,
             ':image_path' => $relativePath,
             ':is_main' => $hasMain ? 0 : 1,
             ':sort_order' => $sortOrder,
         ]);
+        } catch (Throwable $e) { @unlink($uploadDir . '/' . $filename); throw $e; }
         $hasMain = true;
     }
 }

@@ -85,7 +85,7 @@ export default function MultiRoomBooking() {
   const adjust=(slot:number,diff:number)=>setAssigned(current=>current.map((r,i)=>i===slot?{...r,allocatedGuests:Math.max(1,Math.min(r.guests,r.allocatedGuests+diff))}:r));
   const submit=async(e:React.FormEvent)=>{e.preventDefault();setError('');const emailIsValid=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());const phoneDigits=form.phone.replace(/\D/g,'');const validationMessage=!form.full_name.trim()?'Please enter the guest name.':!emailIsValid?'Please enter a valid email address, for example name@example.com.':phoneDigits.length<7?'Please enter a valid phone number including the country code.':'';if(validationMessage){setError(validationMessage);toast.warning(validationMessage);return;}if(allocated!==filters.guests){const message=`Allocate exactly ${filters.guests} guests across the rooms.`;setError(message);toast.warning(message);return;}if(form.payment_method==='Cash'&&!arrivalEnabled){toast.warning('Pay on Arrival is unavailable.');return;}if(form.payment_method==='PayHere'&&!onlinePaymentEnabled){selectPaymentMethod('PayHere');return;}setSubmitting(true);try{
     const result=await submitMultiRoomBooking({...form,check_in_date:filters.checkIn,check_out_date:filters.checkOut,total_guests:filters.guests,rooms:assigned.map(r=>({room_id:r.id,guests:r.allocatedGuests}))});
-    if(form.payment_method==='PayHere'){const checkout=await createCheckoutSession(result.booking_id);window.location.href=checkout.checkout_url;return;}
+    if(form.payment_method==='PayHere'){const checkout=await createCheckoutSession(result.booking_id, result.booking_access_token);window.location.href=checkout.checkout_url;return;}
     if(!result.bill_url)throw new Error('Booking saved but bill link was not returned.');window.location.href=result.bill_url;
   }catch(e){const message=e instanceof Error?e.message:'Unable to book rooms.';setError(message);if(e instanceof PublicRequestError&&e.status>0&&e.status<500)toast.warning(message);else toast.error(message);setSubmitting(false);}};
 
@@ -94,21 +94,21 @@ export default function MultiRoomBooking() {
       <div className="mb-3 grid bg-white border border-border sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col px-5 py-4 border-b sm:border-r lg:border-b-0 border-border">
           <span className="mb-2 flex items-center gap-1.5 text-[9px] tracking-[0.2em] uppercase text-gold"><Calendar size={12}/>Check In</span>
-          <input type="date" value={filters.checkIn} min={todayBookingDate()} onChange={e=>updateFilter('checkin',e.target.value)} className="bg-transparent text-sm outline-none"/>
+          <input type="date" value={filters.checkIn} min={todayBookingDate()} onChange={e=>updateFilter('checkin',e.target.value)} className="bg-transparent text-sm outline-hidden"/>
         </label>
         <label onMouseDown={warnCheckoutRequiresCheckIn} onTouchStart={warnCheckoutRequiresCheckIn} className="flex flex-col px-5 py-4 border-b lg:border-b-0 lg:border-r border-border">
           <span className="mb-2 flex items-center gap-1.5 text-[9px] tracking-[0.2em] uppercase text-gold"><Calendar size={12}/>Check Out</span>
-          <input type="date" value={filters.checkOut} disabled={!filters.checkIn} min={nextBookingDate(filters.checkIn)||todayBookingDate()} onChange={e=>updateFilter('checkout',e.target.value)} className="bg-transparent text-sm outline-none disabled:cursor-not-allowed disabled:opacity-50"/>
+          <input type="date" value={filters.checkOut} disabled={!filters.checkIn} min={nextBookingDate(filters.checkIn)||todayBookingDate()} onChange={e=>updateFilter('checkout',e.target.value)} className="bg-transparent text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50"/>
         </label>
         <label className="flex flex-col px-5 py-4 border-b sm:border-b-0 sm:border-r border-border">
           <span className="mb-2 flex items-center gap-1.5 text-[9px] tracking-[0.2em] uppercase text-gold"><Users size={12}/>Guests</span>
-          <select value={filters.guests} onChange={e=>updateFilter('guests',e.target.value)} className="bg-transparent text-sm outline-none">
+          <select value={filters.guests} onChange={e=>updateFilter('guests',e.target.value)} className="bg-transparent text-sm outline-hidden">
             {Array.from({length:19},(_,i)=>i+2).map(n=><option key={n} value={n}>{n} Guests</option>)}
           </select>
         </label>
         <label className="flex flex-col px-5 py-4">
           <span className="mb-2 flex items-center gap-1.5 text-[9px] tracking-[0.2em] uppercase text-gold"><Home size={12}/>Rooms</span>
-          <select value={filters.rooms} onChange={e=>updateFilter('rooms',e.target.value)} className="bg-transparent text-sm outline-none">
+          <select value={filters.rooms} onChange={e=>updateFilter('rooms',e.target.value)} className="bg-transparent text-sm outline-hidden">
             {[2,3,4,5,6].map(n=><option key={n} value={n}>{n} Rooms</option>)}
           </select>
         </label>

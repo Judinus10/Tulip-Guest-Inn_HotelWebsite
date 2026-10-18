@@ -1,3 +1,4 @@
+import { getBotToken } from './botProtection';
 import { requestJson } from './apiClient';
 
 export type ContactSettings = {
@@ -38,6 +39,6 @@ export async function getPublicContactSettings(): Promise<ContactSettings> {
 export async function submitContactMessage(payload: ContactFormPayload): Promise<{ inquiry_id?: string }> {
   return requestJson<{ inquiry_id?: string }>('/contact/submit_contact.php', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, bot_token: await getBotToken('contact') }),
   });
 }

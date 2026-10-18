@@ -1,8 +1,19 @@
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap');
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.js";
+@theme {
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --radius-sm: 0.125rem;
+  --radius: 0.25rem;
+  --blur-sm: 4px;
+  --blur: 8px;
+}
+@layer base {
+  *, ::before, ::after { border-color: #e5e7eb; }
+  button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
+}
 
 @layer base {
   html {

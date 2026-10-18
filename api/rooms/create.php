@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/_room_helpers.php';
 apply_cors_headers();
 require_admin_auth();
+require_post_request();
 try {
     $pdo = get_db_connection();
     ensure_rooms_schema($pdo);
@@ -11,6 +12,7 @@ try {
     ensure_room_images_table($pdo);
     ensure_amenity_tables($pdo);
     $data = room_input_data();
+    if (array_key_exists('booking_ical_url', $data)) require_calendar_permission($pdo, (int)($data['id'] ?? 0), (string)$data['booking_ical_url']);
     $roomName = clean_string($data['room_name'] ?? '', 150);
     if ($roomName === '') json_response(false, 'Room name is required.', 422);
     $slug = slugify_room($data['slug'] ?? $roomName);

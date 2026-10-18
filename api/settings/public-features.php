@@ -16,5 +16,7 @@ json_response(true, 'Public feature settings loaded.', 200, [
         'online_payment_enabled' => payment_runtime()['payhere_enabled'],
         'pay_on_arrival_enabled' => payment_runtime()['pay_on_arrival'],
         'calendar_sync_enabled' => ics_enabled(),
+        'bot_protection_required' => APP_ENV !== 'local' || security_env('TURNSTILE_SECRET_KEY') !== '',
+        'turnstile_site_key' => security_env('TURNSTILE_SITE_KEY'),
     ],
 ]);

@@ -139,22 +139,37 @@ function activitiesFromBookings(bookings) {
   bookings.forEach((booking) => {
     const bookingStatus = String(booking.booking_status || '').toLowerCase()
     const paymentStatus = String(booking.payment_status || '').toLowerCase()
-    const isCancelled = bookingStatus === 'cancelled'
-
     activities.push(makeActivity({
       id: `booking-${booking.id}`,
-      type: isCancelled ? 'Cancellation' : 'Booking',
-      title: isCancelled ? 'Booking Cancelled' : 'New Booking Received',
+      type: 'Booking',
+      title: 'New Booking Received',
       reference_id: booking.booking_no,
       description: `${booking.guest_name} booked ${booking.room_name} from ${booking.check_in || '-'} to ${booking.check_out || '-'}.`,
       related_room: booking.room_name || '-',
       related_booking: booking.booking_no || '-',
-      status: bookingStatus === 'pending' || isCancelled ? 'New' : 'Resolved',
-      created_at: booking.updated_at || booking.created_at,
+      status: 'New',
+      created_at: booking.created_at,
       details: `Guest: ${booking.guest_name}\nEmail: ${booking.guest_email || '-'}\nPhone: ${booking.guest_phone || '-'}\nBooking status: ${titleCaseStatus(booking.booking_status)}\nPayment status: ${titleCaseStatus(paymentStatus)}\nAmount: ${money(booking.total_amount, booking.payment_currency)}\nSpecial request: ${booking.special_requests || '-'}`,
       route: '/bookings',
       searchText: [booking.booking_no, booking.guest_name, booking.guest_email, booking.guest_phone, booking.room_name].join(' '),
     }))
+
+    if (bookingStatus === 'cancelled') {
+      activities.push(makeActivity({
+        id: `booking-cancelled-${booking.booking_no || booking.id}`,
+        type: 'Cancellation',
+        title: 'Booking Cancelled',
+        reference_id: booking.booking_no,
+        description: `${booking.guest_name} cancelled ${booking.room_name || 'a booking'}.`,
+        related_room: booking.room_name || '-',
+        related_booking: booking.booking_no || '-',
+        status: 'New',
+        created_at: booking.updated_at || booking.created_at,
+        details: `Guest: ${booking.guest_name}\nBooking: ${booking.booking_no}\nRoom: ${booking.room_name || '-'}`,
+        route: '/bookings',
+        searchText: [booking.booking_no, booking.guest_name, booking.room_name, 'cancelled'].join(' '),
+      }))
+    }
 
     if (isActiveStayBooking(booking) && isToday(booking.check_in)) {
       const alreadyCheckedIn = bookingStatus === 'checked_in'

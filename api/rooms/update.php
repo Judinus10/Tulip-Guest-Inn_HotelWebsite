@@ -4,6 +4,7 @@ require_once __DIR__ . '/_room_helpers.php';
 require_once __DIR__ . '/../calendar/url-guard.php';
 apply_cors_headers();
 require_admin_auth();
+require_post_request();
 try {
     $pdo = get_db_connection();
     ensure_rooms_schema($pdo);
@@ -12,6 +13,7 @@ try {
     ensure_room_images_table($pdo);
     ensure_amenity_tables($pdo);
     $data = room_input_data();
+    if (array_key_exists('booking_ical_url', $data)) require_calendar_permission($pdo, (int)($data['id'] ?? 0), (string)$data['booking_ical_url']);
     $id = (int) ($data['id'] ?? $_GET['id'] ?? 0);
     if ($id <= 0) json_response(false, 'Room id is required.', 422);
     // Validate calendar ownership before updating any room fields or media.
@@ -51,7 +53,7 @@ try {
         ':sort_order' => max(0, (int) ($data['sort_order'] ?? 0)),
     ]);
     replace_room_amenities($pdo, $id, $amenityIds);
-    save_room_ical_url($pdo, $id, (string) ($data['booking_ical_url'] ?? ''));
+    if (array_key_exists('booking_ical_url', $data)) save_room_ical_url($pdo, $id, (string)$data['booking_ical_url']);
     save_room_images($pdo, $id, $_FILES['images'] ?? []);
     if (!empty($data['remove_video'])) {
         $old = $pdo->prepare('SELECT video_path FROM rooms WHERE id = :id');
@@ -66,7 +68,7 @@ try {
     $stmt->execute([':id' => $id]);
     $room = $stmt->fetch();
     $assignments = fetch_room_amenity_assignments($pdo, [$id]);
-    $normalized = normalize_room($room, $images[$id] ?? [], $assignments[$id] ?? [], list_amenities($pdo));
+    $normalized = normalize_room($room, $images[$id] ?? [], $assignments[$id] ?? [], list_amenities($pdo), true);
     json_response(true, 'Room updated.', 200, ['data' => $normalized, 'room' => $normalized]);
 } catch (InvalidArgumentException $e) {
     json_response(false, $e->getMessage(), 422);

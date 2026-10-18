@@ -51,6 +51,7 @@ if ($allocations === []) json_response(false, 'The booking must contain at least
 
 try {
     $pdo = get_db_connection();
+    lock_booking_inventory($pdo);
     offer_ensure_booking_snapshot_schema($pdo);
     ensure_booking_audit_table($pdo);
     expire_pending_bookings($pdo, null, false);
@@ -60,6 +61,7 @@ try {
     $primaryStmt = $pdo->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1 FOR UPDATE');
     $primaryStmt->execute([':id' => $id]);
     $primary = $primaryStmt->fetch();
+    if ($primary && booking_has_gateway_payment($pdo, $primary)) json_response(false, 'Bookings with gateway attempts cannot be repriced or reassigned.', 409);
     if (!$primary || (int) ($primary['booking_group_id'] ?? 0) < 1) {
         $pdo->rollBack();
         json_response(false, 'Multi-room booking was not found.', 404);

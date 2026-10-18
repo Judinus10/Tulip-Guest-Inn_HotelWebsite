@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/_offer_helpers.php';
 
 apply_cors_headers();
 
@@ -11,8 +11,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 try {
     $pdo = get_db_connection();
+    offer_ensure_schema($pdo);
+    offer_sync_expired($pdo);
 
-    $stmt = $pdo->query("\n        SELECT\n            id,\n            title,\n            subtitle,\n            description,\n            discount_label,\n            validity_label,\n            image_path,\n            details,\n            sort_order\n        FROM offers\n        WHERE status = 'active'\n          AND (start_date IS NULL OR start_date <= CURDATE())\n          AND (end_date IS NULL OR end_date >= CURDATE())\n        ORDER BY sort_order ASC, id DESC\n    ");
+    $stmt = $pdo->prepare("\n        SELECT\n            id,\n            title,\n            subtitle,\n            description,\n            discount_label,\n            validity_label,\n            image_path,\n            details,\n            sort_order\n        FROM offers\n        WHERE status = 'active'\n          AND (start_date IS NULL OR start_date <= :start_today)\n          AND (end_date IS NULL OR end_date >= :end_today)\n        ORDER BY sort_order ASC, id DESC\n    ");
+    $stmt->execute([':start_today' => date('Y-m-d'), ':end_today' => date('Y-m-d')]);
 
     $offers = array_map(static function (array $row): array {
         $details = [];

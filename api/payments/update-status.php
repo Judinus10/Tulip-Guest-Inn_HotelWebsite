@@ -30,7 +30,7 @@ function admin_payment_status_for_db(mixed $status): string
     return match ($value) {
         // Online PayHere payment must be marked Paid only by api/payments/payhere-notify.php.
         // Admin may still use Cancelled/Refunded/No Pay for non-success adjustments.
-        'paid' => 'Payment Pending',
+        'paid' => 'Paid',
         'cancelled', 'canceled' => 'Cancelled',
         'refunded' => 'Refunded',
         'no_pay', 'nopay', 'no_payment' => 'No Pay',
@@ -67,20 +67,16 @@ try {
     $requestedStatusRaw = (string) ($data['payment_status'] ?? $data['status'] ?? 'Payment Pending');
     $requestedStatusNormalized = strtolower(str_replace([' ', '-'], '_', trim($requestedStatusRaw)));
 
-    if (in_array($requestedStatusNormalized, ['paid', 'payment_paid'], true)) {
-        json_response(false, 'Paid status is locked. PayHere payments can only be marked Paid by the verified PayHere notify webhook.', 200, [
-            'severity' => 'warning',
-            'error_code' => 'PAYHERE_PAID_LOCKED',
-        ]);
-    }
-
+    if (!in_array($requestedStatusNormalized, ['paid','payment_paid','pending','payment_pending','cancelled','canceled','refunded','no_pay','nopay','no_payment'], true)) json_response(false, 'Invalid payment status.', 422);
     $paymentStatus = admin_payment_status_for_db($requestedStatusRaw);
     $paymentMethod = admin_payment_method_for_db($data['payment_method'] ?? $data['method'] ?? 'PayHere');
     $reference = clean_string($data['transaction_reference'] ?? $data['reference'] ?? '', 100);
 
     $pdo = get_db_connection();
+    lock_booking_inventory($pdo);
+    $pdo->beginTransaction();
 
-    $currentStmt = $pdo->prepare('SELECT id, booking_id FROM payments WHERE id = :id LIMIT 1');
+    $currentStmt = $pdo->prepare('SELECT * FROM payments WHERE id = :id LIMIT 1 FOR UPDATE');
     $currentStmt->execute([':id' => $paymentId]);
     $currentPayment = $currentStmt->fetch();
 
@@ -88,35 +84,15 @@ try {
         json_response(false, 'Payment record not found.', 404);
     }
 
-    $updateSql = 'UPDATE payments SET status = :status, method = :method, updated_at = NOW()';
-    $updateParams = [
-        ':status' => $paymentStatus,
-        ':method' => $paymentMethod,
-        ':id' => $paymentId,
-    ];
-
-    if ($reference !== '') {
-        $updateSql .= ', payment_id = :payment_id';
-        $updateParams[':payment_id'] = $reference;
-    }
-
-    $updateSql .= ' WHERE id = :id';
-    $updateStmt = $pdo->prepare($updateSql);
-    $updateStmt->execute($updateParams);
-
-    if (!empty($currentPayment['booking_id'])) {
-        $bookingStmt = $pdo->prepare(
-            'UPDATE bookings
-             SET payment_status = :payment_status,
-                 updated_at = NOW()
-             WHERE id = :booking_id'
-        );
-        $bookingStmt->execute([
-            ':payment_status' => $paymentStatus,
-            ':booking_id' => (int) $currentPayment['booking_id'],
-        ]);
-    }
-
+    $q = $pdo->prepare('SELECT * FROM bookings WHERE id = ? FOR UPDATE'); $q->execute([(int)$currentPayment['booking_id']]); $booking = $q->fetch();
+    if (!$booking || payment_is_gateway($currentPayment)) { $pdo->rollBack(); json_response(false, 'Gateway records cannot be edited manually.', 409); }
+    assert_manual_payment_allowed($pdo, $booking, $paymentMethod);
+    $insert = $pdo->prepare('INSERT INTO payments (booking_id, order_id, payment_id, amount, currency, status, method, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())');
+    $insert->execute([(int)$booking['id'], 'MANUAL-' . bin2hex(random_bytes(12)), $reference, $currentPayment['amount'], $currentPayment['currency'], $paymentStatus, $paymentMethod]);
+    $paymentId = (int)$pdo->lastInsertId();
+    $group = (int)($booking['booking_group_id'] ?? 0);
+    $pdo->prepare('UPDATE bookings SET payment_status = ?, updated_at = NOW() WHERE id = ? OR (? > 0 AND booking_group_id = ?)')->execute([$paymentStatus, (int)$booking['id'], $group, $group]);
+    $pdo->commit();
     $selectStmt = $pdo->prepare(
         "SELECT
             p.id,
@@ -152,6 +128,7 @@ try {
         'data' => $updatedPayment,
     ]);
 } catch (Throwable $e) {
+    if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
     error_log('Admin payment update error: ' . $e->getMessage());
     json_response(false, 'Unable to update payment. Check the server error log for details.', 500);
 }

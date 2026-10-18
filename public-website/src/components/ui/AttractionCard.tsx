@@ -24,7 +24,7 @@ export default function AttractionCard({ attraction, index = 0 }: AttractionCard
           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
           loading="lazy"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-t from-black/50 to-transparent" />
         <div className="absolute bottom-4 left-4">
           <span className="bg-gold text-white text-[9px] tracking-[0.18em] uppercase px-3 py-1.5">
             {attraction.category}

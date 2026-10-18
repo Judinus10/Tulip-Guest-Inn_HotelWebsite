@@ -247,7 +247,7 @@ export default function Home() {
             />
           </motion.div>
         ))}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/60" />
+        <div className="absolute inset-0 bg-linear-to-b from-black/50 via-black/30 to-black/60" />
 
         <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
           <motion.p

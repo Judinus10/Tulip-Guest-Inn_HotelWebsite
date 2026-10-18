@@ -30,7 +30,7 @@ export default function OfferCard({ offer, index = 0 }: OfferCardProps) {
             }
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-t from-black/50 to-transparent" />
         <div className="absolute top-4 right-4 bg-gold text-white text-xs font-medium px-3 py-1.5 tracking-wide">
           {offer.discount}
         </div>

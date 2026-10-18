@@ -248,7 +248,7 @@ export default function RoomDetails() {
   };
 
   const bookingInputClass = (field: RoomBookingField) =>
-    `border px-4 py-2.5 text-sm text-dark outline-none focus:border-gold transition-colors duration-200 bg-background ${
+    `border px-4 py-2.5 text-sm text-dark outline-hidden focus:border-gold transition-colors duration-200 bg-background ${
       invalidFields[field] ? 'booking-field-shake border-red-500 ring-1 ring-red-300' : 'border-border'
     }`;
 
@@ -285,7 +285,7 @@ export default function RoomDetails() {
             transition={{ duration: 0.6 }}
           >
             <img src={src} alt={`${room.name} ${i + 1}`} className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+            <div className="absolute inset-0 bg-linear-to-t from-black/50 to-transparent" />
           </motion.div>
         ))}
 

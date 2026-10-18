@@ -27,6 +27,7 @@ function require_payment_owner(): array {
     return $admin;
 }
 function confirm_payment_password(PDO $pdo, int $id, string $password): void {
+    rate_limit_subject('payment_password', (string)$id, 5, 15);
     if ($password === '') json_response(false, 'Admin password is required.', 422);
     $stmt = $pdo->prepare('SELECT password_hash FROM admin_users WHERE id = ? AND is_active = 1');
     $stmt->execute([$id]); $hash = $stmt->fetchColumn();

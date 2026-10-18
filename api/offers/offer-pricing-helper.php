@@ -25,6 +25,7 @@ function offer_ensure_booking_snapshot_schema(PDO $pdo): void
 
 function offer_best_price(PDO $pdo, float $subtotal, string $checkInDate, int $nights, int $rooms, int $guests): array
 {
+    offer_sync_expired($pdo);
     $scope = $rooms > 1 ? 'multi' : 'single';
     $stmt = $pdo->prepare(
         "SELECT * FROM offers
@@ -34,6 +35,7 @@ function offer_best_price(PDO $pdo, float $subtotal, string $checkInDate, int $n
            AND minimum_nights <= :nights AND minimum_rooms <= :rooms AND minimum_guests <= :guests
            AND (start_date IS NULL OR start_date <= :check_in_start)
            AND (end_date IS NULL OR end_date >= :check_in_end)
+           AND (end_date IS NULL OR end_date >= :today)
          ORDER BY priority DESC, id ASC"
     );
     // Native PDO MySQL prepares do not allow one named placeholder to be
@@ -45,6 +47,7 @@ function offer_best_price(PDO $pdo, float $subtotal, string $checkInDate, int $n
         ':guests' => $guests,
         ':check_in_start' => $checkInDate,
         ':check_in_end' => $checkInDate,
+        ':today' => date('Y-m-d'),
     ]);
 
     $best = null;

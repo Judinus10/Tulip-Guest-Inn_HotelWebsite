@@ -330,7 +330,7 @@ export default function Contact() {
                           aria-invalid={Boolean(fieldErrors.name)}
                           aria-describedby={fieldErrors.name ? 'contact-name-error' : undefined}
                           placeholder="Your full name"
-                          className={`w-full border px-5 py-3.5 text-sm text-dark outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400 ${fieldErrors.name ? 'border-red-500' : 'border-border'}`}
+                          className={`w-full border px-5 py-3.5 text-sm text-dark outline-hidden focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400 ${fieldErrors.name ? 'border-red-500' : 'border-border'}`}
                         />
                         {fieldErrors.name && <p id="contact-name-error" className="mt-1.5 text-xs text-red-600">{fieldErrors.name}</p>}
                       </div>
@@ -348,7 +348,7 @@ export default function Contact() {
                           aria-invalid={Boolean(fieldErrors.email)}
                           aria-describedby={fieldErrors.email ? 'contact-email-error' : undefined}
                           placeholder="your@email.com"
-                          className={`w-full border px-5 py-3.5 text-sm text-dark outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400 ${fieldErrors.email ? 'border-red-500' : 'border-border'}`}
+                          className={`w-full border px-5 py-3.5 text-sm text-dark outline-hidden focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400 ${fieldErrors.email ? 'border-red-500' : 'border-border'}`}
                         />
                         {fieldErrors.email && <p id="contact-email-error" className="mt-1.5 text-xs text-red-600">{fieldErrors.email}</p>}
                       </div>
@@ -371,7 +371,7 @@ export default function Contact() {
                           aria-invalid={Boolean(fieldErrors.phone)}
                           aria-describedby={fieldErrors.phone ? 'contact-phone-error' : undefined}
                           placeholder="94771234567"
-                          className={`w-full border px-5 py-3.5 text-sm text-dark outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400 ${fieldErrors.phone ? 'border-red-500' : 'border-border'}`}
+                          className={`w-full border px-5 py-3.5 text-sm text-dark outline-hidden focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400 ${fieldErrors.phone ? 'border-red-500' : 'border-border'}`}
                         />
                         {fieldErrors.phone && <p id="contact-phone-error" className="mt-1.5 text-xs text-red-600">{fieldErrors.phone}</p>}
                       </div>
@@ -383,7 +383,7 @@ export default function Contact() {
                           name="subject"
                           value={form.subject}
                           onChange={handleChange}
-                          className="w-full border border-border px-5 py-3.5 text-sm text-dark outline-none focus:border-gold transition-colors duration-200 bg-background"
+                          className="w-full border border-border px-5 py-3.5 text-sm text-dark outline-hidden focus:border-gold transition-colors duration-200 bg-background"
                         >
                           <option value="">Select a subject</option>
                           <option value="booking">Room Booking</option>
@@ -407,7 +407,7 @@ export default function Contact() {
                         aria-describedby={fieldErrors.message ? 'contact-message-error' : undefined}
                         rows={6}
                         placeholder="How can we help you?"
-                        className={`w-full border px-5 py-3.5 text-sm text-dark outline-none focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400 resize-none ${fieldErrors.message ? 'border-red-500' : 'border-border'}`}
+                        className={`w-full border px-5 py-3.5 text-sm text-dark outline-hidden focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400 resize-none ${fieldErrors.message ? 'border-red-500' : 'border-border'}`}
                       />
                       {fieldErrors.message && <p id="contact-message-error" className="mt-1.5 text-xs text-red-600">{fieldErrors.message}</p>}
                     </div>

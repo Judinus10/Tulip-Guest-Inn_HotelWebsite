@@ -46,7 +46,7 @@ function payhere_status_for_db(string $statusCode): string
         '0' => 'Payment Pending',
         '-1' => 'Cancelled',
         '-2' => 'Failed',
-        '-3' => 'Refunded',
+        '-3' => 'Chargeback',
         default => 'Failed',
     };
 }
@@ -59,13 +59,15 @@ $payhereAmount = normalize_payhere_amount($payhereAmountRaw);
 $payhereCurrency = strtoupper(clean_string($_POST['payhere_currency'] ?? '', 10));
 $statusCode = clean_string($_POST['status_code'] ?? '', 10);
 $md5sig = strtoupper(clean_string($_POST['md5sig'] ?? '', 100));
-$method = clean_string($_POST['method'] ?? 'PayHere', 60);
+$method = 'PayHere'; // Gateway identity is not taken from unsigned method metadata.
 $statusMessage = clean_string($_POST['status_message'] ?? '', 500);
 $postedBookingId = (int) clean_string($_POST['custom_1'] ?? '0', 20);
 
 if ($merchantId === '' || $orderId === '' || $payhereAmountRaw === '' || $payhereCurrency === '' || $statusCode === '' || $md5sig === '') {
     notify_text_response(400, 'Missing required PayHere fields');
 }
+
+if (!in_array($statusCode, ['2', '0', '-1', '-2', '-3'], true) || !preg_match('/^[0-9]{1,12}(?:\.[0-9]{1,2})?$/', $payhereAmountRaw)) notify_text_response(400, 'Invalid payment fields');
 
 if (payment_runtime()['merchant_id'] === '' || payment_runtime()['merchant_secret'] === '') {
     error_log('PayHere notify rejected: backend PayHere credentials are missing.');
@@ -92,6 +94,7 @@ $sideEffects = [
 
 try {
     $pdo = get_db_connection();
+    lock_booking_inventory($pdo);
     ensure_booking_audit_table($pdo);
     ensure_email_queue_table($pdo);
     if (ics_enabled()) ensure_ics_schema($pdo);
@@ -144,35 +147,7 @@ try {
     $expectedCurrency = strtoupper((string) ($existingPayment['currency'] ?? $booking['currency'] ?? PAYMENT_CURRENCY));
 
     if (!hash_equals($expectedAmount, $payhereAmount) || !hash_equals($expectedCurrency, $payhereCurrency)) {
-        $gatewayResponse = $_POST;
-        $gatewayResponse['server_status_message'] = 'Rejected: amount or currency mismatch. Expected ' . $expectedAmount . ' ' . $expectedCurrency . ', received ' . $payhereAmount . ' ' . $payhereCurrency . '.';
-
-        $rejectPayment = $pdo->prepare(
-            'UPDATE payments
-             SET payment_id = :payment_id,
-                 status = :status,
-                 method = :method,
-                 gateway_response = :gateway_response,
-                 updated_at = NOW()
-             WHERE id = :id'
-        );
-        $rejectPayment->execute([
-            ':payment_id' => $paymentId ?: null,
-            ':status' => 'Failed',
-            ':method' => $method ?: 'PayHere',
-            ':gateway_response' => json_encode($gatewayResponse, JSON_UNESCAPED_SLASHES),
-            ':id' => (int) $existingPayment['id'],
-        ]);
-
-        $rejectBooking = $pdo->prepare(
-            "UPDATE bookings
-             SET payment_status = 'Failed', updated_at = NOW()
-             WHERE id IN ({$scopeSqlIds}) AND payment_status <> 'Paid'"
-        );
-        $rejectBooking->execute();
-
-        $pdo->commit();
-        error_log('PayHere notify rejected: amount/currency mismatch for order ' . $orderId);
+        $pdo->rollBack();
         notify_text_response(400, 'Amount or currency mismatch');
     }
 
@@ -190,7 +165,7 @@ try {
 
     // A final result for this PayHere order is immutable. This prevents contradictory
     // confirmation and failure emails when duplicate/out-of-order callbacks arrive.
-    if (in_array($currentPaymentStatus, ['Paid', 'Failed', 'Cancelled'], true)) {
+    if ($currentPaymentStatus === $incomingPaymentStatus || $currentPaymentStatus === 'Chargeback' || ($currentPaymentStatus === 'Paid' && $incomingPaymentStatus !== 'Chargeback') || (in_array($currentPaymentStatus, ['Failed', 'Cancelled'], true) && !in_array($incomingPaymentStatus, ['Paid', 'Chargeback'], true))) {
         booking_audit_log($pdo, $bookingId, 'duplicate_payment_notify', 'Duplicate Payment Notification Ignored', 'PayHere sent a notification after this payment order had already reached a final state.', [
             'order_id' => $orderId,
             'payment_id' => $paymentId,
@@ -202,7 +177,10 @@ try {
     }
 
     // Expiry and gateway results apply to the entire reservation.
-    if ($incomingPaymentStatus !== 'Paid') {
+    $otherPaid = $pdo->prepare("SELECT id FROM payments WHERE booking_id IN ({$scopeSqlIds}) AND id <> ? AND status = 'Paid' LIMIT 1");
+    $otherPaid->execute([(int)$existingPayment['id']]);
+    $hasOtherPaid = (bool)$otherPaid->fetchColumn();
+    if ($incomingPaymentStatus !== 'Paid' && !$hasOtherPaid) {
         foreach ($scopeIds as $scopeId) expire_pending_bookings($pdo, $scopeId, false);
     }
 
@@ -219,10 +197,12 @@ try {
         error_log('Paid PayHere booking needs availability review. Booking ID: ' . $bookingId);
     }
 
-    if (in_array($finalPaymentStatus, ['Failed', 'Cancelled', 'Refunded'], true)) {
+    if (in_array($finalPaymentStatus, ['Failed', 'Cancelled', 'Refunded', 'Chargeback'], true)) {
         $finalBookingStatus = 'Cancelled';
     }
 
+    // Preserve operational history on delayed payment results.
+    if (in_array((string)$booking['status'], ['Checked In', 'Checked Out', 'No Show', 'Cancelled'], true)) $finalBookingStatus = (string)$booking['status'];
     $gatewayResponse = $_POST;
     $gatewayResponse['server_status_message'] = $statusMessage;
     $gatewayResponse['verified_by_server'] = true;
@@ -257,7 +237,7 @@ try {
              currency = :currency, updated_at = NOW()
          WHERE id IN ({$scopeSqlIds})"
     );
-    $updateBooking->execute([
+    if (!$hasOtherPaid) $updateBooking->execute([
         ':status' => $finalBookingStatus,
         ':payment_status' => $finalPaymentStatus,
         ':currency' => $payhereCurrency,
@@ -270,7 +250,7 @@ try {
             'amount' => $payhereAmount,
             'currency' => $payhereCurrency,
         ]);
-    } elseif (in_array($finalPaymentStatus, ['Failed', 'Cancelled', 'Refunded'], true)) {
+    } elseif (in_array($finalPaymentStatus, ['Failed', 'Cancelled', 'Refunded', 'Chargeback'], true)) {
         booking_audit_log($pdo, $bookingId, 'payment_' . strtolower($finalPaymentStatus), 'Payment ' . $finalPaymentStatus, 'PayHere reported that the payment was not completed.', [
             'order_id' => $orderId,
             'payment_id' => $paymentId,
@@ -294,7 +274,7 @@ try {
     $pdo->commit();
 
     $sideEffects['send_success'] = $finalPaymentStatus === 'Paid' && $currentPaymentStatus !== 'Paid' && $finalBookingStatus === 'Confirmed';
-    $sideEffects['send_failed'] = in_array($finalPaymentStatus, ['Failed', 'Cancelled'], true) && !in_array($currentPaymentStatus, ['Failed', 'Cancelled'], true);
+    $sideEffects['send_failed'] = !$hasOtherPaid && in_array($finalPaymentStatus, ['Failed', 'Cancelled'], true) && !in_array($currentPaymentStatus, ['Failed', 'Cancelled'], true);
     $sideEffects['amount'] = (float) $payhereAmount;
     $sideEffects['currency'] = $payhereCurrency;
     $sideEffects['method'] = $method ?: 'PayHere';

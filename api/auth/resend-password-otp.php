@@ -34,6 +34,8 @@ function ensure_admin_password_otp_table(PDO $pdo): void
 
 try {
     $admin = require_admin_auth();
+    rate_limit_subject('otp_resend', (string)$admin['id'], 10, 30);
+    security_lock_account(get_db_connection(), (int)$admin['id']);
     $data = read_request_data();
 
     $oldToken = clean_string($data['request_token'] ?? '', 64);

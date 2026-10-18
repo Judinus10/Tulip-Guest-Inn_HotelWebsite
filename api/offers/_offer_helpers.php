@@ -79,15 +79,31 @@ function offer_bootstrap(bool $requireAuth = true): PDO
 
     $pdo = get_db_connection();
     offer_ensure_schema($pdo);
+    offer_sync_expired($pdo);
 
     return $pdo;
 }
 
-function offer_json(array $payload, int $statusCode = 200): void
+/** The date check also runs in price and public reads, so cron is not required. */
+function offer_sync_expired(PDO $pdo): void
 {
-    http_response_code($statusCode);
-    echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-    exit;
+    $stmt = $pdo->prepare("UPDATE offers SET status = 'expired' WHERE status IN ('active', 'upcoming') AND end_date < :today");
+    $stmt->execute([':today' => date('Y-m-d')]);
+}
+
+function offer_effective_status(array $row): string
+{
+    $status = offer_valid_status((string) ($row['status'] ?? 'active'));
+    if ($status === 'inactive') return 'inactive';
+    $today = date('Y-m-d');
+    if (!empty($row['end_date']) && $row['end_date'] < $today) return 'expired';
+    if (!empty($row['start_date']) && $row['start_date'] > $today) return 'upcoming';
+    return $status === 'expired' ? 'expired' : 'active';
+}
+
+function offer_json(array $data, int $code = 200): void {
+    $success = (bool)($data['success'] ?? ($code < 400)); $message = (string)($data['message'] ?? '');
+    unset($data['success'], $data['message']); json_response($success, $message, $code, $data);
 }
 
 function offer_clean(?string $value, int $maxLength = 1000): string
@@ -201,7 +217,7 @@ function offer_normalize(array $row): array
         'validity_label' => (string) ($row['validity_label'] ?? ''),
         'image_path' => public_upload_url((string) ($row['image_path'] ?? ''), 'offers'),
         'details' => $details,
-        'status' => offer_valid_status((string) ($row['status'] ?? 'active')),
+        'status' => offer_effective_status($row),
         'start_date' => $row['start_date'] ?? '',
         'end_date' => $row['end_date'] ?? '',
         'sort_order' => (int) ($row['sort_order'] ?? 0),

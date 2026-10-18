@@ -46,7 +46,7 @@ export default function RoomCard({ room, index = 0, bookingPath }: RoomCardProps
       }}
       role="button"
       tabIndex={0}
-      className="group bg-white border border-border shadow-luxury hover:shadow-luxury-lg transition-shadow duration-500 cursor-pointer focus:outline-none focus:ring-2 focus:ring-gold/50"
+      className="group bg-white border border-border shadow-luxury hover:shadow-luxury-lg transition-shadow duration-500 cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-gold/50"
     >
       {/* Image */}
       <div className="relative h-64 overflow-hidden">
@@ -56,7 +56,7 @@ export default function RoomCard({ room, index = 0, bookingPath }: RoomCardProps
           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
           loading="lazy"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+        <div className="absolute inset-0 bg-linear-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
         <div className="absolute top-4 left-4">
           <span className="bg-gold text-white text-[9px] tracking-[0.18em] uppercase px-3 py-1.5">
             {room.category}
