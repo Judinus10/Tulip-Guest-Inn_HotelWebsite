@@ -84,8 +84,8 @@ try {
     ? 'https://www.payhere.lk/pay/checkout'
     : 'https://sandbox.payhere.lk/pay/checkout';
 
-    $nonce = base64_encode(random_bytes(24));
-    header("Content-Security-Policy: default-src 'none'; script-src 'nonce-{$nonce}'; base-uri 'none'; frame-ancestors 'none'; form-action https://www.payhere.lk https://sandbox.payhere.lk");
+    // An external same-origin script also satisfies the inherited public-site CSP.
+    header("Content-Security-Policy: default-src 'none'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action https://www.payhere.lk https://sandbox.payhere.lk");
     header('Cache-Control: no-store');
     header('Referrer-Policy: no-referrer');
     header('Content-Type: text/html; charset=utf-8');
@@ -107,11 +107,10 @@ try {
         <?php foreach ($payload as $key => $value): ?>
             <input type="hidden" name="<?= htmlspecialchars((string) $key, ENT_QUOTES, 'UTF-8') ?>" value="<?= htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8') ?>">
         <?php endforeach; ?>
-        <noscript><button type="submit">Continue to PayHere</button></noscript>
+        <p>If you are not redirected automatically, continue below.</p>
+        <button type="submit">Continue to PayHere</button>
     </form>
-    <script nonce="<?= htmlspecialchars($nonce, ENT_QUOTES) ?>">
-        document.getElementById('payhere-checkout-form').submit();
-    </script>
+    <script src="./payhere-checkout.js?v=20261019" defer></script>
 </body>
 </html>
 
