@@ -13,6 +13,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../calendar/ics-helper.php';
+require_once __DIR__ . '/daily-room-helper.php';
 
 apply_cors_headers();
 
@@ -32,14 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     json_response(false, 'Only GET requests are allowed.', 405);
 }
 
-const JEBAL_HOME_ROOMS = [
-    'Ground Floor Room 1',
-    'Ground Floor Room 2',
-    'First Floor Room 1',
-    'First Floor Room 2',
-    'Family Room',
-    'Private Cottage',
-];
+
 
 function fetch_single_value(PDO $pdo, string $sql, array $params = []): mixed
 {
@@ -515,14 +509,7 @@ try {
         "SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'Paid'"
     );
 
-    $activeConfirmedBookings = (int) fetch_single_value(
-        $pdo,
-        "SELECT COUNT(*)
-         FROM bookings
-         WHERE status = 'Confirmed'
-           AND check_in_date <= CURDATE()
-           AND check_out_date > CURDATE()"
-    );
+    $dailyRooms = dashboard_daily_room_summary($pdo);
 
     $mostBookedRoom = fetch_single_value(
         $pdo,
@@ -554,15 +541,9 @@ try {
                 'currentYear' => $currentYearRevenue,
                 'lifetime' => $lifetimeRevenue,
             ],
-            'rooms' => [
-                'totalRooms' => count(JEBAL_HOME_ROOMS),
-                'availableRooms' => max(0, count(JEBAL_HOME_ROOMS) - $activeConfirmedBookings),
-                'groundFloorRooms' => 2,
-                'firstFloorRooms' => 2,
-                'cottageUnits' => 1,
+            'rooms' => array_merge($dailyRooms, [
                 'mostBookedRoom' => $mostBookedRoom ?: 'No confirmed bookings yet',
-                'occupancyRate' => count(JEBAL_HOME_ROOMS) > 0 ? (int) round(($activeConfirmedBookings / count(JEBAL_HOME_ROOMS)) * 100) : 0,
-            ],
+            ]),
             'charts' => [
                 'monthlyBookingTrend' => build_monthly_booking_trend($pdo),
                 'revenueTrend' => build_revenue_trend($pdo),

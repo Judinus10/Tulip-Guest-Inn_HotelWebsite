@@ -168,8 +168,8 @@ function ImageCarousel({ room, heightClass = 'h-72', showThumbnails = true, onDe
   }
 
   return (
-    <div className="space-y-3">
-      <div className={cn('relative overflow-hidden rounded-2xl border border-border bg-slate-100', heightClass)}>
+    <div className="min-w-0 w-full max-w-full space-y-3">
+      <div className={cn('relative w-full overflow-hidden rounded-2xl border border-border bg-slate-100', heightClass)}>
         {activeImage ? (
           <img src={activeImage.src} alt={room?.room_name || 'Room'} className="h-full w-full object-cover" />
         ) : (
@@ -217,7 +217,7 @@ function ImageCarousel({ room, heightClass = 'h-72', showThumbnails = true, onDe
       </div>
 
       {showThumbnails && images.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="flex min-w-0 w-full max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1">
           {images.map((image, index) => (
             <div key={image.src} className="group relative h-14 w-20 shrink-0">
               <button
@@ -912,7 +912,7 @@ function RoomDetailsModal({ room, amenities, image, onClose }) {
         </div>
 
         <div className="max-h-[calc(92vh-81px)] overflow-x-hidden overflow-y-auto p-4 sm:p-6">
-          <div className="grid min-w-0 gap-6 lg:grid-cols-[1fr_1.1fr]">
+          <div className="grid min-w-0 w-full grid-cols-1 items-start gap-6 lg:grid-cols-2">
             <ImageCarousel room={room} heightClass="h-52 sm:h-72" />
 
             <div className="min-w-0 space-y-5">

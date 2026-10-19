@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
   CalendarDays,
@@ -1398,6 +1398,13 @@ function Pagination({ page, totalPages, totalItems, startItem, endItem, onPageCh
 
 export default function Bookings() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const dailyFilter = useMemo(() => {
+    const params = new URLSearchParams(location.search)
+    const kind = params.get('dashboard_stay')
+    if (!['checkins', 'checkouts'].includes(kind)) return null
+    return { kind, date: params.get('stay_date') || '', references: new Set((params.get('references') || '').split(',').filter(Boolean)) }
+  }, [location.search])
   const focusRefs = useRef({})
   const focusRequestRef = useRef('')
   const [focusedBookingNo, setFocusedBookingNo] = useState('')
@@ -1463,14 +1470,15 @@ export default function Bookings() {
       const matchesDateFrom = !dateFrom || booking.check_in >= dateFrom
       const matchesDateTo = !dateTo || booking.check_in <= dateTo
 
-      return matchesSearch && matchesBookingStatus && matchesPaymentStatus && matchesDateFrom && matchesDateTo
+      const matchesDailyFilter = !dailyFilter || dailyFilter.references.has(booking.booking_no)
+      return matchesSearch && matchesBookingStatus && matchesPaymentStatus && matchesDateFrom && matchesDateTo && matchesDailyFilter
     })
-  }, [bookings, searchTerm, bookingStatusFilter, paymentStatusFilter, dateFrom, dateTo])
+  }, [bookings, searchTerm, bookingStatusFilter, paymentStatusFilter, dateFrom, dateTo, dailyFilter])
 
   useEffect(() => {
     if (focusRequestRef.current) return
     setCurrentPage(1)
-  }, [searchTerm, bookingStatusFilter, paymentStatusFilter, dateFrom, dateTo])
+  }, [searchTerm, bookingStatusFilter, paymentStatusFilter, dateFrom, dateTo, dailyFilter])
   const totalPages = Math.max(1, Math.ceil(filteredBookings.length / BOOKINGS_PER_PAGE))
   const safeCurrentPage = Math.min(currentPage, totalPages)
   const startIndex = (safeCurrentPage - 1) * BOOKINGS_PER_PAGE
@@ -1681,6 +1689,11 @@ export default function Bookings() {
           <Button onClick={() => setIsAddBookingOpen(true)}><Plus className="h-4 w-4" />Add Booking</Button>
         </div>
       </PageHeader>
+
+      {dailyFilter && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        <span>{dailyFilter.kind === 'checkins' ? 'Check-ins' : 'Check-outs'} for {dailyFilter.date} · selected from dashboard</span>
+        <Button type="button" variant="outline" size="sm" onClick={() => { clearFilters(); navigate('/bookings') }}>Show all bookings</Button>
+      </div>}
 
       <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-5">
         <SummaryCard title="Total bookings" value={summary.total} icon={CalendarDays} description="All reservations" />

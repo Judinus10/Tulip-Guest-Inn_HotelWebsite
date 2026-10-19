@@ -11,8 +11,8 @@ import {
   Tag,
   TrendingUp,
   Home,
-  Layers,
-  Building2,
+  LogIn,
+  LogOut,
   Download,
 } from 'lucide-react'
 import {
@@ -59,11 +59,14 @@ const defaultDashboardData = {
     lifetime: 0,
   },
   rooms: {
-    totalRooms: 6,
-    availableRooms: 6,
-    groundFloorRooms: 2,
-    firstFloorRooms: 2,
-    cottageUnits: 1,
+    totalRooms: 0,
+    availableRooms: 0,
+    availableTonight: 0,
+    todayCheckIns: 0,
+    todayCheckOuts: 0,
+    today: '',
+    checkInReferences: [],
+    checkOutReferences: [],
     mostBookedRoom: 'No confirmed bookings yet',
     occupancyRate: 0,
   },
@@ -231,7 +234,9 @@ function buildDashboardReportRows(data, monthlyBookingTrend, revenueTrend) {
     { Section: 'Payments', Metric: 'Payment Pending', Value: data.cards.paymentPendingBookings },
     { Section: 'Messages', Metric: 'Total Enquiries', Value: data.cards.totalEnquiries },
     { Section: 'Rooms', Metric: 'Total Rooms', Value: data.rooms.totalRooms },
-    { Section: 'Rooms', Metric: 'Available Rooms', Value: data.rooms.availableRooms },
+    { Section: 'Rooms', Metric: 'Available Tonight', Value: data.rooms.availableTonight },
+    { Section: 'Bookings', Metric: 'Today Check-ins', Value: data.rooms.todayCheckIns },
+    { Section: 'Bookings', Metric: 'Today Check-outs', Value: data.rooms.todayCheckOuts },
     { Section: 'Rooms', Metric: 'Occupancy Rate', Value: `${data.rooms.occupancyRate}%` },
   ]
 
@@ -275,13 +280,13 @@ function KpiCard({ title, value, helper, icon: Icon, to }) {
   )
 }
 
-function MiniSummaryCard({ title, value, helper, icon: Icon, to }) {
+function MiniSummaryCard({ title, value, helper, icon: Icon, to, tone = 'blue' }) {
   return (
     <ClickableCard to={to}>
       <Card className="h-full min-h-[112px] cursor-pointer transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md">
         <CardContent className="p-4">
           <div className="flex h-full items-start gap-3">
-            <div className="rounded-xl bg-blue-50 p-3 text-blue-700">
+            <div className={`rounded-xl p-3 ${tone === 'amber' ? 'bg-amber-50 text-amber-700' : tone === 'green' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>
               <Icon className="h-5 w-5" />
             </div>
             <div className="min-w-0">
@@ -512,6 +517,11 @@ export default function Dashboard() {
     { title: 'Payment Pending', value: dashboardData.cards.paymentPendingBookings, helper: 'Awaiting payment', icon: CreditCard, to: '/payments' },
   ]
 
+  const dailyBookingsLink = (kind, references) => `/bookings?${new URLSearchParams({
+    dashboard_stay: kind, stay_date: dashboardData.rooms.today,
+    references: (references || []).join(','),
+  }).toString()}`
+
   const quickActions = [
     { label: 'Add Room', to: '/rooms', icon: BedDouble },
     { label: 'View Bookings', to: '/bookings', icon: CalendarCheck },
@@ -579,8 +589,8 @@ export default function Dashboard() {
         <MiniSummaryCard title="Month Revenue" value={currencyFormatter.format(dashboardData.revenue.currentMonth)} helper="Paid this month" icon={TrendingUp} to="/payments" />
         <MiniSummaryCard title="Year Revenue" value={currencyFormatter.format(dashboardData.revenue.currentYear)} helper="Paid this year" icon={CreditCard} to="/payments" />
 
-        <MiniSummaryCard title="Ground Floor Rooms" value={dashboardData.rooms.groundFloorRooms} helper="Easy access rooms" icon={Home} to="/rooms" />
-        <MiniSummaryCard title="First Floor Rooms" value={dashboardData.rooms.firstFloorRooms} helper="Upper floor rooms" icon={Building2} to="/rooms" />
+        <MiniSummaryCard title="Today’s Check-ins" value={dashboardData.rooms.todayCheckIns} helper="Scheduled arrivals · includes Booking.com" icon={LogIn} to={dailyBookingsLink('checkins', dashboardData.rooms.checkInReferences)} />
+        <MiniSummaryCard title="Today’s Check-outs" value={dashboardData.rooms.todayCheckOuts} helper="Scheduled departures · includes Booking.com" icon={LogOut} tone="amber" to={dailyBookingsLink('checkouts', dashboardData.rooms.checkOutReferences)} />
 
         <Card className="h-full min-h-[360px] md:row-span-3">
           <CardHeader className="pb-3">
@@ -604,9 +614,9 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <MiniSummaryCard title="Cottage Units" value={dashboardData.rooms.cottageUnits} helper="Separate cottage units" icon={Layers} to="/rooms" />
+        <MiniSummaryCard title="Available Tonight" value={`${dashboardData.rooms.availableTonight} / ${dashboardData.rooms.totalRooms}`} helper="Available units · check availability calendar" icon={BedDouble} tone="green" to="/booking-calendar" />
         <MiniSummaryCard title="Most Booked Room" value={dashboardData.rooms.mostBookedRoom} helper="Based on confirmed bookings" icon={BedDouble} to="/bookings" />
-        <MiniSummaryCard title="Occupancy Rate" value={`${dashboardData.rooms.occupancyRate}%`} helper="Current confirmed stays" icon={Home} to="/booking-calendar" />
+        <MiniSummaryCard title="Occupancy Rate" value={`${dashboardData.rooms.occupancyRate}%`} helper="Confirmed stays · includes Booking.com" icon={Home} to="/booking-calendar" />
         <MiniSummaryCard title="New Enquiries" value={dashboardData.enquiries.new} helper="Unread guest messages" icon={MessageSquareText} to="/messages" />
       </section>
 
