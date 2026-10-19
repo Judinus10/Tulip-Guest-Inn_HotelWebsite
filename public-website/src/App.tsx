@@ -7,6 +7,7 @@ import Footer from './components/layout/Footer';
 import ScrollToTop, { ScrollRestorer } from './components/layout/ScrollToTop';
 import SeoManager from './components/seo/SeoManager';
 import AutoTranslate from './i18n/AutoTranslate';
+import TranslationNotice from './i18n/TranslationNotice';
 
 const Home = lazy(() => import('./pages/Home'));
 const Rooms = lazy(() => import('./pages/Rooms'));
@@ -30,6 +31,7 @@ function PageWrapper({ children }: { children: React.ReactNode }) {
     <AnimatePresence mode="wait">
       <motion.div
         key={location.pathname}
+        data-no-translate={location.pathname === '/booking-bill' ? true : undefined}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -48,6 +50,7 @@ function AppLayout() {
       <ScrollRestorer />
       <SeoManager />
       <AutoTranslate />
+      <TranslationNotice />
       <Navbar />
       <PageWrapper key={location.pathname}>
         <Suspense fallback={<div className="min-h-screen bg-white" aria-label="Loading page" />}>
