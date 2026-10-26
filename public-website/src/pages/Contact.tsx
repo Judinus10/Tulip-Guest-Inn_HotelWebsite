@@ -495,7 +495,6 @@ export default function Contact() {
               bg-white/[0.001] backdrop-blur-[1px] backdrop-saturate-100
               border border-white/10 shadow-none
               ring-1 ring-white/5
-              shadow-none
               px-10 py-10
               text-center
               max-w-md
@@ -505,11 +504,11 @@ export default function Contact() {
             >
             <MapPin size={32} className="text-gold mx-auto mb-4" />
 
-            <p className="font-serif text-2xl font-light text-white mb-2 drop-shadow-lg">
+            <p className="font-serif text-2xl font-light text-black mb-2">
               Find Us Here
             </p>
 
-            <p className="whitespace-pre-line text-white/90 text-sm mb-6 drop-shadow">
+            <p className="whitespace-pre-line text-black text-sm mb-6">
               {activeAddress}
             </p>
 
