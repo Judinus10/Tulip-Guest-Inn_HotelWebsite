@@ -6,7 +6,7 @@ import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
 import LegalRichTextEditor from '@/components/ui/LegalRichTextEditor'
 
 const url=buildApiUrl('/settings/legal-content.php')
-const titles={terms:'Terms & Conditions',privacy:'Privacy Policy'}
+const titles={terms:'Terms & Conditions',privacy:'Privacy Policy',refund:'Refund Policy'}
 const escapeHtml=text=>String(text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
 function legacyHtml(content) {
  if(!content)return ''
