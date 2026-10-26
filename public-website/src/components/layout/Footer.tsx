@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Phone, Mail, MapPin, Instagram, Facebook } from 'lucide-react';
+import { Phone, Mail, MapPin } from 'lucide-react';
 import { getPublicContactSettings, fetchPublicRooms, type ContactSettings } from '../../services/publicApi';
+import { getSocialLinks } from '../../services/socialLinks';
 import footerBackground from '../../assets/images/shared/footer-background.jpg';
 
 const quickLinks = [
@@ -25,8 +26,8 @@ const fallbackContactSettings: ContactSettings = {
   business_hours: 'Reception: 24 Hours, 7 Days',
   business_hours_mode: '24_7',
   business_hours_schedule: '{}',
-  facebook_link: '#',
-  instagram_link: '#',
+  facebook_link: '',
+  instagram_link: '',
   map_embed_url: '',
 };
 
@@ -76,6 +77,7 @@ export default function Footer() {
     };
   }, []);
 
+  const socialLinks = getSocialLinks(contactSettings);
   const businessName = contactSettings.business_name || fallbackContactSettings.business_name;
   const displayPhone = contactSettings.reception_contact_number || contactSettings.phone || fallbackContactSettings.phone;
   const displayEmail = contactSettings.email || fallbackContactSettings.email;
@@ -116,26 +118,9 @@ export default function Footer() {
             <p className="text-gray-400 text-sm leading-relaxed mb-6">
               A family-run guest house offering clean, comfortable accommodation and thoughtful service in Point Pedro.
             </p>
-            <div className="flex items-center gap-3">
-              <a
-                href={contactSettings.instagram_link || "#"}
-                className="w-9 h-9 border border-white/20 flex items-center justify-center text-gray-400 hover:border-gold hover:text-gold transition-all duration-300"
-                aria-label="Instagram"
-                target={contactSettings.instagram_link ? "_blank" : undefined}
-                rel={contactSettings.instagram_link ? "noreferrer" : undefined}
-              >
-                <Instagram size={15} />
-              </a>
-              <a
-                href={contactSettings.facebook_link || "#"}
-                className="w-9 h-9 border border-white/20 flex items-center justify-center text-gray-400 hover:border-gold hover:text-gold transition-all duration-300"
-                aria-label="Facebook"
-                target={contactSettings.facebook_link ? "_blank" : undefined}
-                rel={contactSettings.facebook_link ? "noreferrer" : undefined}
-              >
-                <Facebook size={15} />
-              </a>
-            </div>
+            {socialLinks.length > 0 && <div className="flex flex-wrap items-center gap-3">
+              {socialLinks.map((social, index) => <a key={`${social.href}-${index}`} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label} title={social.label} className="w-9 h-9 border border-white/20 flex items-center justify-center text-gray-400 hover:border-gold hover:text-gold transition-all duration-300"><social.icon size={15} /></a>)}
+            </div>}
           </div>
 
           {/* Quick Links */}

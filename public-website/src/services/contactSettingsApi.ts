@@ -12,6 +12,7 @@ export type ContactSettings = {
   business_hours: string;
   business_hours_mode: '24_7' | 'custom';
   business_hours_schedule: string;
+  social_links?: string;
   facebook_link: string;
   instagram_link: string;
   map_embed_url: string;

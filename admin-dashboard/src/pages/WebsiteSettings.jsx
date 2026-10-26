@@ -47,11 +47,23 @@ const defaultSettings = {
   business_hours_schedule: JSON.stringify(Object.fromEntries(
     ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => [day, { enabled: true, all_day: false, open: '08:00', close: '18:00' }])
   )),
+  social_links: '',
   facebook_link: '',
   instagram_link: '',
   map_embed_url: '',
 }
 
+const socialPlatforms = ['facebook', 'instagram', 'youtube', 'tiktok', 'x', 'linkedin', 'other']
+function readSocialLinks(settings) {
+  try {
+    if (settings.social_links) {
+      const items = JSON.parse(settings.social_links)
+      return Array.isArray(items) ? items : []
+    }
+  } catch { return [] }
+  return ['facebook', 'instagram'].filter(platform => settings[`${platform}_link`] && settings[`${platform}_link`] !== '#')
+    .map(platform => ({ platform, url: settings[`${platform}_link`], label: '' }))
+}
 function normalizeSettings(data = {}) {
   return {
     ...defaultSettings,
@@ -165,6 +177,10 @@ export default function WebsiteSettings() {
   const updateSetting = (field, value) => {
     setSettings((current) => ({ ...current, [field]: value }))
   }
+
+  const socialLinks = readSocialLinks(settings)
+  const setSocialLinks = (items) => updateSetting('social_links', JSON.stringify(items))
+  const updateSocialLink = (index, field, value) => setSocialLinks(socialLinks.map((item, i) => i === index ? { ...item, [field]: value } : item))
 
   const updateBusinessDay = (day, field, value) => {
     setSettings((current) => {
@@ -459,32 +475,20 @@ export default function WebsiteSettings() {
                 <p className="text-xs text-text-secondary">Use only the iframe src URL, not the full iframe code.</p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="facebook_link">Facebook Link</Label>
-                <FieldWithIcon icon={Facebook}>
-                  <Input
-                    id="facebook_link"
-                    type="url"
-                    value={settings.facebook_link}
-                    onChange={(event) => updateSetting('facebook_link', event.target.value)}
-                    className="pl-9"
-                    placeholder="https://facebook.com/tulipguestinn"
-                  />
-                </FieldWithIcon>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="instagram_link">Instagram Link</Label>
-                <FieldWithIcon icon={Globe2}>
-                  <Input
-                    id="instagram_link"
-                    type="url"
-                    value={settings.instagram_link}
-                    onChange={(event) => updateSetting('instagram_link', event.target.value)}
-                    className="pl-9"
-                    placeholder="https://instagram.com/tulipguestinn"
-                  />
-                </FieldWithIcon>
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h3 className="font-semibold">Social Media</h3>
+                  <Button type="button" disabled={socialLinks.length >= 20} onClick={() => setSocialLinks([...socialLinks, { platform: 'youtube', url: '', label: '' }])}><Plus className="h-4 w-4" />Add Social Media</Button>
+                </div>
+                <p className="text-xs text-text-secondary">Only saved links appear on the website. Remove a row to hide its icon.</p>
+                {socialLinks.map((item, index) => <div key={index} className="flex items-center gap-3 rounded-xl border border-border p-3">
+                  <select aria-label={`Social platform ${index + 1}`} value={item.platform} onChange={e => updateSocialLink(index, 'platform', e.target.value)} className="w-28 min-w-0 shrink-0 rounded-lg border border-border bg-white p-3 text-sm sm:w-36">
+                    {socialPlatforms.map(platform => <option key={platform} value={platform}>{({youtube:'YouTube',tiktok:'TikTok',x:'X',linkedin:'LinkedIn'})[platform] || platform.charAt(0).toUpperCase() + platform.slice(1)}</option>)}
+                  </select>
+                  {item.platform === 'other' && <Input className="min-w-0 flex-1" aria-label="Social media name" maxLength={60} value={item.label || ''} onChange={e => updateSocialLink(index, 'label', e.target.value)} placeholder="Name" />}
+                  <Input className="min-w-0 flex-[2]" type="url" aria-label={`Social URL ${index + 1}`} maxLength={1000} value={item.url} onChange={e => updateSocialLink(index, 'url', e.target.value)} placeholder="https://..." />
+                  <Button className="shrink-0" type="button" aria-label={`Remove social link ${index + 1}`} onClick={() => setSocialLinks(socialLinks.filter((_, i) => i !== index))}><Trash2 className="h-4 w-4 text-red-600" /></Button>
+                </div>)}
               </div>
 
               <div className="border-t border-border pt-5">

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Phone, Mail, MapPin, Clock, Send, Instagram, Facebook } from 'lucide-react';
+import { Phone, Mail, MapPin, Clock, Send } from 'lucide-react';
 import PageHero from '../components/ui/PageHero';
 import AnimatedSection from '../components/ui/AnimatedSection';
 import { getPublicContactSettings, submitContactMessage, type ContactSettings } from '../services/publicApi';
+import { getSocialLinks } from '../services/socialLinks';
 import bannerContact from '../assets/images/banners/banner-contact.jpg';
 import { useToast } from '../components/ui/ToastProvider';
 
@@ -168,21 +169,7 @@ export default function Contact() {
   const mapHref = getMapOpenUrl(activeAddress, settings.map_embed_url || '');
   const mapEmbedUrl = getMapEmbedUrl(activeAddress, settings.map_embed_url || '');
 
-  const socialLinks = useMemo(
-    () => [
-      {
-        label: 'Instagram',
-        href: settings.instagram_link,
-        icon: Instagram,
-      },
-      {
-        label: 'Facebook',
-        href: settings.facebook_link,
-        icon: Facebook,
-      },
-    ].filter((item) => isValidUrl(item.href || '')),
-    [settings.facebook_link, settings.instagram_link],
-  );
+  const socialLinks = useMemo(() => getSocialLinks(settings), [settings.social_links, settings.facebook_link, settings.instagram_link]);
 
   const dynamicContactCards = contactCards.map((card) => {
     if (card.label === 'Phone') {
@@ -444,7 +431,7 @@ export default function Contact() {
                 </div>
 
                 {/* Social */}
-                <div className="bg-deep-green p-8">
+                {socialLinks.length > 0 && <div className="bg-deep-green p-8">
                   <h3 className="font-serif text-xl font-light text-white mb-4">Follow Us</h3>
                   <div className="w-8 h-[1px] bg-gold mb-5" />
                   <p className="text-gray-400 text-sm mb-6">
@@ -471,7 +458,7 @@ export default function Contact() {
                   ) : (
                     <p className="text-xs text-gray-500">Social links are not available yet.</p>
                   )}
-                </div>
+                </div>}
 
                 {/* Direct Book */}
                 <div className="border border-gold p-8">

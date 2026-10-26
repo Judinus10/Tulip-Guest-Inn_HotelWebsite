@@ -35,6 +35,7 @@ function default_contact_settings(): array
         'business_hours' => 'Daily · 7:00 AM – 10:00 PM',
         'business_hours_mode' => '24_7',
         'business_hours_schedule' => json_encode($weeklySchedule, JSON_UNESCAPED_SLASHES),
+        'social_links' => '',
         'facebook_link' => '',
         'instagram_link' => '',
         'map_embed_url' => '',
@@ -111,6 +112,11 @@ function save_contact_settings(PDO $pdo, array $settings): array
             $cleaned[$key] = clean_business_hours_schedule($settings[$key] ?? $defaultValue);
             continue;
         }
+        if ($key === 'social_links') {
+            $existing = get_contact_settings($pdo);
+            $cleaned[$key] = clean_social_links($settings[$key] ?? $existing[$key]);
+            continue;
+        }
         $maxLength = in_array($key, ['map_embed_url', 'facebook_link', 'instagram_link'], true) ? 1000 : 255;
         $cleaned[$key] = clean_string($settings[$key] ?? $defaultValue, $maxLength);
     }
@@ -180,4 +186,31 @@ function save_contact_settings(PDO $pdo, array $settings): array
     }
 
     return $cleaned;
+}
+
+function clean_social_links(mixed $value): string
+{
+    if ($value === '') return '';
+    $items = is_array($value) ? $value : json_decode((string) $value, true);
+    if (!is_array($items) || !array_is_list($items) || count($items) > 20) {
+        json_response(false, 'Social links must be a list of at most 20 entries.', 422);
+    }
+    $result = [];
+    foreach ($items as $item) {
+        if (!is_array($item)) json_response(false, 'Invalid social link.', 422);
+        $url = trim((string) ($item['url'] ?? ''));
+        if ($url === '' || $url === '#') continue;
+        $platform = (string) ($item['platform'] ?? 'other');
+        if (!in_array($platform, ['facebook','instagram','youtube','tiktok','x','linkedin','other'], true)) {
+            json_response(false, 'Choose a valid social platform.', 422);
+        }
+        if (strlen($url) > 1000 || !filter_var($url, FILTER_VALIDATE_URL)
+            || !in_array(strtolower((string) parse_url($url, PHP_URL_SCHEME)), ['http','https'], true)
+            || parse_url($url, PHP_URL_USER) !== null || parse_url($url, PHP_URL_PASS) !== null) {
+            json_response(false, 'Enter a valid http or https social URL without login details.', 422);
+        }
+        $label = clean_string($item['label'] ?? '', 60);
+        $result[] = ['platform' => $platform, 'url' => $url, 'label' => $label];
+    }
+    return (string) json_encode($result, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 }
