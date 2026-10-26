@@ -74,14 +74,14 @@ try{
  $pdo=get_db_connection();legal_init($pdo);
  if($_SERVER['REQUEST_METHOD']==='GET'){
   $key=(string)($_GET['page']??'');
-  if(!in_array($key,['terms','privacy'],true))json_response(false,'Invalid page.',422);
+  if(!in_array($key,['terms','privacy','refund'],true))json_response(false,'Invalid page.',422);
   $stmt=$pdo->prepare('SELECT content_json,updated_at FROM website_legal_content WHERE page_key=?');$stmt->execute([$key]);$row=$stmt->fetch(PDO::FETCH_ASSOC);
   json_response(true,'Content loaded.',200,['data'=>$row?['content'=>json_decode($row['content_json'],true),'updated_at'=>$row['updated_at']]:null]);
  }
  require_admin_auth();
  if($_SERVER['REQUEST_METHOD']!=='POST')json_response(false,'Method not allowed.',405);
  $input=read_request_data();$key=(string)($input['page']??'');
- if(!in_array($key,['terms','privacy'],true))json_response(false,'Invalid page.',422);
+ if(!in_array($key,['terms','privacy','refund'],true))json_response(false,'Invalid page.',422);
  $content=legal_validate($input['content']??null);
  $stmt=$pdo->prepare('INSERT INTO website_legal_content(page_key,content_json) VALUES(?,?) ON DUPLICATE KEY UPDATE content_json=VALUES(content_json),updated_at=CURRENT_TIMESTAMP');
  $stmt->execute([$key,json_encode($content,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)]);
