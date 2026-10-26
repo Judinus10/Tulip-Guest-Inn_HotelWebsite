@@ -16,6 +16,7 @@ const routeNames: Record<string, string> = {
   '/contact': 'Contact',
   '/booking': 'Book a Room',
   '/multi-room-booking': 'Multiple Room Booking',
+  '/refund-policy': 'Refund Policy',
   '/privacy-policy': 'Privacy Policy',
   '/terms-and-conditions': 'Terms and Conditions',
 };
@@ -82,6 +83,10 @@ const pages: Record<string, SeoConfig> = {
     title: 'Booking Payment Status | Tulip Guest Inn',
     description: 'View the status of your Tulip Guest Inn booking payment.',
     index: false,
+  },
+  '/refund-policy': {
+    title: 'Refund Policy | Tulip Guest Inn',
+    description: 'Read the cancellation and refund policy for Tulip Guest Inn bookings.',
   },
   '/privacy-policy': {
     title: 'Privacy Policy | Tulip Guest Inn',
