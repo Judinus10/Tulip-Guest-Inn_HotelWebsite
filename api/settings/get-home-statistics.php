@@ -48,7 +48,7 @@ try {
             ['id' => 'happy-guests', 'value' => $displayGuestCount, 'suffix' => '+', 'label' => 'Happy Guests'],
             ['id' => 'rooms', 'value' => $roomCount, 'suffix' => '', 'label' => 'Luxury Rooms'],
             ['id' => 'years', 'value' => $yearsOfService, 'suffix' => '', 'label' => 'Years of Service'],
-            ['id' => 'rating', 'value' => 4.5, 'suffix' => '/5', 'label' => 'Guest Rating'],
+            ['id' => 'rating', 'value' => max(0.0, min(5.0, (float) $settings['guest_rating'])), 'suffix' => '/5', 'label' => 'Guest Rating'],
         ],
     ]);
 } catch (Throwable $e) {

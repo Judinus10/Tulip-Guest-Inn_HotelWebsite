@@ -19,6 +19,7 @@ function default_contact_settings(): array
 
     return [
         'business_name' => 'Tulip Guest Inn',
+        'guest_rating' => '4.5',
         'opening_year' => (string) max(1900, (int) date('Y') - 8),
         'address' => 'Tulip Guest Inn, Sri Lanka',
         'phone' => '+94 77 123 4567',
@@ -110,6 +111,15 @@ function save_contact_settings(PDO $pdo, array $settings): array
         }
         if ($key === 'business_hours_schedule') {
             $cleaned[$key] = clean_business_hours_schedule($settings[$key] ?? $defaultValue);
+            continue;
+        }
+        if ($key === 'guest_rating') {
+            $existing = get_contact_settings($pdo);
+            $rating = trim((string) ($settings[$key] ?? $existing[$key]));
+            if (!preg_match('/^(?:[0-4](?:\.[0-9])?|5(?:\.0)?)$/D', $rating)) {
+                json_response(false, 'Guest rating must be between 0 and 5, with at most one decimal place.', 422);
+            }
+            $cleaned[$key] = number_format((float) $rating, 1, '.', '');
             continue;
         }
         if ($key === 'social_links') {

@@ -30,6 +30,7 @@ import { fetchContactSettings, fetchPropertyContent, saveContactSettings, savePr
 const defaultSettings = {
   business_name: 'Tulip Guest Inn',
   opening_year: '2018',
+  guest_rating: '4.5',
   address: 'Tulip Guest Inn, Sri Lanka',
   phone: '+94 77 123 4567',
   reception_contact_number: '+94 21 222 4567',
@@ -298,6 +299,7 @@ export default function WebsiteSettings() {
                 />
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div className="space-y-2">
                 <Label htmlFor="opening_year">Opening Year</Label>
                 <FieldWithIcon icon={Clock3}>
@@ -314,6 +316,13 @@ export default function WebsiteSettings() {
                   />
                 </FieldWithIcon>
                 <p className="text-xs text-text-secondary">Used to calculate Years of Service automatically.</p>
+              </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="guest_rating">Guest Rating (out of 5)</Label>
+                  <Input id="guest_rating" type="number" min="0" max="5" step="0.1" required value={settings.guest_rating} onChange={event => updateSetting('guest_rating', event.target.value)} placeholder="4.5" />
+                  <p className="text-xs text-text-secondary">Displayed as the Guest Rating on the homepage.</p>
+                </div>
               </div>
 
               <div className="space-y-2">
