@@ -52,8 +52,12 @@ try {
     // A single-room search requires one room to hold everyone. A multi-room
     // search must return the individual available rooms so the frontend can
     // build a real room combination using each backend max_guests value.
-    if ($guests > 0 && $requestedRooms === 1) {
-        $rooms = array_values(array_filter($rooms, static fn(array $room): bool => (int) ($room['guests'] ?? 0) >= $guests));
+    if (isset($_GET['adults']) || isset($_GET['children']) || isset($_GET['children_ages'])) {
+        $party = booking_party_input($_GET);
+        if ($requestedRooms === 1) $rooms = array_values(array_filter($rooms, static fn(array $room): bool => booking_room_occupancy($room, $party, (bool) $room['count_children_toward_capacity'])['fits']));
+    } elseif ($guests > 0 && $requestedRooms === 1) {
+        $party = booking_party_input(['guests' => $_GET['guests']]);
+        $rooms = array_values(array_filter($rooms, static fn(array $room): bool => booking_room_occupancy($room, $party, (bool) $room['count_children_toward_capacity'])['fits']));
     }
 
     if ($roomType !== '' && strtolower($roomType) !== 'all rooms' && strtolower($roomType) !== 'all') {
@@ -80,6 +84,8 @@ try {
             'room_type' => $roomType,
         ],
     ]);
+} catch (InvalidArgumentException $e) {
+    json_response(false, $e->getMessage(), 422);
 } catch (Throwable $e) {
     json_response(false, 'Unable to load rooms.', 500, ['error' => APP_ENV === 'local' ? $e->getMessage() : null]);
 }

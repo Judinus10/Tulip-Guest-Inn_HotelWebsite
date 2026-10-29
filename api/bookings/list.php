@@ -59,8 +59,8 @@ try {
             b.check_in_date AS check_in,
             b.check_out_date AS check_out,
             b.guests,
-            b.guests AS adults,
-            0 AS children,
+            COALESCE(b.adults, b.guests) AS adults,
+            b.children, b.children_ages_json,
             GREATEST(1, DATEDIFF(b.check_out_date, b.check_in_date)) AS total_nights,
             b.message AS special_requests,
             b.message AS special_request,
@@ -90,6 +90,7 @@ try {
 
     $data = $stmt->fetchAll();
     foreach ($data as &$bookingRow) {
+        $bookingRow['children_ages'] = json_decode((string) ($bookingRow['children_ages_json'] ?? '[]'), true) ?: [];
         $groupId = (int) ($bookingRow['booking_group_id'] ?? 0);
         if ($groupId < 1) {
             $bookingRow['group_rooms'] = [];
@@ -104,6 +105,7 @@ try {
             'room_name' => (string) ($row['room_name'] ?? ''),
             'room_number' => (string) ($roomNumbers[(int) ($row['room_id'] ?? 0)] ?? ''),
             'room_code' => (string) (($roomNumbers[(int) $row['room_id']] ?? '') ?: ('R' . str_pad((string) $row['room_id'], 2, '0', STR_PAD_LEFT))),
+            ...booking_stored_party($row),
             'guests' => (int) ($row['guests'] ?? 0),
             'capacity' => (int) ($row['max_guests'] ?? 0),
             'price_per_night' => (float) ($row['base_price'] ?? 0),
@@ -113,7 +115,9 @@ try {
         $bookingRow['room_code'] = implode(', ', array_column($bookingRow['group_rooms'], 'room_code'));
         $bookingRow['room_name'] = implode(', ', array_column($groupRows, 'room_name'));
         $bookingRow['guests'] = array_sum(array_map(static fn(array $row): int => (int) ($row['guests'] ?? 0), $groupRows));
-        $bookingRow['adults'] = $bookingRow['guests'];
+        $bookingRow['adults'] = array_sum(array_column($groupRows, 'adults'));
+        $bookingRow['children'] = array_sum(array_column($groupRows, 'children'));
+        $bookingRow['children_ages'] = array_merge(...array_column($groupRows, 'children_ages'));
         $bookingRow['total_amount'] = array_sum(array_map(static fn(array $row): float => (float) ($row['amount'] ?? 0), $groupRows));
     }
     unset($bookingRow);

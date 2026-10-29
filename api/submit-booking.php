@@ -37,7 +37,9 @@ if ($roomId < 1) json_response(false, 'Please refresh the page and select a vali
 $roomName = clean_string($data['room_name'] ?? '', 150);
 $checkInDate = clean_string($data['check_in_date'] ?? '', 20);
 $checkOutDate = clean_string($data['check_out_date'] ?? '', 20);
-$guests = (int) ($data['guests'] ?? 0);
+try { $party = booking_party_input($data); }
+catch (InvalidArgumentException $e) { json_response(false, $e->getMessage(), 422); }
+$guests = $party['guests'];
 $message = clean_string($data['message'] ?? '', 3000);
 $paymentMethod = strtolower(clean_string($data['payment_method'] ?? 'Cash', 30));
 $isOnlinePayment = in_array($paymentMethod, ['payhere', 'online', 'pay online'], true);
@@ -140,10 +142,7 @@ try {
         json_response(false, 'Please select a valid available room.', 422);
     }
 
-    if ($guests > (int) ($room['max_guests'] ?? 0)) {
-        $pdo->rollBack();
-        json_response(false, 'This room cannot accommodate the selected number of guests. Please reduce the guest count or choose multiple rooms.', 422, ['error_code' => 'ROOM_CAPACITY_EXCEEDED']);
-    }
+    $occupancySnapshot = booking_require_room_occupancy($pdo, $room, $party);
 
     $conflict = $pdo->prepare(
         "SELECT id, check_in_date, check_out_date
@@ -228,6 +227,7 @@ try {
     $stmt->execute($insertParams);
 
     $bookingId = (int) $pdo->lastInsertId();
+    booking_save_party($pdo, $bookingId, $party, $occupancySnapshot);
 
     $bookingNumber = 'BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT);
     $cashOrderId = '';
@@ -317,6 +317,9 @@ try {
             'bill_url' => $cashBillUrl !== '' ? $cashBillUrl : null,
         ],
     ]);
+ } catch (InvalidArgumentException $e) {
+    if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+    json_response(false, $e->getMessage(), 422);
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();

@@ -29,7 +29,7 @@ try {
     ensure_rooms_schema($pdo);
     if (ics_enabled()) ensure_ics_schema($pdo);
 
-    $rooms = $pdo->query("SELECT id, room_number, room_name, max_guests, base_price, currency, status FROM rooms ORDER BY sort_order ASC, id ASC")->fetchAll() ?: [];
+    $rooms = $pdo->query("SELECT * FROM rooms ORDER BY sort_order ASC, id ASC")->fetchAll() ?: [];
     $conflictStmt = $pdo->prepare(
         "SELECT id FROM bookings
          WHERE (booking_group_id IS NULL OR booking_group_id <> :group_id)
@@ -41,6 +41,8 @@ try {
          LIMIT 1"
     );
 
+    $party = (isset($data['adults']) || isset($data['guests'])) ? booking_party_input($data) : null;
+    $countChildren = room_count_children_setting($pdo);
     $result = [];
     foreach ($rooms as $room) {
         $conflictStmt->execute([
@@ -51,7 +53,7 @@ try {
             ':check_in' => $checkInDate,
             ':check_out' => $checkOutDate,
         ]);
-        $available = strcasecmp((string) ($room['status'] ?? ''), 'Available') === 0
+        $available = ($party === null || booking_room_occupancy($room, $party, $countChildren)['fits']) && strcasecmp((string) ($room['status'] ?? ''), 'Available') === 0
             && !$conflictStmt->fetch()
             && !ics_room_conflict($pdo, (int) $room['id'], $checkInDate, $checkOutDate);
         $result[] = [
@@ -59,6 +61,11 @@ try {
             'room_name' => (string) $room['room_name'],
             'room_number' => (string) $room['room_number'],
             'capacity' => (int) $room['max_guests'],
+            'max_adults' => (int) ($room['max_adults'] ?? $room['max_guests']),
+            'max_children' => (int) $room['max_children'],
+            'max_total_occupants' => (int) ($room['max_total_occupants'] ?? $room['max_guests']),
+            'max_child_age' => (int) $room['max_child_age'],
+            'count_children_toward_capacity' => $countChildren,
             'price_per_night' => (float) $room['base_price'],
             'currency' => (string) ($room['currency'] ?: 'LKR'),
             'available' => $available,
@@ -66,6 +73,8 @@ try {
     }
 
     json_response(true, 'Room availability loaded.', 200, ['data' => $result]);
+} catch (InvalidArgumentException $e) {
+    json_response(false, $e->getMessage(), 422);
 } catch (Throwable $e) {
     error_log('Group room availability error: ' . $e->getMessage());
     json_response(false, 'Unable to check room availability.', 500);

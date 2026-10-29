@@ -27,7 +27,7 @@ function multi_room_group_rows(PDO $pdo, int $groupId): array
          ORDER BY b.is_group_primary DESC, b.id ASC'
     );
     $stmt->execute([':group_id' => $groupId]);
-    return $stmt->fetchAll() ?: [];
+    return array_map(static fn(array $row): array => $row + booking_stored_party($row), $stmt->fetchAll() ?: []);
 }
 
 function multi_room_primary_booking_id(PDO $pdo, int $groupId): int
@@ -76,7 +76,7 @@ function multi_room_lock_selected_rooms(PDO $pdo, array $allocations): array
     if (!$ids) throw new InvalidArgumentException('Select at least two rooms.');
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
     $stmt = $pdo->prepare(
-        "SELECT id, room_name, max_guests, base_price, currency, status
+        "SELECT *
          FROM rooms WHERE id IN ({$placeholders})
          ORDER BY sort_order ASC, id ASC FOR UPDATE"
     );
@@ -91,14 +91,14 @@ function multi_room_lock_selected_rooms(PDO $pdo, array $allocations): array
 /** Calculate each room's nightly subtotal after checking capacity and conflicts. */
 function multi_room_prepare_rooms(
     PDO $pdo, array $rooms, array $allocations,
-    string $checkInDate, string $checkOutDate, int $nights
+    string $checkInDate, string $checkOutDate, int $nights, array $parties = []
 ): array {
     $total = 0.0;
     $currency = PAYMENT_CURRENCY;
     foreach ($rooms as &$room) {
         $id = (int) $room['id'];
         $guests = $allocations[$id] ?? 0;
-        if (($room['status'] ?? '') !== 'Available' || $guests > (int) ($room['max_guests'] ?? 0)) {
+        if (($room['status'] ?? '') !== 'Available') {
             throw new RuntimeException('An assigned room cannot accommodate the selected guests.');
         }
         $conflict = $pdo->prepare(
@@ -117,6 +117,8 @@ function multi_room_prepare_rooms(
         if ($conflict->fetch() || ics_room_conflict($pdo, $id, $checkInDate, $checkOutDate)) {
             throw new RuntimeException('One of the assigned rooms is no longer available. Please search again.');
         }
+        $party = $parties[$id] ?? booking_party_input(['guests' => $guests]);
+        $room['occupancy_snapshot'] = booking_require_room_occupancy($pdo, $room, $party);
         $room['allocated_guests'] = $guests;
         $room['room_total'] = round((float) $room['base_price'] * $nights, 2);
         $total += $room['room_total'];

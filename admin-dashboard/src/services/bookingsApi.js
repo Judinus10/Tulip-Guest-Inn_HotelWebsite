@@ -1,3 +1,4 @@
+import { partyRequest } from './bookingOccupancy'
 import { bookingRooms } from '@/data/bookingData'
 import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
 
@@ -91,6 +92,9 @@ export function normalizeBooking(booking) {
     room_number: String(groupRoom.room_number || '').trim(),
     room_code: groupRoom.room_code || groupRoom.room_number || `R${String(groupRoom.room_id || 0).padStart(2, '0')}`,
     guests: Number(groupRoom.guests || 0),
+    adults: Number(groupRoom.adults ?? groupRoom.guests ?? 0),
+    children: Number(groupRoom.children || 0),
+    children_ages: groupRoom.children_ages || JSON.parse(groupRoom.children_ages_json || '[]'),
     capacity: Number(groupRoom.capacity || 0),
     price_per_night: Number(groupRoom.price_per_night || 0),
     amount: Number(groupRoom.amount || 0),
@@ -124,8 +128,9 @@ export function normalizeBooking(booking) {
     check_in_date: checkIn,
     check_out_date: checkOut,
     guests,
-    adults: Number(booking.adults || guests || 1),
-    children: Number(booking.children || 0),
+    adults: groupRooms.length ? groupRooms.reduce((n,r)=>n+r.adults,0) : Number(booking.adults ?? guests ?? 1),
+    children_ages: groupRooms.length ? groupRooms.flatMap(r=>r.children_ages) : (booking.children_ages || JSON.parse(booking.children_ages_json || '[]')),
+    children: groupRooms.length ? groupRooms.reduce((n,r)=>n+r.children,0) : Number(booking.children || 0),
     total_nights: totalNights,
     booking_status: normalizeBookingStatus(booking.booking_status || booking.status || booking.bookingState, isExternal),
     payment_status: normalizePaymentStatus(booking.payment_status || booking.paymentStatus, isExternal),
@@ -165,7 +170,7 @@ export async function createManualBooking(formData) {
     room_name: formData.room_name,
     check_in_date: formData.check_in_date,
     check_out_date: formData.check_out_date,
-    guests: Number(formData.guests || 1),
+    ...partyRequest(formData),
     message: formData.message || '',
     is_booking_for_other: Boolean(formData.is_booking_for_other),
     staying_guest_name: formData.staying_guest_name || '',
@@ -296,7 +301,7 @@ export async function updateBookingDetails(bookingId, updates) {
       room_name: updates.room_name,
       check_in_date: updates.check_in_date,
       check_out_date: updates.check_out_date,
-      guests: Number(updates.guests || 1),
+      ...partyRequest(updates),
       message: updates.message || '',
       is_booking_for_other: Boolean(updates.is_booking_for_other),
       staying_guest_name: updates.staying_guest_name || '',
@@ -328,6 +333,8 @@ export async function updateGroupBookingDetails(bookingId, updates) {
       check_in_date: updates.check_in_date,
       check_out_date: updates.check_out_date,
       message: updates.message || '',
+      ...partyRequest(updates),
+      total_guests: Number(updates.total_guests),
       rooms: updates.rooms,
       send_email: updates.send_email !== false,
     }),

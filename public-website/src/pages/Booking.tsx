@@ -1,3 +1,5 @@
+import GuestPartyFields from '../components/ui/GuestPartyFields';
+import { readParty, writeParty, partyError, partyTotal, partyRequest } from '../services/guestOccupancy';
 import { useContactPhones } from '../hooks/useContactPhones';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -45,11 +47,12 @@ export default function Booking() {
   const toast = useToast();
   const phones = useContactPhones();
   const [searchParams] = useSearchParams();
+  const [party, setParty] = useState(() => readParty(searchParams));
 
   const readBookingParams = (): Pick<BookingForm, 'checkIn' | 'checkOut' | 'guests' | 'rooms' | 'roomType'> => ({
     checkIn: searchParams.get('checkin') || searchParams.get('checkIn') || '',
     checkOut: searchParams.get('checkout') || searchParams.get('checkOut') || '',
-    guests: searchParams.get('guests') || '2',
+    guests: String(partyTotal(readParty(searchParams))),
     rooms: searchParams.get('rooms') || '1',
     roomType: searchParams.get('room') || '',
   });
@@ -71,7 +74,7 @@ export default function Booking() {
   });
   const [bookingRooms, setBookingRooms] = useState<Room[]>([]);
   const [submitError, setSubmitError] = useState('');
-  const availabilityKey = `${form.checkIn}|${form.checkOut}|${form.guests}`;
+  const availabilityKey = `${form.checkIn}|${form.checkOut}|${JSON.stringify(party)}`;
   const [checkedAvailabilityKey, setCheckedAvailabilityKey] = useState('');
   const [availabilityError, setAvailabilityError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -105,6 +108,7 @@ export default function Booking() {
 
   useEffect(() => {
     const params = readBookingParams();
+    setParty(readParty(searchParams));
 
     setForm((prev) => ({
       ...prev,
@@ -121,6 +125,7 @@ export default function Booking() {
   ) => {
     const target = e.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
     const value = target instanceof HTMLInputElement && target.type === 'checkbox' ? target.checked : target.value;
+    if (target.name==='rooms' && Number(value)>1) { window.location.href=`/multi-room-booking?${writeParty(new URLSearchParams({checkin:form.checkIn,checkout:form.checkOut,rooms:String(value)}),party).toString()}`; return; }
     setForm((prev) => ({ ...prev, [target.name]: value }));
   };
 
@@ -139,6 +144,8 @@ export default function Booking() {
       params.guests = form.guests;
     }
 
+    if (partyError(party)) { setBookingRooms([]); setAvailabilityError(partyError(party)); return; }
+    Object.assign(params, Object.fromEntries(writeParty(new URLSearchParams(), party)));
     setBookingRooms([]);
     setAvailabilityError('');
     fetchPublicRooms(params)
@@ -152,7 +159,7 @@ export default function Booking() {
     return () => {
       mounted = false;
     };
-  }, [form.checkIn, form.checkOut, form.guests]);
+  }, [form.checkIn, form.checkOut, form.guests, JSON.stringify(party)]);
 
   const availabilityReady = checkedAvailabilityKey === availabilityKey && !availabilityError;
   const roomTypeOptions = buildRoomTypeOptions(availabilityReady ? bookingRooms : []);
@@ -175,6 +182,7 @@ export default function Booking() {
     e.preventDefault();
     setSubmitError('');
 
+    if (partyError(party)) { setSubmitError(partyError(party)); toast.warning(partyError(party)); return; }
     const emailIsValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
     const phoneDigits = form.phone.replace(/\D/g, '');
     const validationMessage = !form.firstName.trim() || !form.lastName.trim()
@@ -197,6 +205,7 @@ export default function Booking() {
       return;
     }
 
+    if (Number(form.rooms)>1) { window.location.href=`/multi-room-booking?${writeParty(new URLSearchParams({checkin:form.checkIn,checkout:form.checkOut,rooms:form.rooms}),party).toString()}`; return; }
     if (!selectedRoom) {
       setSubmitError(availabilityError || 'Choose an available room for these dates and guest count.');
       toast.warning(availabilityError || 'Choose an available room for these dates and guest count.');
@@ -220,7 +229,7 @@ export default function Booking() {
         room_name: selectedRoom.name,
         check_in_date: form.checkIn,
         check_out_date: form.checkOut,
-        guests: Number(form.guests),
+        ...partyRequest(party),
         is_booking_for_other: form.isBookingForOther,
         staying_guest_name: form.isBookingForOther ? form.stayingGuestName : '',
         staying_guest_email: form.isBookingForOther ? form.stayingGuestEmail : '',
@@ -352,16 +361,8 @@ export default function Booking() {
                           <Users size={10} className="inline mr-1" />
                           Guests *
                         </label>
-                        <select
-                          name="guests"
-                          value={form.guests}
-                          onChange={handleChange}
-                          className="w-full border border-border px-5 py-3.5 text-sm outline-hidden focus:border-gold transition-colors duration-200 bg-background"
-                        >
-                          {[1, 2, 3, 4, 5, 6].map((n) => (
-                            <option key={n} value={n}>{n} {n === 1 ? 'Guest' : 'Guests'}</option>
-                          ))}
-                        </select>
+                        <GuestPartyFields value={party} disabled={isSubmitting} onChange={next => { setParty(next); setForm(prev => ({...prev,guests:String(partyTotal(next))})); }} />
+                        {availabilityReady && bookingRooms.length===0 && !partyError(party) && <a className="mt-2 block text-xs text-gold underline" href={`/rooms?${writeParty(new URLSearchParams({checkin:form.checkIn,checkout:form.checkOut}),party).toString()}`}>Find suitable rooms or a multi-room combination</a>}
                       </div>
                       <div>
                         <label className="block text-[9px] tracking-[0.2em] uppercase text-muted mb-2">
@@ -625,7 +626,7 @@ export default function Booking() {
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-muted">Guests</span>
-                        <span className="text-dark font-medium">{form.guests}</span>
+                        <span className="text-dark font-medium">{partyTotal(party)}</span>
                       </div>
                     </div>
 

@@ -278,6 +278,7 @@ function normalize_room(array $room, array $images = [], array $amenityRecords =
         'max_children' => (int) ($room['max_children'] ?? 0),
         'max_total_occupants' => (int) ($room['max_total_occupants'] ?? $guests),
         'max_child_age' => (int) ($room['max_child_age'] ?? 11),
+        'count_children_toward_capacity' => (bool) ($room['count_children_toward_capacity'] ?? true),
         'beds' => $bedType,
         'bed_type' => $bedType,
         'size' => $roomSize,
@@ -320,9 +321,10 @@ function get_room_payload(PDO $pdo, bool $publicOnly = false): array
     $images = fetch_room_images($pdo, $roomIds);
     $amenities = fetch_room_amenity_assignments($pdo, $roomIds);
     $catalog = list_amenities($pdo);
+    $countChildren = room_count_children_setting($pdo);
     return array_map(
         static fn($room): array => normalize_room(
-            $room,
+            $room + ['count_children_toward_capacity' => $countChildren],
             $images[(int) $room['id']] ?? [],
             $amenities[(int) $room['id']] ?? [],
             $catalog, !$publicOnly
@@ -546,5 +548,6 @@ function room_saved_payload(PDO $pdo, int $id): array
     $room = $stmt->fetch();
     if (!$room) throw new RuntimeException('Room was not found while saving.');
     $assignments = fetch_room_amenity_assignments($pdo, [$id]);
+    $room['count_children_toward_capacity'] = room_count_children_setting($pdo);
     return normalize_room($room, $images[$id] ?? [], $assignments[$id] ?? [], list_amenities($pdo), true);
 }

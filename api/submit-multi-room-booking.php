@@ -59,20 +59,12 @@ if ($totalGuests < 2 || $totalGuests > 20 || count($requestedRooms) < 2) {
 
 protect_public_booking($data, $email, $phone, $checkInDate, $checkOutDate);
 
-$allocations = [];
-$allocationTotal = 0;
-foreach ($requestedRooms as $requestedRoom) {
-    $roomId = (int) ($requestedRoom['room_id'] ?? 0);
-    $guests = (int) ($requestedRoom['guests'] ?? 0);
-    if ($roomId < 1 || $guests < 1 || isset($allocations[$roomId])) {
-        json_response(false, 'Invalid room allocation.', 422);
-    }
-    $allocations[$roomId] = $guests;
-    $allocationTotal += $guests;
-}
-if ($allocationTotal !== $totalGuests) {
-    json_response(false, 'Allocated guests must equal the total guest count.', 422);
-}
+try {
+    $totalParty = booking_party_input($data, 'total_guests');
+    $partyAllocations = booking_party_allocations($requestedRooms, $totalParty);
+} catch (InvalidArgumentException $e) { json_response(false, $e->getMessage(), 422); }
+$allocations = array_map(static fn(array $p): int => $p['guests'], $partyAllocations);
+$totalGuests = $totalParty['guests'];
 
 $pdo = null;
 $bookingCommitted = false;
@@ -100,7 +92,7 @@ try {
     $roomIds = array_keys($allocations);
     $placeholders = implode(',', array_fill(0, count($roomIds), '?'));
     $roomStmt = $pdo->prepare(
-        "SELECT id, room_name, max_guests, base_price, currency, status
+        "SELECT *
          FROM rooms
          WHERE id IN ({$placeholders})
          ORDER BY id ASC
@@ -120,7 +112,7 @@ try {
     foreach ($selectedRooms as &$selectedRoom) {
         $roomId = (int) $selectedRoom['id'];
         $roomGuests = $allocations[$roomId] ?? 0;
-        if (($selectedRoom['status'] ?? '') !== 'Available' || $roomGuests > (int) ($selectedRoom['max_guests'] ?? 0)) {
+        if (($selectedRoom['status'] ?? '') !== 'Available') {
             throw new RuntimeException('An assigned room cannot accommodate the selected guests.');
         }
 
@@ -143,6 +135,7 @@ try {
             throw new RuntimeException('One of the assigned rooms is no longer available. Please search again.');
         }
 
+        $selectedRoom['occupancy_snapshot'] = booking_require_room_occupancy($pdo, $selectedRoom, $partyAllocations[$roomId]);
         $selectedRoom['allocated_guests'] = $roomGuests;
         $selectedRoom['room_total'] = round((float) $selectedRoom['base_price'] * $nights, 2);
         $totalAmount += $selectedRoom['room_total'];
@@ -218,6 +211,7 @@ try {
             ':user_agent' => mb_substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255),
         ]);
         $bookingIds[] = (int) $pdo->lastInsertId();
+        booking_save_party($pdo, (int) end($bookingIds), $partyAllocations[(int) $selectedRoom['id']], $selectedRoom['occupancy_snapshot']);
     }
 
     $primaryBookingId = $bookingIds[0];
@@ -302,6 +296,9 @@ try {
             'amount' => (float) $room['room_total'],
         ], $selectedRooms),
     ]);
+} catch (InvalidArgumentException $e) {
+    if ($pdo && $pdo->inTransaction()) $pdo->rollBack();
+    json_response(false, $e->getMessage(), 422);
 } catch (Throwable $exception) {
     if ($pdo instanceof PDO && $pdo->inTransaction()) $pdo->rollBack();
     $supportReference = strtoupper(substr(hash('sha256', uniqid('multi-booking-', true)), 0, 8));

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/bookings/room-identity-helper.php';
+require_once __DIR__ . '/bookings/guest-occupancy-helper.php';
 
 function get_db_connection(): PDO
 {
@@ -25,6 +26,7 @@ function get_db_connection(): PDO
     $connection->exec("SET time_zone = '+05:30'");
 
     ensure_booking_room_identity($connection);
+    ensure_booking_guest_schema($connection);
     $pdo = $connection;
     return $pdo;
 }

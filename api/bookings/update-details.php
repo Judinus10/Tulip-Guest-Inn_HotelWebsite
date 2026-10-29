@@ -29,7 +29,9 @@ if ($roomId < 1) json_response(false, 'Please refresh the page and select a vali
 $roomName = clean_string($data['room_name'] ?? '', 150);
 $checkInDate = clean_string($data['check_in_date'] ?? '', 20);
 $checkOutDate = clean_string($data['check_out_date'] ?? '', 20);
-$guests = (int) ($data['guests'] ?? 0);
+try { $party = booking_party_input($data); }
+catch (InvalidArgumentException $e) { json_response(false, $e->getMessage(), 422); }
+$guests = $party['guests'];
 $message = clean_string($data['message'] ?? '', 3000);
 $isBookingForOther = !empty($data['is_booking_for_other']) && filter_var($data['is_booking_for_other'], FILTER_VALIDATE_BOOLEAN);
 $stayingGuestName = clean_string($data['staying_guest_name'] ?? '', 150);
@@ -122,10 +124,7 @@ try {
         $pdo->rollBack();
         json_response(false, 'The selected room is not currently available. Please choose another room.', 409);
     }
-    if ($guests > (int) ($room['max_guests'] ?? 0)) {
-        $pdo->rollBack();
-        json_response(false, 'The selected room can accommodate a maximum of ' . (int) $room['max_guests'] . ' guests.', 422);
-    }
+    $occupancySnapshot = booking_require_room_occupancy($pdo, $room, $party);
 
     $conflictStmt = $pdo->prepare(
         "SELECT id FROM bookings
@@ -205,6 +204,8 @@ try {
         ':id' => $id,
     ]);
 
+    booking_save_party($pdo, $id, $party, $occupancySnapshot);
+
     if ($payment && in_array($paymentStatus, ['payment pending', 'pending'], true)) {
         $paymentUpdate = $pdo->prepare('UPDATE payments SET amount = :amount, currency = :currency, updated_at = NOW() WHERE id = :id');
         $paymentUpdate->execute([':amount' => $amount, ':currency' => $currency, ':id' => (int) $payment['id']]);
@@ -229,7 +230,7 @@ try {
     ];
     $newSnapshot = [
         'full_name' => $fullName, 'email' => $email, 'phone' => $phone,
-        'room_id' => $roomId, 'room_name' => $roomName, 'check_in_date' => $checkInDate,
+        ...$party, 'room_id' => $roomId, 'room_name' => $roomName, 'check_in_date' => $checkInDate,
         'check_out_date' => $checkOutDate, 'guests' => $guests,
         'message' => $message, 'amount' => $amount,
         'is_booking_for_other' => $isBookingForOther ? 1 : 0,
@@ -293,6 +294,9 @@ try {
         ],
         'email_queued' => $emailQueued,
     ]);
+ } catch (InvalidArgumentException $e) {
+    if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+    json_response(false, $e->getMessage(), 422);
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
     error_log('Admin booking details update error: ' . $e->getMessage());

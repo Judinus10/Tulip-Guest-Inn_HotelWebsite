@@ -1,11 +1,13 @@
+import { partyError, partyRequest } from '@/services/bookingOccupancy'
 import { useEffect, useState } from 'react'
 import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
 
 // Read physical-room availability from the database, including every group row
 // and external calendar block. Never label a failed or stale check available.
-export function useRoomAvailability(checkIn, checkOut, excludeBookingId = 0) {
-  const valid = Boolean(checkIn && checkOut && checkOut > checkIn)
-  const key = `${checkIn}|${checkOut}|${excludeBookingId}`
+export function useRoomAvailability(checkIn, checkOut, excludeBookingId = 0, party = null) {
+  const guestError = party ? partyError(party) : ''
+  const valid = Boolean(checkIn && checkOut && checkOut > checkIn && !guestError)
+  const key = `${checkIn}|${checkOut}|${excludeBookingId}|${JSON.stringify(party)}`
   const [result, setResult] = useState({ key: '', rows: [], loading: false, error: '' })
 
   useEffect(() => {
@@ -19,7 +21,7 @@ export function useRoomAvailability(checkIn, checkOut, excludeBookingId = 0) {
         const response = await apiFetch(buildApiUrl('/bookings/group-room-availability.php'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ check_in_date: checkIn, check_out_date: checkOut, exclude_booking_id: excludeBookingId }),
+          body: JSON.stringify({ check_in_date: checkIn, check_out_date: checkOut, exclude_booking_id: excludeBookingId, ...(party ? partyRequest(party) : {}) }),
         })
         const payload = await readJsonResponse(response)
         if (!Array.isArray(payload.data)) throw new Error('Unable to check room availability.')
@@ -44,7 +46,7 @@ export function useRoomAvailability(checkIn, checkOut, excludeBookingId = 0) {
   const rows = current ? result.rows : []
   return {
     loading: valid && (!current || result.loading),
-    error: current ? result.error : '',
+    error: guestError || (current ? result.error : ''),
     availableIds: new Set(rows.filter((room) => room.available).map((room) => Number(room.room_id))),
     unavailableIds: new Set(rows.filter((room) => !room.available).map((room) => Number(room.room_id))),
     availableNames: new Set(rows.filter((room) => room.available).map((room) => room.room_name.trim().toLowerCase())),

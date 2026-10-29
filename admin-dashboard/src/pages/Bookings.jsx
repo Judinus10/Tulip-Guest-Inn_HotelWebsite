@@ -1,3 +1,5 @@
+import BookingGuestFields from '@/components/ui/BookingGuestFields'
+import { occupancy, partyError, partyTotal, partyRequest, roomOccupancyLabel } from '@/services/bookingOccupancy'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -153,6 +155,7 @@ function humanizePaymentStatus(value) {
 
 function normalizeRoom(room) {
   return {
+    ...room,
     id: Number(room.id || 0),
     room_name: room.room_name || room.name || '',
     room_number: room.room_number || '',
@@ -629,6 +632,7 @@ function CombinedStatusModal({ booking, focus = 'booking', onClose, onSave }) {
 
 function AddBookingModal({ rooms, bookings, onClose, onSave }) {
   const [form, setForm] = useState({ ...emptyManualBooking, room_id: Number(rooms[0]?.id || 0), room_name: rooms[0]?.room_name || '' })
+  const [party, setParty] = useState({ adults: 1, children: 0, children_ages: [] })
   const [errors, setErrors] = useState({})
   const [submitWarning, setSubmitWarning] = useState('')
   const fieldRefs = {
@@ -642,8 +646,8 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
   }
 
   const today = getTodayInputDate()
-  const roomAvailability = useRoomAvailability(form.check_in_date, form.check_out_date)
-  const availableRooms = rooms.filter((room) => roomAvailability.availableIds.has(Number(room.id)) && Number(room.capacity || room.max_guests || 0) >= Number(form.guests || 1))
+  const roomAvailability = useRoomAvailability(form.check_in_date, form.check_out_date, 0, party)
+  const availableRooms = rooms.filter((room) => roomAvailability.availableIds.has(Number(room.id)) && occupancy(room, party).fits)
 
   const selectedRoom = rooms.find((room) => Number(room.id) === Number(form.room_id))
   const nights = getNights(form.check_in_date, form.check_out_date)
@@ -743,7 +747,7 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
 
     if (!validateForm()) return
 
-    onSave({ ...form, room_id: Number(selectedRoom?.id || 0), room_name: selectedRoom?.room_name || form.room_name })
+    onSave({ ...form, ...partyRequest(party), room_id: Number(selectedRoom?.id || 0), room_name: selectedRoom?.room_name || form.room_name })
   }
 
   return (
@@ -798,16 +802,7 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
 
           <div className="space-y-2">
             <Label>Guests *</Label>
-            <Input
-              ref={fieldRefs.guests}
-              type="number"
-              min="1"
-              max="20"
-              value={form.guests}
-              onChange={(event) => updateField('guests', event.target.value)}
-              className={errorClass(Boolean(errors.guests))}
-              aria-invalid={Boolean(errors.guests)}
-            />
+            <BookingGuestFields value={party} onChange={next => { setParty(next); setForm(current => ({...current,guests:partyTotal(next)})) }} />
             <FieldError message={errors.guests} />
           </div>
         </div>
@@ -935,12 +930,14 @@ function EditGroupBookingModal({ booking, rooms, onClose, onSave }) {
   const roomOptions = useMemo(() => rooms.map((room) => {
     const existing = existingByRoomId.get(Number(room.id))
     return {
+      ...room,
       room_id: Number(room.id),
       booking_id: Number(existing?.booking_id || 0),
       room_name: room.room_name,
       capacity: Number(room.capacity || 1),
       price_per_night: Number(room.price_per_night || 0),
       selected: Boolean(existing),
+      party: { adults: Number(existing?.adults ?? existing?.guests ?? 0), children: Number(existing?.children || 0), children_ages: existing?.children_ages || [] },
       guests: existing ? Number(existing.guests || 1) : 0,
     }
   }), [rooms, existingByRoomId])
@@ -955,6 +952,7 @@ function EditGroupBookingModal({ booking, rooms, onClose, onSave }) {
     rooms: roomOptions,
     send_email: true,
   })
+  const [party, setParty] = useState({ adults: Number(booking.adults ?? booking.guests ?? 1), children: Number(booking.children || 0), children_ages: booking.children_ages || [] })
   const [warning, setWarning] = useState('')
   const [availability, setAvailability] = useState({})
   const [checkingAvailability, setCheckingAvailability] = useState(false)
@@ -987,21 +985,21 @@ function EditGroupBookingModal({ booking, rooms, onClose, onSave }) {
       ? { ...current, check_in_date: value, check_out_date: current.check_out_date > value ? current.check_out_date : '' }
       : { ...current, [name]: value })
   }
-  const updateRoomGuests = (roomId, value) => {
+  const updateRoomParty = (roomId, next) => {
     setWarning('')
-    setForm((current) => ({ ...current, rooms: current.rooms.map((room) => room.room_id === roomId ? { ...room, guests: Number(value) } : room) }))
+    setForm(current => ({...current,rooms:current.rooms.map(room=>room.room_id===roomId?{...room,party:next,guests:partyTotal(next)}:room)}))
   }
   const toggleRoom = (roomId) => {
     setWarning('')
     setForm((current) => ({ ...current, rooms: current.rooms.map((room) => room.room_id === roomId
-      ? { ...room, selected: !room.selected, guests: room.selected ? 0 : 1 }
+      ? { ...room, selected: !room.selected, guests: room.selected ? 0 : (partyTotal(room.party)||1), party: partyTotal(room.party) ? room.party : {adults:1,children:0,children_ages:[]} }
       : room) }))
   }
   const submit = (event) => {
     event.preventDefault()
     const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())
     const chosenRooms = form.rooms.filter((room) => room.selected)
-    const invalidRoom = chosenRooms.find((room) => Number(room.guests) < 1 || Number(room.guests) > Number(room.capacity || 0))
+    const invalidRoom = chosenRooms.find((room) => !partyTotal(room.party) || partyError(room.party, true) || !occupancy(room, room.party).fits)
     const unavailableRoom = chosenRooms.find((room) => availability[room.room_id] !== true)
     const message = !form.full_name.trim() ? 'Guest name is required.'
       : !emailValid ? 'Please enter a valid email address.'
@@ -1009,12 +1007,14 @@ function EditGroupBookingModal({ booking, rooms, onClose, onSave }) {
       : !form.check_in_date || form.check_in_date < earliestCheckIn ? 'Check-in must be after today.'
       : !form.check_out_date || form.check_out_date <= form.check_in_date ? 'Check-out must be after check-in.'
       : chosenRooms.length === 0 ? 'Select at least one room.'
-      : invalidRoom ? `${invalidRoom.room_name} allows 1 to ${invalidRoom.capacity} guests.`
+      : invalidRoom ? `${invalidRoom.room_name}: adult, child or total occupancy limits exceeded.`
       : unavailableRoom ? `${unavailableRoom.room_name} is unavailable for the selected dates.`
       : Number(form.total_guests) < 1 ? 'Total guests must be at least one.'
       : allocatedGuests !== Number(form.total_guests) ? `Allocate all ${form.total_guests} guests. Currently allocated: ${allocatedGuests}.` : ''
-    if (message) { setWarning(message); return }
-    onSave(booking.id, { ...form, rooms: chosenRooms.map(({ room_id, guests }) => ({ room_id, guests })) })
+    if (message || partyError(party)) { setWarning(message || partyError(party)); return }
+    const ages=chosenRooms.flatMap(room=>room.party.children_ages.map(Number)).sort((a,b)=>a-b)
+    if(chosenRooms.reduce((n,room)=>n+room.party.adults,0)!==party.adults || JSON.stringify(ages)!==JSON.stringify(party.children_ages.map(Number).sort((a,b)=>a-b))){setWarning('Allocate every adult and child exactly once.');return}
+    onSave(booking.id, { ...form, ...partyRequest(party), total_guests:partyTotal(party), rooms: chosenRooms.map(room => ({room_id:room.room_id,...partyRequest(room.party)})) })
   }
 
   return <Modal title="Edit multi-room booking" description={`${booking.booking_no} · ${selectedRooms.length} room${selectedRooms.length === 1 ? '' : 's'}`} onClose={onClose} size="max-w-4xl">
@@ -1026,7 +1026,7 @@ function EditGroupBookingModal({ booking, rooms, onClose, onSave }) {
         <div><Label>Phone *</Label><Input value={form.phone} onChange={(event) => updateField('phone', event.target.value)} /></div>
         <div><Label>Check-in *</Label><Input type="date" min={earliestCheckIn} value={form.check_in_date} onChange={(event) => updateField('check_in_date', event.target.value)} /></div>
         <div><Label>Check-out *</Label><Input type="date" min={earliestCheckOut} disabled={!form.check_in_date} value={form.check_out_date} onChange={(event) => updateField('check_out_date', event.target.value)} /></div>
-        <div><Label>Total guests *</Label><Input type="number" min="1" value={form.total_guests} onChange={(event) => updateField('total_guests', Number(event.target.value))} /></div>
+        <div className="md:col-span-3"><BookingGuestFields value={party} onChange={next=>{setParty(next);setForm(current=>({...current,total_guests:partyTotal(next)}))}} /></div>
       </div>
       <div className="rounded-xl border border-border p-4">
         <div className="mb-4 flex items-center justify-between gap-3"><div><h3 className="font-bold text-text-primary">Rooms and guest allocation</h3><p className="mt-1 text-xs text-text-secondary">Add or remove rooms, then allocate exactly {form.total_guests || 0} guests.</p></div><span className="text-xs font-semibold text-text-secondary">{checkingAvailability ? 'Checking availability…' : `${allocatedGuests}/${form.total_guests || 0} allocated`}</span></div>
@@ -1034,10 +1034,10 @@ function EditGroupBookingModal({ booking, rooms, onClose, onSave }) {
           const isAvailable = availability[room.room_id] === true
           return <div key={room.room_id} className={`rounded-xl border p-4 ${room.selected ? 'border-blue-300 bg-blue-50/50' : 'border-border bg-slate-50'}`}>
             <div className="flex items-start justify-between gap-3">
-              <div><p className="font-semibold text-text-primary">{room.room_name}</p><p className="text-xs text-text-secondary">Maximum {room.capacity} guests · {formatMoney(room.price_per_night)}/night</p><p className={`mt-1 text-xs font-semibold ${isAvailable ? 'text-emerald-700' : 'text-red-600'}`}>{isAvailable ? 'Available' : 'Unavailable for these dates'}</p></div>
+              <div><p className="font-semibold text-text-primary">{room.room_name}</p><p className="text-xs text-text-secondary">{roomOccupancyLabel(room)} · {formatMoney(room.price_per_night)}/night</p><p className={`mt-1 text-xs font-semibold ${isAvailable ? 'text-emerald-700' : 'text-red-600'}`}>{isAvailable ? 'Available' : 'Unavailable for these dates'}</p></div>
               <Button type="button" size="sm" variant={room.selected ? 'outline' : 'default'} disabled={!room.selected && (!isAvailable || checkingAvailability)} onClick={() => toggleRoom(room.room_id)}>{room.selected ? 'Remove' : 'Add'}</Button>
             </div>
-            {room.selected ? <div className="mt-3 flex items-center justify-between border-t border-border pt-3"><Label>Guests in room</Label><Input type="number" min="1" max={room.capacity} value={room.guests} onChange={(event) => updateRoomGuests(room.room_id, event.target.value)} className="w-24" /></div> : null}
+            {room.selected ? <div className="mt-3 border-t border-border pt-3"><BookingGuestFields value={room.party} onChange={next=>updateRoomParty(room.room_id,next)} allowZeroAdults />{!occupancy(room,room.party).fits&&<p className="mt-2 text-xs text-red-600">This allocation exceeds the room limits. Older children use adult places.</p>}</div> : null}
           </div>
         })}</div>
       </div>
@@ -1068,6 +1068,7 @@ function EditBookingModal({ booking, rooms, bookings, onClose, onSave }) {
     staying_guest_note: booking.staying_guest_note || '',
     send_email: true,
   })
+  const [party, setParty] = useState({ adults: Number(booking.adults ?? booking.guests ?? 1), children: Number(booking.children || 0), children_ages: booking.children_ages || [] })
   const [errors, setErrors] = useState({})
   const [submitWarning, setSubmitWarning] = useState('')
   const fieldRefs = {
@@ -1082,9 +1083,8 @@ function EditBookingModal({ booking, rooms, bookings, onClose, onSave }) {
     staying_guest_email: useRef(null),
   }
 
-  const roomAvailability = useRoomAvailability(form.check_in_date, form.check_out_date, booking.id)
+  const roomAvailability = useRoomAvailability(form.check_in_date, form.check_out_date, booking.id, party)
   const selectedRoom = rooms.find((room) => Number(room.id) === Number(form.room_id))
-  const selectedRoomCapacity = Math.max(1, Number(selectedRoom?.capacity || 1))
   const earliestCheckOut = addDaysToInputDate(form.check_in_date, 1) || addDaysToInputDate(earliestCheckIn, 1)
   const nights = getNights(form.check_in_date, form.check_out_date)
   const newAmount = nights * Number(selectedRoom?.price_per_night || 0)
@@ -1132,7 +1132,8 @@ function EditBookingModal({ booking, rooms, bookings, onClose, onSave }) {
     if (form.check_in_date && form.check_in_date < earliestCheckIn) nextErrors.check_in_date = 'Check-in must be after today.'
     if (form.check_in_date && form.check_out_date && form.check_out_date <= form.check_in_date) nextErrors.check_out_date = 'Check-out must be after check-in.'
     if (!selectedRoom) nextErrors.room_name = 'Select a valid assigned room.'
-    if (selectedRoom && Number(form.guests) > selectedRoomCapacity) nextErrors.guests = `This room allows a maximum of ${selectedRoomCapacity} guests.`
+    if (partyError(party)) nextErrors.guests = partyError(party)
+    if (selectedRoom && !occupancy(selectedRoom, party).fits) nextErrors.guests = 'The adults and child ages exceed this room’s limits.'
     if (roomAvailability.loading || roomAvailability.error) nextErrors.room_name = roomAvailability.error || 'Wait for the availability check to finish.'
     if (!roomAvailability.availableIds.has(Number(form.room_id))) nextErrors.room_name = 'This room is already booked for the selected dates.'
 
@@ -1149,7 +1150,7 @@ function EditBookingModal({ booking, rooms, bookings, onClose, onSave }) {
   const handleSubmit = (event) => {
     event.preventDefault()
     if (!validate()) return
-    onSave(booking.id, { ...form, room_id: Number(selectedRoom?.id || 0), room_name: selectedRoom?.room_name || form.room_name })
+    onSave(booking.id, { ...form, ...partyRequest(party), room_id: Number(selectedRoom?.id || 0), room_name: selectedRoom?.room_name || form.room_name })
   }
 
   return (
@@ -1175,8 +1176,8 @@ function EditBookingModal({ booking, rooms, bookings, onClose, onSave }) {
           </div>
           <div className="space-y-2">
             <Label>Guests *</Label>
-            <Input ref={fieldRefs.guests} type="number" min="1" max={selectedRoomCapacity} value={form.guests} onChange={(event) => updateField('guests', event.target.value)} className={errorClass(Boolean(errors.guests))} />
-            <p className="text-xs text-text-secondary">Maximum capacity for this room: {selectedRoomCapacity} guest{selectedRoomCapacity === 1 ? '' : 's'}.</p>
+            <BookingGuestFields value={party} onChange={next => { setParty(next); setForm(current => ({...current,guests:partyTotal(next)})) }} />
+            {selectedRoom && <p className="text-xs text-text-secondary">{roomOccupancyLabel(selectedRoom)}</p>}
             <FieldError message={errors.guests} />
           </div>
           <div className="space-y-2">

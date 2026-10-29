@@ -20,6 +20,7 @@ try {
     if (!$room || ($room['status'] ?? '') !== 'Available') json_response(false, 'Room not found.', 404);
     $images = fetch_room_images($pdo, [(int) $room['id']]);
     $assignments = fetch_room_amenity_assignments($pdo, [(int) $room['id']]);
+    $room['count_children_toward_capacity'] = room_count_children_setting($pdo);
     $payload = normalize_room(
         $room,
         $images[(int) $room['id']] ?? [],

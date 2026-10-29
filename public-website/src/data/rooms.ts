@@ -8,6 +8,12 @@ export interface Room {
   price: number;
   currency?: string;
   guests: number;
+  max_guests?: number;
+  max_adults?: number;
+  max_children?: number;
+  max_total_occupants?: number;
+  max_child_age?: number;
+  count_children_toward_capacity?: boolean;
   beds: string;
   bathrooms: number;
   size: number;

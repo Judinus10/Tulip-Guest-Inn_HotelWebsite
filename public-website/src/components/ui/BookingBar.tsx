@@ -1,3 +1,5 @@
+import GuestPartyFields from './GuestPartyFields';
+import { readParty, writeParty, partyError, partyTotal } from '../../services/guestOccupancy';
 import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Users, Search } from 'lucide-react';
@@ -25,6 +27,7 @@ const buildBookingQuery = (form: BookingBarForm) => {
 
 export default function BookingBar() {
   const navigate = useNavigate();
+  const [party, setParty] = useState(() => readParty(new URLSearchParams()));
   const fieldRefs = useRef<Record<BookingBarField, HTMLInputElement | HTMLSelectElement | null>>({
     checkIn: null,
     checkOut: null,
@@ -90,9 +93,11 @@ export default function BookingBar() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validateForm()) return;
+    if (!validateForm() || partyError(party)) return;
 
-    navigate(buildBookingQuery(form));
+    const query = new URL(buildBookingQuery(form), window.location.origin);
+    writeParty(query.searchParams, party);
+    navigate(query.pathname + query.search);
   };
 
   return (
@@ -116,7 +121,7 @@ export default function BookingBar() {
       <form
         onSubmit={handleSubmit}
         noValidate
-        className="glass shadow-luxury-lg border border-border grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-0"
+        className="glass shadow-luxury-lg border border-border grid grid-cols-2 md:grid-cols-3 lg:grid-cols-[1fr_1fr_1.5fr_auto] gap-0"
       >
         {/* Check In */}
         <div className={fieldClass('checkIn')}>
@@ -158,19 +163,7 @@ export default function BookingBar() {
             <Users size={11} />
             Guests
           </label>
-          <select
-            ref={(node) => { fieldRefs.current.guests = node; }}
-            name="guests"
-            value={form.guests}
-            onChange={handleChange}
-            className={inputClass('guests')}
-          >
-            {Array.from({ length: 20 }, (_, index) => index + 1).map((n) => (
-              <option key={n} value={n}>
-                {n} {n === 1 ? 'Guest' : 'Guests'}
-              </option>
-            ))}
-          </select>
+          <GuestPartyFields value={party} onChange={next => { setParty(next); setForm(prev => ({...prev,guests:String(partyTotal(next))})); }} />
         </div>
 
         {/* Search */}

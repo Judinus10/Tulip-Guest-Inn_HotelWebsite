@@ -58,7 +58,12 @@ try {
     ]);
     $conflict = $stmt->fetch();
     $bookingComConflict = ics_room_conflict($pdo, $roomId, $checkInDate, $availabilityCheckOutDate);
-    $unavailable = strcasecmp((string) ($room['status'] ?? ''), 'Available') !== 0 || (bool) $conflict || $bookingComConflict;
+    $occupancyUnavailable = false;
+    if (isset($data['adults']) || isset($data['guests'])) {
+        $party = booking_party_input($data);
+        $occupancyUnavailable = !booking_room_occupancy($room, $party, room_count_children_setting($pdo))['fits'];
+    }
+    $unavailable = $occupancyUnavailable || strcasecmp((string) ($room['status'] ?? ''), 'Available') !== 0 || (bool) $conflict || $bookingComConflict;
 
     json_response(true, $unavailable ? 'Room is unavailable for the selected dates.' : 'Room is available.', 200, [
         'available' => !$unavailable,
@@ -66,6 +71,8 @@ try {
         'room_name' => $roomName,
         'conflict' => $conflict ?: ($bookingComConflict ? ['source' => 'booking.com'] : null),
     ]);
+} catch (InvalidArgumentException $e) {
+    json_response(false, $e->getMessage(), 422);
 } catch (Throwable $e) {
     error_log('Availability check error: ' . $e->getMessage());
     json_response(false, 'Unable to check availability.', 500);

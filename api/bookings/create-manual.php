@@ -27,7 +27,9 @@ if ($roomId < 1) json_response(false, 'Please refresh the page and select a vali
 $roomName = clean_string($data['room_name'] ?? '', 150);
 $checkInDate = clean_string($data['check_in_date'] ?? '', 20);
 $checkOutDate = clean_string($data['check_out_date'] ?? '', 20);
-$guests = (int) ($data['guests'] ?? 0);
+try { $party = booking_party_input($data); }
+catch (InvalidArgumentException $e) { json_response(false, $e->getMessage(), 422); }
+$guests = $party['guests'];
 $message = clean_string($data['message'] ?? '', 3000);
 $paymentMethod = clean_string($data['payment_method'] ?? 'Cash', 60);
 $rawPaymentStatus = clean_string($data['payment_status'] ?? 'Payment Pending', 40);
@@ -116,10 +118,7 @@ try {
         json_response(false, 'Please select a valid available room.', 422);
     }
 
-    if ($guests > (int) ($room['max_guests'] ?? 0)) {
-        $pdo->rollBack();
-        json_response(false, 'Selected room cannot hold this number of guests.', 422);
-    }
+    $occupancySnapshot = booking_require_room_occupancy($pdo, $room, $party);
 
     $conflict = $pdo->prepare(
         "SELECT id
@@ -182,6 +181,7 @@ try {
     ]);
 
     $bookingId = (int) $pdo->lastInsertId();
+    booking_save_party($pdo, $bookingId, $party, $occupancySnapshot);
 
     $insertPayment = $pdo->prepare(
         'INSERT INTO payments (booking_id, order_id, amount, currency, status, method, gateway_response, created_at, updated_at)
@@ -254,8 +254,7 @@ try {
             'check_in_date' => $checkInDate,
             'check_out_date' => $checkOutDate,
             'guests' => $guests,
-            'adults' => $guests,
-            'children' => 0,
+            ...$party,
             'total_nights' => max(1, (int) $checkIn->diff($checkOut)->days),
             'special_request' => $message,
             'special_requests' => $message,
@@ -268,6 +267,9 @@ try {
             'updated_at' => date('Y-m-d H:i:s'),
         ],
     ]);
+ } catch (InvalidArgumentException $e) {
+    if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+    json_response(false, $e->getMessage(), 422);
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo->inTransaction()) {
         $pdo->rollBack();

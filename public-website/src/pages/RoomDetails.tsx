@@ -1,3 +1,5 @@
+import GuestPartyFields from '../components/ui/GuestPartyFields';
+import { readParty, writeParty, partyError, partyTotal, occupancy, roomOccupancyLabel } from '../services/guestOccupancy';
 import { useEffect, useRef, useState } from 'react';
 import { useParams, Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -28,6 +30,8 @@ export default function RoomDetails() {
   const toast = useToast();
   const [checkingRoom, setCheckingRoom] = useState(false);
   const [searchParams] = useSearchParams();
+  const [party, setParty] = useState(() => readParty(searchParams));
+  useEffect(() => setParty(readParty(searchParams)), [searchParams]);
   const queryCheckIn = searchParams.get('checkin') || searchParams.get('checkIn') || '';
   const queryCheckOut = searchParams.get('checkout') || searchParams.get('checkOut') || '';
   const queryGuests = searchParams.get('guests') || '1';
@@ -238,9 +242,10 @@ export default function RoomDetails() {
 
   const handleBookRoom = async () => {
     if (!validateBookingForm() || checkingRoom) return;
+    if (partyError(party)) { toast.warning(partyError(party)); return; }
     setCheckingRoom(true);
     try {
-      const available = await fetchPublicRooms({ check_in_date: bookingForm.checkIn, check_out_date: bookingForm.checkOut, guests: bookingForm.guests });
+      const available = await fetchPublicRooms({ check_in_date: bookingForm.checkIn, check_out_date: bookingForm.checkOut, ...Object.fromEntries(writeParty(new URLSearchParams(), party)) });
       if (!available.some((item) => item.id === room.id)) {
         toast.warning('This room is unavailable for the selected dates or guest count. Please choose another room.');
         return;
@@ -254,6 +259,7 @@ export default function RoomDetails() {
       rooms: '1',
     });
 
+    writeParty(params, party);
     navigate(`/booking?${params.toString()}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to check availability.');
@@ -487,17 +493,9 @@ export default function RoomDetails() {
                   </div>
                   <div className="flex flex-col">
                     <label className="text-[9px] tracking-[0.2em] uppercase text-muted mb-1.5">Guests</label>
-                    <select
-                      ref={(node) => { fieldRefs.current.guests = node; }}
-                      name="guests"
-                      value={bookingForm.guests}
-                      onChange={handleBookingChange}
-                      className={bookingInputClass('guests')}
-                    >
-                      {Array.from({ length: room.guests }, (_, i) => i + 1).map((n) => (
-                        <option key={n} value={n}>{n} {n === 1 ? 'Guest' : 'Guests'}</option>
-                      ))}
-                    </select>
+                    <GuestPartyFields value={party} onChange={next => { setParty(next); setBookingForm(prev => ({...prev,guests:String(partyTotal(next))})); }} />
+                    <p className="mt-3 text-xs text-muted">{roomOccupancyLabel(room)}</p>
+                    {!partyError(party) && !occupancy(room,party).fits && <p className="mt-2 text-xs text-red-600">This group needs a different room or additional rooms. <Link className="underline" to={`/rooms?${writeParty(new URLSearchParams({checkin:bookingForm.checkIn,checkout:bookingForm.checkOut}),party).toString()}`}>Find suitable rooms</Link></p>}
                   </div>
                 </div>
 

@@ -38,16 +38,13 @@ $checkIn = new DateTimeImmutable($checkInDate);
 $checkOut = new DateTimeImmutable($checkOutDate);
 if ($checkIn <= $today) json_response(false, 'Check-in date must be after today.', 422);
 
-$allocations = [];
-foreach ($requestedRooms as $requestedRoom) {
-    $roomId = (int) ($requestedRoom['room_id'] ?? 0);
-    $guests = (int) ($requestedRoom['guests'] ?? 0);
-    if ($roomId < 1 || $guests < 1 || isset($allocations[$roomId])) {
-        json_response(false, 'Select each room once and allocate at least one guest to it.', 422);
-    }
-    $allocations[$roomId] = $guests;
-}
-if ($allocations === []) json_response(false, 'The booking must contain at least one room.', 422);
+try {
+    $partyData = $data + ['total_guests' => array_sum(array_column($requestedRooms, 'guests'))];
+    $totalParty = booking_party_input($partyData, 'total_guests');
+    $partyAllocations = booking_party_allocations($requestedRooms, $totalParty);
+} catch (InvalidArgumentException $e) { json_response(false, $e->getMessage(), 422); }
+$allocations = array_map(static fn(array $p): int => $p['guests'], $partyAllocations);
+$occupancySnapshots = [];
 
 try {
     $pdo = get_db_connection();
@@ -79,7 +76,7 @@ try {
 
     $roomIds = array_keys($allocations);
     $placeholders = implode(',', array_fill(0, count($roomIds), '?'));
-    $roomStmt = $pdo->prepare("SELECT id, room_name, max_guests, base_price, currency, status FROM rooms WHERE id IN ($placeholders) FOR UPDATE");
+    $roomStmt = $pdo->prepare("SELECT * FROM rooms WHERE id IN ($placeholders) FOR UPDATE");
     $roomStmt->execute($roomIds);
     $selectedRooms = $roomStmt->fetchAll() ?: [];
     if (count($selectedRooms) !== count($roomIds)) {
@@ -94,15 +91,11 @@ try {
     $totalGuests = 0;
     foreach ($allocations as $roomId => $guests) {
         $room = $selectedById[$roomId];
-        $capacity = (int) ($room['max_guests'] ?? 0);
         if (strcasecmp((string) ($room['status'] ?? ''), 'Available') !== 0) {
             $pdo->rollBack();
             json_response(false, (string) $room['room_name'] . ' is not active.', 409);
         }
-        if ($guests > $capacity) {
-            $pdo->rollBack();
-            json_response(false, (string) $room['room_name'] . ' allows a maximum of ' . $capacity . ' guests.', 422);
-        }
+        $occupancySnapshots[$roomId] = booking_require_room_occupancy($pdo, $room, $partyAllocations[$roomId]);
         $conflictStmt = $pdo->prepare(
             "SELECT id FROM bookings
              WHERE (booking_group_id IS NULL OR booking_group_id <> :group_id)
@@ -213,8 +206,10 @@ try {
                 ':ip_address' => $primary['ip_address'] ?? get_client_ip(),
                 ':user_agent' => $primary['user_agent'] ?? mb_substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255),
             ]);
-            $usedBookingIds[(int) $pdo->lastInsertId()] = true;
+            $bookingId = (int) $pdo->lastInsertId();
+            $usedBookingIds[$bookingId] = true;
         }
+        booking_save_party($pdo, $bookingId, $partyAllocations[$roomId], $occupancySnapshots[$roomId]);
     }
 
     $removeIds = array_values(array_filter(array_keys($existingById), static fn(int $bookingId): bool => !isset($usedBookingIds[$bookingId])));
@@ -251,6 +246,7 @@ try {
     foreach ($freshRows as $freshRow) if ((int) $freshRow['id'] === $primaryBookingId) { $freshPrimary = $freshRow; break; }
     $freshPrimary ??= $freshRows[0] ?? $primary;
     $groupRooms = array_map(static fn(array $row): array => [
+        ...booking_stored_party($row),
         'booking_id' => (int) $row['id'], 'room_id' => (int) ($row['room_id'] ?? 0),
         'room_name' => (string) $row['room_name'], 'guests' => (int) $row['guests'],
         'capacity' => (int) ($row['max_guests'] ?? 0), 'price_per_night' => (float) ($row['base_price'] ?? 0),
@@ -260,7 +256,7 @@ try {
     $adjustmentType = $paymentStatus === 'paid' && $delta > 0 ? 'balance_due' : ($paymentStatus === 'paid' && $delta < 0 ? 'refund_due' : 'none');
 
     json_response(true, 'Multi-room booking updated successfully.', 200, [
-        'data' => array_merge($freshPrimary, [
+        'data' => array_merge($freshPrimary, $totalParty, [
             'booking_group_id' => $groupId, 'booking_no' => multi_room_booking_number($freshPrimary),
             'full_name' => $fullName, 'guest_name' => $fullName, 'email' => $email, 'guest_email' => $email,
             'phone' => $phone, 'guest_phone' => $phone, 'check_in_date' => $checkInDate, 'check_out_date' => $checkOutDate,
@@ -271,6 +267,9 @@ try {
         'adjustment' => ['type' => $adjustmentType, 'amount' => abs($delta), 'old_total' => $oldTotal, 'new_total' => $newTotal],
         'email_queued' => false,
     ]);
+ } catch (InvalidArgumentException $e) {
+    if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+    json_response(false, $e->getMessage(), 422);
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) $pdo->rollBack();
     error_log('Admin group booking update error: ' . $e->getMessage());

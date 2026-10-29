@@ -2,6 +2,9 @@ import { getBotToken } from './botProtection';
 import { requestJson } from './apiClient';
 
 export type BookingFormPayload = {
+  adults?: number;
+  children?: number;
+  children_ages?: number[];
   room_id: string | number;
   full_name: string;
   email: string;
@@ -110,6 +113,9 @@ export async function submitBookingRequest(payload: BookingFormPayload): Promise
 }
 
 export type MultiRoomBookingPayload = {
+  adults: number;
+  children: number;
+  children_ages: number[];
   full_name: string;
   email: string;
   phone: string;
@@ -118,7 +124,7 @@ export type MultiRoomBookingPayload = {
   total_guests: number;
   payment_method: 'Cash' | 'PayHere';
   message?: string;
-  rooms: Array<{ room_id: string | number; guests: number }>;
+  rooms: Array<{ room_id: string | number; guests: number; adults?: number; children?: number; children_ages?: number[] }>;
 };
 
 export async function submitMultiRoomBooking(payload: MultiRoomBookingPayload): Promise<{

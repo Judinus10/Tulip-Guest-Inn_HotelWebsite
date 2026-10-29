@@ -1,6 +1,8 @@
+import GuestPartyFields from '../components/ui/GuestPartyFields';
+import { readParty, writeParty, partyError, partyTotal, occupancy, allocateParty } from '../services/guestOccupancy';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { BedDouble, Calendar, Users } from 'lucide-react';
+import { BedDouble, Calendar } from 'lucide-react';
 import PageHero from '../components/ui/PageHero';
 import RoomCard from '../components/ui/RoomCard';
 import CTASection from '../components/ui/CTASection';
@@ -19,19 +21,8 @@ const readFilters = (params: URLSearchParams) => ({
   checkIn: params.get('checkin') || params.get('checkIn') || '',
   checkOut: params.get('checkout') || params.get('checkOut') || '',
   guests: params.get('guests') || '2',
+  ...readParty(params),
 });
-
-function minimumRoomCombination(rooms: Room[], guests: number): Room[] {
-  const sorted = [...rooms].filter((room) => room.guests > 0).sort((a, b) => b.guests - a.guests);
-  const selected: Room[] = [];
-  let capacity = 0;
-  for (const room of sorted) {
-    selected.push(room);
-    capacity += room.guests;
-    if (capacity >= guests) return selected;
-  }
-  return [];
-}
 
 export default function Rooms() {
   const toast = useToast();
@@ -50,7 +41,7 @@ export default function Rooms() {
   // availability request.
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      const next = new URLSearchParams({ guests: form.guests });
+      const next = writeParty(new URLSearchParams(), form);
       if (form.checkIn) next.set('checkin', form.checkIn);
       if (form.checkIn && form.checkOut && form.checkOut > form.checkIn) {
         next.set('checkout', form.checkOut);
@@ -75,14 +66,14 @@ export default function Rooms() {
     return () => { mounted = false; };
   }, [urlFilters.checkIn, urlFilters.checkOut]);
 
-  const guests = Math.max(1, Number(form.guests));
+  const guests = partyTotal(form);
   const hasSearched = Boolean(urlFilters.checkIn && urlFilters.checkOut && urlFilters.checkOut > urlFilters.checkIn);
   const datesPending = Boolean((form.checkIn || form.checkOut) && (!form.checkIn || !form.checkOut || form.checkOut <= form.checkIn || form.checkIn !== urlFilters.checkIn || form.checkOut !== urlFilters.checkOut));
   const categoryRooms = active === 'all' ? roomList : roomList.filter((room) => room.category === active);
-  const singleRoomMatches = categoryRooms.filter((room) => room.guests >= guests);
-  const suggestedRooms = minimumRoomCombination(categoryRooms, guests);
+  const singleRoomMatches = partyError(form) ? [] : categoryRooms.filter((room) => occupancy(room, form).fits);
+  const suggestedRooms = allocateParty(categoryRooms, form).map(item => item.room);
   const needsMultipleRooms = singleRoomMatches.length === 0 && suggestedRooms.length >= 2;
-  const suggestedCapacity = suggestedRooms.reduce((sum, room) => sum + room.guests, 0);
+  const suggestedCapacity = suggestedRooms.reduce((sum, room) => sum + (room.max_total_occupants ?? room.guests), 0);
   // The regular Rooms page represents a single-room search. Never fall back
   // to showing smaller rooms that cannot hold the selected guest count.
   const resultRooms = singleRoomMatches;
@@ -94,6 +85,7 @@ export default function Rooms() {
     multiParams.set('checkin', urlFilters.checkIn);
     multiParams.set('checkout', urlFilters.checkOut);
   }
+  writeParty(multiParams, form);
   const multiQuery = multiParams.toString();
   const multipleRoomBookingPath = `/multi-room-booking?${multiQuery}`;
 
@@ -111,7 +103,7 @@ export default function Rooms() {
       <div className="glass shadow-luxury border border-border grid grid-cols-1 md:grid-cols-3">
         <label className="flex flex-col px-6 py-3.5 border-r border-border"><span className="flex items-center gap-1.5 text-[9px] tracking-[0.2em] uppercase text-gold mb-1.5"><Calendar size={11}/>Check In</span><input type="date" value={form.checkIn} min={new Date().toISOString().split('T')[0]} onChange={(e) => setForm({...form, checkIn:e.target.value, checkOut: form.checkOut && form.checkOut <= e.target.value ? '' : form.checkOut})} className="bg-transparent text-sm outline-hidden" /></label>
         <label onMouseDown={warnCheckoutRequiresCheckIn} onTouchStart={warnCheckoutRequiresCheckIn} className="flex flex-col px-6 py-3.5 border-r border-border"><span className="flex items-center gap-1.5 text-[9px] tracking-[0.2em] uppercase text-gold mb-1.5"><Calendar size={11}/>Check Out</span><input type="date" value={form.checkOut} disabled={!form.checkIn} min={form.checkIn || new Date().toISOString().split('T')[0]} onChange={(e) => setForm({...form, checkOut:e.target.value})} className="bg-transparent text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50" /></label>
-        <label className="flex flex-col px-6 py-3.5"><span className="flex items-center gap-1.5 text-[9px] tracking-[0.2em] uppercase text-gold mb-1.5"><Users size={11}/>Guests</span><select value={form.guests} onChange={(e) => setForm({...form, guests:e.target.value})} className="bg-transparent text-sm outline-hidden">{Array.from({length:20},(_,i)=>i+1).map(n=><option key={n} value={n}>{n} Guest{n>1?'s':''}</option>)}</select></label>
+        <div className="p-4"><GuestPartyFields value={form} onChange={party => setForm({...form,...party,guests:String(partyTotal(party))})} /></div>
       </div>
       {form.checkIn && form.checkOut && form.checkOut <= form.checkIn && <p className="mt-2 text-sm text-red-600">Check-out must be after check-in.</p>}
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
