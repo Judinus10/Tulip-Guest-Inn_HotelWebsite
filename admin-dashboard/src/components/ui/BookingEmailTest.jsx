@@ -4,6 +4,7 @@ import { sendBookingEmailTest } from '@/services/bookingEmailSettings'
 
 export default function BookingEmailTest({ type, content, scenario }) {
   const [recipient, setRecipient] = useState('')
+  const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -27,7 +28,9 @@ export default function BookingEmailTest({ type, content, scenario }) {
       if (active.current) setBusy(false)
     }
   }
-  return <form onSubmit={send} className="mt-5 border-t border-border pt-5">
+  return <div className="booking-email-test">
+    <button type="button" aria-expanded={open} aria-controls="booking-email-test-form" onClick={() => setOpen(value => !value)} className="booking-email-test-open"><Mail className="h-4 w-4" />Send test email</button>
+    {open && <form id="booking-email-test-form" onSubmit={send} className="booking-email-test-form">
     <label htmlFor="booking-email-test-recipient" className="text-sm font-semibold text-text-primary">Send a test email</label>
     <p className="mb-3 mt-1 text-xs leading-5 text-text-secondary">Uses the current draft and selected sample booking. This does not save your changes or create a reservation.</p>
     <div className="flex flex-wrap gap-2">
@@ -40,5 +43,6 @@ export default function BookingEmailTest({ type, content, scenario }) {
     </div>
     {message && <p role="status" className="mt-3 flex items-start gap-2 rounded-lg bg-emerald-50 p-3 text-xs leading-5 text-emerald-800"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />{message}</p>}
     {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-xs leading-5 text-red-700">{error}</p>}
-  </form>
+  </form>}
+  </div>
 }

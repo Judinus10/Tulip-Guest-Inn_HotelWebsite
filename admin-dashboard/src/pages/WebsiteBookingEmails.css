@@ -1,0 +1,58 @@
+.booking-email-page{container:booking-emails/inline-size;color:#0f172a}
+.booking-email-workspace{display:grid;gap:18px;align-items:start}
+@container booking-emails (min-width:980px){.booking-email-workspace{grid-template-columns:minmax(0,1.04fr) minmax(0,1fr)}}
+.booking-email-card{min-width:0;border:1px solid #dce5f1;background:#fff;border-radius:10px;padding:18px;box-shadow:0 2px 8px #102a4310}
+.booking-email-card-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.booking-email-card-heading h2,.booking-email-card-heading h3{font-size:17px;font-weight:750;line-height:1.4;margin:0}
+.booking-email-draft-badge{font-size:11px;font-weight:600;color:#966318;background:#fff7e6;padding:4px 9px;border-radius:20px}
+.booking-email-type-tabs{display:inline-flex;max-width:100%;gap:2px;border:1px solid #dbe3ee;border-radius:7px;background:#f6f8fc;padding:2px}
+.booking-email-type-tabs button{padding:8px 15px;border-radius:5px;font-size:12px;white-space:normal}
+.booking-email-type-description{font-size:11px;line-height:1.6;color:#64748b;margin:6px 0 13px}
+.booking-email-fields{display:grid;gap:13px}
+.booking-email-field>div:first-child{margin-bottom:5px}
+.booking-email-field label,.booking-email-insert>label{font-size:12px;line-height:1.4;font-weight:650}
+.booking-email-field input{height:36px;border-radius:6px;font-size:12px;padding:7px 11px;box-shadow:none}
+.booking-email-field textarea{min-height:54px;height:58px;max-height:160px;resize:vertical;border-radius:6px;font-size:12px;line-height:1.6;padding:8px 11px;box-shadow:none}
+.booking-email-field [role=textbox]{min-height:81px;max-height:210px;font-size:12px;line-height:1.7;padding:8px 12px}
+.booking-email-field [role=textbox] p{margin:0 0 7px}
+.booking-email-field [role=textbox] p:last-child{margin-bottom:0}
+.booking-email-field [role=toolbar]{padding:3px 6px;gap:2px}
+.booking-email-field [role=toolbar] button{padding:5px 7px;border-radius:4px}
+.booking-email-field [role=toolbar] button svg{height:14px;width:14px}
+.booking-email-field [role=toolbar] span.ml-auto{display:none}
+.booking-email-field--closing [role=textbox]{min-height:56px}
+.booking-email-field--closing [role=toolbar]{display:none}
+.booking-email-field--closing:focus-within [role=toolbar]{display:flex}
+.booking-email-insert{margin-top:12px}
+.booking-email-insert-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;align-items:center}
+.booking-email-insert-row>div:first-child{flex:1 1 170px}
+.booking-email-insert select{appearance:none;width:100%;height:34px;border:1px solid #d6e0ed;border-radius:6px;padding:5px 32px 5px 10px;background:#fff;font-size:11px;color:#34445b}
+.booking-email-token-chips{display:flex;gap:5px;flex-wrap:wrap;flex:2 1 285px}
+.booking-email-token-chips button{border:1px solid #d9e4f3;border-radius:6px;background:#f0f5fc;padding:6px 8px;font-size:10px;color:#425674;transition:background .15s}
+.booking-email-token-chips button:hover{background:#dfeaff}
+.booking-email-token-chips button:disabled{opacity:.5}
+.booking-email-insert-target{font-size:10px;color:#71819a;margin:5px 0 0}
+.booking-email-info{display:flex;align-items:center;gap:8px;margin-top:11px;border:1px solid #e0eafe;border-radius:6px;background:#edf4ff;padding:9px 11px;font-size:11px;line-height:1.6;color:#2462df}
+.booking-email-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid #e1e7f0;margin-top:13px;padding-top:13px;flex-wrap:wrap}
+.booking-email-actions>div{display:flex;gap:9px;flex-wrap:wrap;margin-left:auto}
+.booking-email-actions>button{font-size:11px}
+.booking-email-actions>div>button{height:35px;border-radius:6px;padding:0 13px;font-size:12px}
+.booking-email-actions>div>button svg{display:none}
+.booking-email-preview-column{min-width:0}
+.booking-email-preview-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.booking-email-preview-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.booking-email-device-tabs{display:flex;border:1px solid #dce5f1;background:#fff;border-radius:6px;padding:2px}
+.booking-email-device-tabs button{display:flex;align-items:center;justify-content:center;gap:5px;padding:6px 10px;border-radius:4px;font-size:11px;font-weight:600;color:#4e5e75}
+.booking-email-device-tabs button[aria-pressed=true]{background:#1760ff;color:#fff;box-shadow:0 1px 4px #1760ff20}
+.booking-email-sample-select{appearance:none;max-width:135px;border:1px solid #dce5f1;background:#f0f5fc;border-radius:20px;padding:7px 12px;font-size:10px;color:#62728c;cursor:pointer}
+.booking-email-preview-meta{display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:10px;color:#71819a;min-width:0}
+.booking-email-preview-meta p{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin:0}
+.booking-email-preview-meta button{border:0;background:none;padding:3px;color:#71819a}
+.booking-email-preview-stage{border:1px solid #e3e9f1;border-radius:7px;background:#f5f7fa;padding:9px;min-width:0;overflow:hidden}
+.booking-email-preview-frame{margin:auto;overflow:hidden;background:white;box-shadow:0 1px 5px #102a4310}
+.booking-email-preview-note{font-size:10px;color:#8290a6;margin:7px 0 0;line-height:1.5}
+.booking-email-test{margin-top:10px;border-top:1px solid #e3e9f1;padding-top:10px}
+.booking-email-test-open{display:inline-flex;align-items:center;gap:7px;border:1px solid #c8d9f7;border-radius:6px;background:#fff;color:#2462df;padding:7px 12px;font-size:12px;font-weight:600}
+.booking-email-test-open:hover{background:#f2f6ff}
+.booking-email-test-form{margin-top:10px}
+@container booking-emails (max-width:520px){.booking-email-card{padding:13px}.booking-email-actions>div{width:100%;margin-left:0}.booking-email-actions>div>button{flex:1}.booking-email-preview-controls{width:100%;justify-content:space-between}.booking-email-token-chips{flex-basis:100%}}

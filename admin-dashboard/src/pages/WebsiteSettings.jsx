@@ -241,8 +241,8 @@ export default function WebsiteSettings() {
       <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: '', type: 'success' })} />
 
       <PageHeader
-        title="Website Settings"
-        description="Manage website content, appearance, policies, FAQs and booking email wording."
+        title={activeTab === 'booking-emails' ? 'Booking Emails' : 'Website Settings'}
+        description={activeTab === 'booking-emails' ? 'Customize guest emails and preview changes before saving.' : 'Manage website content, appearance, policies, FAQs and booking email wording.'}
       />
 
       <div className="mb-6 rounded-2xl border border-border bg-white p-2 shadow-sm shadow-slate-200/60">
