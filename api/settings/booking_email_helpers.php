@@ -106,6 +106,20 @@ function booking_email_editor_validate(mixed $content): array
         foreach ($matches[1] as $token) {
             if (!isset(booking_email_editor_placeholders()[$token])) throw new InvalidArgumentException('Unsupported placeholder: {' . $token . '}. Use Insert booking detail.');
         }
+        if ($rich) {
+            $tokenDoc = new DOMDocument('1.0', 'UTF-8');
+            $previousErrors = libxml_use_internal_errors(true);
+            try { $tokenDoc->loadHTML('<?xml encoding="UTF-8"><html><body>' . $value . '</body></html>', LIBXML_NONET); }
+            finally { libxml_clear_errors(); libxml_use_internal_errors($previousErrors); }
+            $nodes = (new DOMXPath($tokenDoc))->query('//body//text()');
+            $nodeTokens = [];
+            foreach ($nodes as $textNode) {
+                preg_match_all('/\{[^{}]*\}/u', $textNode->nodeValue, $nodeMatches);
+                array_push($nodeTokens, ...$nodeMatches[0]);
+            }
+            $allTokens = $matches[0]; sort($allTokens); sort($nodeTokens);
+            if ($allTokens !== $nodeTokens) throw new InvalidArgumentException('Keep each placeholder together. Apply formatting to the whole placeholder, not part of it.');
+        }
         if (preg_match('/[{}]/', preg_replace('/\{[^{}]*\}/u', '', $text))) throw new InvalidArgumentException('A placeholder is incomplete. Use Insert booking detail.');
         $result[$key] = $value;
     }

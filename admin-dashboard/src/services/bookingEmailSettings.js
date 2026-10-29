@@ -10,3 +10,11 @@ export async function saveBookingEmailSettings(type, content, version) {
     body: JSON.stringify({ type, content, version }) })
   return (await readJsonResponse(response)).data
 }
+
+export async function previewBookingEmail(type, content, scenario = 'single', signal) {
+  const response = await apiFetch(buildApiUrl('/settings/booking-email-preview.php'), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type, content, scenario }), signal,
+  })
+  return (await readJsonResponse(response)).data
+}

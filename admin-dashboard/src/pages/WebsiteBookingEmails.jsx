@@ -1,3 +1,4 @@
+import BookingEmailPreview from '@/components/ui/BookingEmailPreview'
 import { useEffect, useRef, useState } from 'react'
 import { AlertCircle, CheckCircle2, ChevronDown, Info, Loader2, Mail, RotateCcw, Save, Braces } from 'lucide-react'
 import { SectionCard } from '@/components/ui/page-header'
@@ -83,11 +84,11 @@ export default function WebsiteBookingEmails() {
     <SectionCard>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-start gap-3"><div className="rounded-2xl bg-blue-50 p-3 text-blue-600"><Mail className="h-6 w-6" /></div>
-          <div><h2 className="text-xl font-bold text-text-primary">Booking Emails</h2><p className="mt-1 text-sm text-text-secondary">Manage the wording guests receive about their reservations.</p></div></div>
+          <div><h2 className="text-xl font-bold text-text-primary">Booking Emails</h2><p className="mt-1 text-sm text-text-secondary">Customize guest emails and preview changes before saving.</p></div></div>
         <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${dirty ? 'bg-amber-50 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>{dirty ? 'Unsaved changes' : 'Content up to date'}</span>
       </div>
     </SectionCard>
-    <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
+    <div className="grid items-start gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <SectionCard>
         <div role="tablist" aria-label="Email type" className="mb-3 flex gap-1 rounded-xl bg-slate-100 p-1">
           {Object.entries(types).map(([key, item]) => <button key={key} type="button" role="tab" aria-selected={type === key} disabled={busy}
@@ -119,9 +120,10 @@ export default function WebsiteBookingEmails() {
             <Button disabled={busy || !dirty} onClick={save}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{busy ? 'Saving...' : 'Save changes'}</Button></div>
         </div>
       </SectionCard>
-      <aside className="space-y-5">
+      <aside className="min-w-0 space-y-5">
+        <BookingEmailPreview type={type} content={draft} />
         <SectionCard><div className="mb-3 flex items-center gap-2"><Braces className="h-5 w-5 text-blue-600" /><h3 className="font-semibold text-text-primary">Personalized details</h3></div>
-          <p className="mb-4 text-sm leading-6 text-text-secondary">These placeholders will be replaced with the booking’s information.</p>
+          <p className="mb-4 text-sm leading-6 text-text-secondary">The preview uses sample values. Real emails use the booking’s information.</p>
           <dl className="space-y-4">{Object.entries(settings.placeholders).map(([key, label]) => <div key={key}><dt className="text-xs font-semibold text-text-secondary">{label}</dt><dd className="mt-1 break-all rounded-lg bg-slate-50 px-2 py-1.5 font-mono text-xs text-blue-700">{'{' + key + '}'}</dd></div>)}</dl>
         </SectionCard>
         <SectionCard><div className="mb-3 flex items-center gap-2"><Info className="h-5 w-5 text-blue-600" /><h3 className="font-semibold text-text-primary">Booking information</h3></div>
