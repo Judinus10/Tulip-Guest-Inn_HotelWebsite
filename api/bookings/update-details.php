@@ -24,6 +24,8 @@ $id = (int) ($data['id'] ?? 0);
 $fullName = clean_string($data['full_name'] ?? '', 150);
 $email = strtolower(clean_string($data['email'] ?? '', 190));
 $phone = clean_string($data['phone'] ?? '', 50);
+$roomId = (int) ($data['room_id'] ?? 0);
+if ($roomId < 1) json_response(false, 'Please refresh the page and select a valid room before saving.', 422);
 $roomName = clean_string($data['room_name'] ?? '', 150);
 $checkInDate = clean_string($data['check_in_date'] ?? '', 20);
 $checkOutDate = clean_string($data['check_out_date'] ?? '', 20);
@@ -39,7 +41,7 @@ $sendEmail = !empty($data['send_email']) && filter_var($data['send_email'], FILT
 if ($id < 1) {
     json_response(false, 'Please select a valid booking to edit.', 422);
 }
-if ($fullName === '' || $email === '' || $phone === '' || $roomName === '' || $checkInDate === '' || $checkOutDate === '' || $guests < 1) {
+if ($fullName === '' || $email === '' || $phone === '' || $roomId < 1 || $checkInDate === '' || $checkOutDate === '' || $guests < 1) {
     json_response(false, 'Please complete all required booking details.', 422);
 }
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -108,10 +110,13 @@ try {
         json_response(false, 'This booking can no longer be edited because it is cancelled or the stay has already started.', 409);
     }
 
-    $roomStmt = $pdo->prepare('SELECT id, room_name, max_guests, base_price, currency, status FROM rooms WHERE room_name = :room_name LIMIT 1 FOR UPDATE');
-    $roomStmt->execute([':room_name' => $roomName]);
-    $room = $roomStmt->fetch();
-    $sameRoom = strcasecmp($roomName, (string) ($booking['room_name'] ?? '')) === 0;
+    $room = booking_selected_room($pdo, $roomId, $roomName, true);
+    if ($room) {
+        $roomId = (int) $room['id'];
+        $roomName = (string) $room['room_name'];
+    }
+
+    $sameRoom = $room && $roomId === (int) ($booking['room_id'] ?? 0);
 
     if (!$room || (!$sameRoom && (string) ($room['status'] ?? '') !== 'Available')) {
         $pdo->rollBack();
@@ -125,7 +130,7 @@ try {
     $conflictStmt = $pdo->prepare(
         "SELECT id FROM bookings
          WHERE id <> :id
-           AND room_name = :room_name
+           AND (room_id = :room_id OR room_id IS NULL)
            " . active_booking_conflict_sql() . "
            AND :check_in < check_out_date
            AND :check_out > check_in_date
@@ -133,7 +138,7 @@ try {
     );
     $conflictStmt->execute([
         ':id' => $id,
-        ':room_name' => $roomName,
+        ':room_id' => $roomId,
         ':hold_cutoff' => booking_hold_cutoff_datetime(),
         ':check_in' => $checkInDate,
         ':check_out' => $checkOutDate,
@@ -169,7 +174,7 @@ try {
             staying_guest_email = :staying_guest_email,
             staying_guest_phone = :staying_guest_phone,
             staying_guest_note = :staying_guest_note,
-            room_name = :room_name, check_in_date = :check_in_date,
+            room_id = :room_id, room_name = :room_name, check_in_date = :check_in_date,
             check_out_date = :check_out_date, guests = :guests,
             message = :message, subtotal_amount=:subtotal_amount, discount_amount=:discount_amount,
             applied_offer_id=:applied_offer_id, applied_offer_title=:applied_offer_title, offer_snapshot_json=:offer_snapshot_json,
@@ -186,6 +191,7 @@ try {
         ':staying_guest_email' => $stayingGuestEmail !== '' ? $stayingGuestEmail : null,
         ':staying_guest_phone' => $stayingGuestPhone !== '' ? $stayingGuestPhone : null,
         ':staying_guest_note' => $stayingGuestNote !== '' ? $stayingGuestNote : null,
+        ':room_id' => $roomId,
         ':room_name' => $roomName,
         ':check_in_date' => $checkInDate,
         ':check_out_date' => $checkOutDate,
@@ -208,6 +214,7 @@ try {
         'full_name' => (string) ($booking['full_name'] ?? ''),
         'email' => (string) ($booking['email'] ?? ''),
         'phone' => (string) ($booking['phone'] ?? ''),
+        'room_id' => (int) ($booking['room_id'] ?? 0),
         'room_name' => (string) ($booking['room_name'] ?? ''),
         'check_in_date' => (string) ($booking['check_in_date'] ?? ''),
         'check_out_date' => (string) ($booking['check_out_date'] ?? ''),
@@ -222,7 +229,7 @@ try {
     ];
     $newSnapshot = [
         'full_name' => $fullName, 'email' => $email, 'phone' => $phone,
-        'room_name' => $roomName, 'check_in_date' => $checkInDate,
+        'room_id' => $roomId, 'room_name' => $roomName, 'check_in_date' => $checkInDate,
         'check_out_date' => $checkOutDate, 'guests' => $guests,
         'message' => $message, 'amount' => $amount,
         'is_booking_for_other' => $isBookingForOther ? 1 : 0,

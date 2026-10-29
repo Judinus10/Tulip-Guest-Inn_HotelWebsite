@@ -34,7 +34,7 @@ try {
         "SELECT id FROM bookings
          WHERE (booking_group_id IS NULL OR booking_group_id <> :group_id)
            AND id <> :exclude_id
-           AND room_name = :room_name
+           AND (room_id = :room_id OR room_id IS NULL)
            " . active_booking_conflict_sql() . "
            AND :check_in < check_out_date
            AND :check_out > check_in_date
@@ -46,7 +46,7 @@ try {
         $conflictStmt->execute([
             ':group_id' => $groupId,
             ':exclude_id' => $excludeBookingId,
-            ':room_name' => $room['room_name'],
+            ':room_id' => $room['id'],
             ':hold_cutoff' => booking_hold_cutoff_datetime(),
             ':check_in' => $checkInDate,
             ':check_out' => $checkOutDate,

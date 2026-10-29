@@ -60,7 +60,7 @@ function load_payment_history(PDO $pdo, int $bookingId): array
     }, $stmt->fetchAll() ?: []);
 }
 
-function public_room_url(PDO $pdo, string $roomName): string
+function public_room_url(PDO $pdo, int $roomId): string
 {
     $publicBaseUrl = defined('FRONTEND_URL') && FRONTEND_URL !== ''
         ? FRONTEND_URL
@@ -68,8 +68,8 @@ function public_room_url(PDO $pdo, string $roomName): string
     $publicBaseUrl = rtrim((string) $publicBaseUrl, '/');
 
     try {
-        $stmt = $pdo->prepare('SELECT id, slug FROM rooms WHERE room_name = :room_name LIMIT 1');
-        $stmt->execute([':room_name' => $roomName]);
+        $stmt = $pdo->prepare('SELECT id, slug FROM rooms WHERE id = :room_id LIMIT 1');
+        $stmt->execute([':room_id' => $roomId]);
         $room = $stmt->fetch();
 
         if ($room) {
@@ -233,7 +233,7 @@ try {
             'order_id' => $orderId,
             'payment_id' => (string) ($record['payment_id'] ?? ''),
             'payment_method' => (string) ($record['payment_method'] ?? 'PayHere'),
-            'room_url' => public_room_url($pdo, (string) ($record['room_name'] ?? '')),
+            'room_url' => public_room_url($pdo, (int) ($record['room_id'] ?? 0)),
             'invoice_download_url' => $invoiceDownloadUrl,
             'hold_minutes' => booking_hold_minutes(),
             'expires_at' => $expiresAt,

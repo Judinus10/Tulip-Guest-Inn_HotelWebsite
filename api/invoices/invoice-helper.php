@@ -167,11 +167,11 @@ function pdf_prepare_png_logo(string $pngPath): string
     return $temporaryPath;
 }
 
-function invoice_find_room_image(PDO $pdo, string $roomName): string
+function invoice_find_room_image(PDO $pdo, int $roomId): string
 {
     try {
-        $stmt = $pdo->prepare('SELECT id FROM rooms WHERE room_name = :room_name LIMIT 1');
-        $stmt->execute([':room_name' => $roomName]);
+        $stmt = $pdo->prepare('SELECT id FROM rooms WHERE id = :room_id LIMIT 1');
+        $stmt->execute([':room_id' => $roomId]);
         $room = $stmt->fetch();
         if (!$room) return '';
 
@@ -222,8 +222,8 @@ function invoice_settings(PDO $pdo): array
 function invoice_room_assignments(PDO $pdo, int $bookingId, int $groupId = 0): array
 {
     $where = $groupId > 0 ? 'b.booking_group_id = :assignment_id' : 'b.id = :assignment_id';
-    $stmt = $pdo->prepare("SELECT b.id AS booking_id, b.room_name, COALESCE(r.room_number, '') AS room_number
-        FROM bookings b LEFT JOIN rooms r ON r.room_name = b.room_name
+    $stmt = $pdo->prepare("SELECT b.id AS booking_id, b.room_id, b.room_name, COALESCE(r.room_number, '') AS room_number
+        FROM bookings b LEFT JOIN rooms r ON r.id = b.room_id
         WHERE " . $where . " ORDER BY b.is_group_primary DESC, b.id ASC");
     $stmt->execute([':assignment_id' => $groupId > 0 ? $groupId : $bookingId]);
     return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -275,7 +275,7 @@ function build_invoice_data_for_booking(PDO $pdo, int $bookingId, array $payment
     }
 
     $settings = invoice_settings($pdo);
-    $roomImage = invoice_find_room_image($pdo, (string) ($booking['room_name'] ?? ''));
+    $roomImage = invoice_find_room_image($pdo, (int) ($booking['room_id'] ?? 0));
 
     return [
         'booking_id' => $bookingId,

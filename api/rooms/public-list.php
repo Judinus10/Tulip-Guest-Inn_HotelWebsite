@@ -13,14 +13,14 @@ function room_is_available_for_dates(PDO $pdo, int $roomId, string $roomName, st
     $stmt = $pdo->prepare(
         "SELECT id
          FROM bookings
-         WHERE room_name = :room_name
+         WHERE (room_id = :room_id OR room_id IS NULL)
            " . active_booking_conflict_sql() . "
            AND :requested_check_in < check_out_date
            AND :requested_check_out > check_in_date
          LIMIT 1"
     );
     $stmt->execute([
-        ':room_name' => $roomName,
+        ':room_id' => $roomId,
         ':hold_cutoff' => booking_hold_cutoff_datetime(),
         ':requested_check_in' => $checkInDate,
         ':requested_check_out' => $checkOutDate,

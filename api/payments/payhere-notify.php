@@ -142,7 +142,7 @@ try {
 
     $expectedAmount = normalize_payhere_amount((string) ($existingPayment['amount'] ?? $booking['amount'] ?? 0));
     if ((float) $expectedAmount <= 0) {
-        $expectedAmount = normalize_payhere_amount((string) calculate_booking_amount((string) $booking['room_name'], (string) $booking['check_in_date'], (string) $booking['check_out_date']));
+        $expectedAmount = normalize_payhere_amount((string) calculate_booking_amount((int) ($booking['room_id'] ?? 0), (string) $booking['check_in_date'], (string) $booking['check_out_date']));
     }
     $expectedCurrency = strtoupper((string) ($existingPayment['currency'] ?? $booking['currency'] ?? PAYMENT_CURRENCY));
 

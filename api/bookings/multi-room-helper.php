@@ -20,9 +20,9 @@ function multi_room_group_rows(PDO $pdo, int $groupId): array
     if ($groupId < 1) return [];
 
     $stmt = $pdo->prepare(
-        'SELECT b.*, r.id AS room_id, r.max_guests, r.base_price
+        'SELECT b.*, r.max_guests, r.base_price
          FROM bookings b
-         LEFT JOIN rooms r ON r.room_name = b.room_name
+         LEFT JOIN rooms r ON r.id = b.room_id
          WHERE b.booking_group_id = :group_id
          ORDER BY b.is_group_primary DESC, b.id ASC'
     );
@@ -102,14 +102,14 @@ function multi_room_prepare_rooms(
             throw new RuntimeException('An assigned room cannot accommodate the selected guests.');
         }
         $conflict = $pdo->prepare(
-            "SELECT id FROM bookings WHERE room_name = :room_name
+            "SELECT id FROM bookings WHERE (room_id = :room_id OR room_id IS NULL)
                " . active_booking_conflict_sql() . "
                AND :requested_check_in < check_out_date
                AND :requested_check_out > check_in_date
              LIMIT 1 FOR UPDATE"
         );
         $conflict->execute([
-            ':room_name' => $room['room_name'],
+            ':room_id' => $id,
             ':hold_cutoff' => booking_hold_cutoff_datetime(),
             ':requested_check_in' => $checkInDate,
             ':requested_check_out' => $checkOutDate,
@@ -164,31 +164,30 @@ function multi_room_lock_booking_scope(PDO $pdo, array $booking): array
 function multi_room_scope_has_conflict(PDO $pdo, array $rows): bool
 {
     if (!$rows) throw new InvalidArgumentException('A booking is required.');
-    $names = array_values(array_unique(array_column($rows, 'room_name')));
-    sort($names);
-    $placeholders = implode(',', array_fill(0, count($names), '?'));
-    $lock = $pdo->prepare("SELECT id, room_name FROM rooms WHERE room_name IN ({$placeholders}) ORDER BY id FOR UPDATE");
-    $lock->execute($names);
-    $rooms = $lock->fetchAll();
-    if (count($rooms) !== count($names)) return true;
-    $roomIds = array_column($rooms, 'id', 'room_name');
+    $roomIds = array_values(array_unique(array_map(static fn(array $row): int => (int) ($row['room_id'] ?? 0), $rows)));
+    if (in_array(0, $roomIds, true)) return true;
+    sort($roomIds);
+    $placeholders = implode(',', array_fill(0, count($roomIds), '?'));
+    $lock = $pdo->prepare("SELECT id FROM rooms WHERE id IN ({$placeholders}) ORDER BY id FOR UPDATE");
+    $lock->execute($roomIds);
+    if (count($lock->fetchAll()) !== count($roomIds)) return true;
     $ids = array_map(static fn(array $row): int => (int) $row['id'], $rows);
     // IDs come from locked database rows, never from request text.
     $excluded = implode(',', $ids);
     $conflict = $pdo->prepare("SELECT id FROM bookings
-        WHERE room_name = :room_name AND id NOT IN ({$excluded})
+        WHERE (room_id = :room_id OR room_id IS NULL) AND id NOT IN ({$excluded})
         " . active_booking_conflict_sql() . "
         AND :requested_check_in < check_out_date
         AND :requested_check_out > check_in_date
         LIMIT 1 FOR UPDATE");
     foreach ($rows as $row) {
         $conflict->execute([
-            ':room_name' => $row['room_name'],
+            ':room_id' => (int) $row['room_id'],
             ':hold_cutoff' => booking_hold_cutoff_datetime(),
             ':requested_check_in' => $row['check_in_date'],
             ':requested_check_out' => $row['check_out_date'],
         ]);
-        if ($conflict->fetch() || ics_room_conflict($pdo, (int) $roomIds[$row['room_name']],
+        if ($conflict->fetch() || ics_room_conflict($pdo, (int) $row['room_id'],
             (string) $row['check_in_date'], (string) $row['check_out_date'])) return true;
     }
     return false;

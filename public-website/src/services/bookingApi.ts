@@ -2,6 +2,7 @@ import { getBotToken } from './botProtection';
 import { requestJson } from './apiClient';
 
 export type BookingFormPayload = {
+  room_id: string | number;
   full_name: string;
   email: string;
   phone: string;

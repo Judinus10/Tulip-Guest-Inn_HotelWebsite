@@ -39,9 +39,9 @@ try {
             b.staying_guest_email,
             b.staying_guest_phone,
             b.staying_guest_note,
-            r.id AS room_id,
+            b.room_id,
             r.room_number,
-            b.room_name,
+            COALESCE(r.room_name, b.room_name) AS room_name,
             CASE
                 WHEN b.room_name LIKE 'Ground Floor%' THEN 'Ground Floor'
                 WHEN b.room_name LIKE 'First Floor%' THEN 'First Floor'
@@ -83,7 +83,7 @@ try {
             b.created_at,
             b.updated_at
          FROM bookings b
-         LEFT JOIN rooms r ON r.room_name = b.room_name
+         LEFT JOIN rooms r ON r.id = b.room_id
          WHERE b.booking_group_id IS NULL OR b.is_group_primary = 1
          ORDER BY b.created_at DESC"
     );

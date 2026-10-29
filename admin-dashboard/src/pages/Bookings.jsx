@@ -163,13 +163,9 @@ function normalizeRoom(room) {
   }
 }
 
-function getRoom(roomId, roomName = '', rooms = bookingRooms) {
-  return (
-    rooms.find((room) => Number(room.id) === Number(roomId)) ||
-    rooms.find((room) => room.room_name === roomName) ||
-    bookingRooms.find((room) => Number(room.id) === Number(roomId)) ||
-    bookingRooms.find((room) => room.room_name === roomName)
-  )
+function getRoom(roomId, rooms = bookingRooms) {
+  // A booking label is historical text, never a substitute for its physical ID.
+  return Number(roomId) > 0 ? rooms.find((room) => Number(room.id) === Number(roomId)) : undefined
 }
 
 function getNights(checkIn, checkOut) {
@@ -632,7 +628,7 @@ function CombinedStatusModal({ booking, focus = 'booking', onClose, onSave }) {
 }
 
 function AddBookingModal({ rooms, bookings, onClose, onSave }) {
-  const [form, setForm] = useState({ ...emptyManualBooking, room_name: rooms[0]?.room_name || '' })
+  const [form, setForm] = useState({ ...emptyManualBooking, room_id: Number(rooms[0]?.id || 0), room_name: rooms[0]?.room_name || '' })
   const [errors, setErrors] = useState({})
   const [submitWarning, setSubmitWarning] = useState('')
   const fieldRefs = {
@@ -647,24 +643,23 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
 
   const today = getTodayInputDate()
   const roomAvailability = useRoomAvailability(form.check_in_date, form.check_out_date)
-  const unavailableRoomNames = roomAvailability.unavailableNames
-  const availableRooms = rooms.filter((room) => roomAvailability.availableNames.has(String(room.room_name || '').trim().toLowerCase()) && Number(room.capacity || room.max_guests || 0) >= Number(form.guests || 1))
+  const availableRooms = rooms.filter((room) => roomAvailability.availableIds.has(Number(room.id)) && Number(room.capacity || room.max_guests || 0) >= Number(form.guests || 1))
 
-  const selectedRoom = getRoom(0, form.room_name, rooms)
+  const selectedRoom = rooms.find((room) => Number(room.id) === Number(form.room_id))
   const nights = getNights(form.check_in_date, form.check_out_date)
   const estimatedAmount = nights * Number(selectedRoom?.price_per_night || 0)
-  const selectedRoomAvailable = availableRooms.some((room) => room.room_name === form.room_name)
+  const selectedRoomAvailable = availableRooms.some((room) => Number(room.id) === Number(form.room_id))
   const canCheckAvailability = form.check_in_date && form.check_out_date && form.check_out_date > form.check_in_date
 
   useEffect(() => {
     if (!canCheckAvailability) return
 
     if (roomAvailability.loading || roomAvailability.error) return
-    if (!availableRooms.some((room) => room.room_name === form.room_name)) {
-      const nextRoom = availableRooms[0]?.room_name || ''
-      if (form.room_name !== nextRoom) setForm((current) => ({ ...current, room_name: nextRoom }))
+    if (!availableRooms.some((room) => Number(room.id) === Number(form.room_id))) {
+      const nextRoom = availableRooms[0]
+      if (Number(form.room_id) !== Number(nextRoom?.id || 0)) setForm((current) => ({ ...current, room_id: Number(nextRoom?.id || 0), room_name: nextRoom?.room_name || '' }))
     }
-  }, [canCheckAvailability, roomAvailability.loading, roomAvailability.error, availableRooms, form.room_name])
+  }, [canCheckAvailability, roomAvailability.loading, roomAvailability.error, availableRooms, form.room_id])
 
   const scrollToField = (fieldName) => {
     const element = fieldRefs[fieldName]?.current
@@ -748,7 +743,7 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
 
     if (!validateForm()) return
 
-    onSave(form)
+    onSave({ ...form, room_id: Number(selectedRoom?.id || 0), room_name: selectedRoom?.room_name || form.room_name })
   }
 
   return (
@@ -850,16 +845,16 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
             <Label>Room *</Label>
             <select
               ref={fieldRefs.room_name}
-              value={form.room_name}
+              value={form.room_id || ''}
               disabled={!canCheckAvailability || roomAvailability.loading || Boolean(roomAvailability.error)}
-              onChange={(event) => updateField('room_name', event.target.value)}
+              onChange={(event) => { const room = rooms.find((item) => Number(item.id) === Number(event.target.value)); updateField('room_id', Number(event.target.value)); updateField('room_name', room?.room_name || '') }}
               className={`h-10 w-full rounded-lg border px-3 text-sm text-text-primary shadow-sm focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 ${errorClass(Boolean(errors.room_name))}`}
               aria-invalid={Boolean(errors.room_name)}
             >
               {!canCheckAvailability ? <option value="">Select dates first</option> : null}
               {canCheckAvailability && availableRooms.length === 0 ? <option value="">No rooms available</option> : null}
               {canCheckAvailability && availableRooms.map((room) => (
-                <option key={room.id || room.room_name} value={room.room_name}>
+                <option key={room.id || room.room_name} value={room.id}>
                   {room.room_number ? `${room.room_number} · ` : ''}{room.room_name} · {formatMoney(room.price_per_night)} / night
                 </option>
               ))}
@@ -1060,7 +1055,8 @@ function EditBookingModal({ booking, rooms, bookings, onClose, onSave }) {
     full_name: booking.booker_name || booking.guest_name || '',
     email: booking.booker_email || booking.guest_email || '',
     phone: booking.booker_phone || booking.guest_phone || '',
-    room_name: booking.room_name || '',
+    room_id: Number(booking.room_id || 0),
+    room_name: getRoom(booking.room_id, rooms)?.room_name || booking.room_name || '',
     check_in_date: booking.check_in || '',
     check_out_date: booking.check_out || '',
     guests: Number(booking.guests || 1),
@@ -1087,8 +1083,7 @@ function EditBookingModal({ booking, rooms, bookings, onClose, onSave }) {
   }
 
   const roomAvailability = useRoomAvailability(form.check_in_date, form.check_out_date, booking.id)
-  const unavailableRoomNames = roomAvailability.unavailableNames
-  const selectedRoom = getRoom(0, form.room_name, rooms)
+  const selectedRoom = rooms.find((room) => Number(room.id) === Number(form.room_id))
   const selectedRoomCapacity = Math.max(1, Number(selectedRoom?.capacity || 1))
   const earliestCheckOut = addDaysToInputDate(form.check_in_date, 1) || addDaysToInputDate(earliestCheckIn, 1)
   const nights = getNights(form.check_in_date, form.check_out_date)
@@ -1136,9 +1131,10 @@ function EditBookingModal({ booking, rooms, bookings, onClose, onSave }) {
     if (form.staying_guest_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.staying_guest_email.trim())) nextErrors.staying_guest_email = 'Please enter a valid staying guest email.'
     if (form.check_in_date && form.check_in_date < earliestCheckIn) nextErrors.check_in_date = 'Check-in must be after today.'
     if (form.check_in_date && form.check_out_date && form.check_out_date <= form.check_in_date) nextErrors.check_out_date = 'Check-out must be after check-in.'
+    if (!selectedRoom) nextErrors.room_name = 'Select a valid assigned room.'
     if (selectedRoom && Number(form.guests) > selectedRoomCapacity) nextErrors.guests = `This room allows a maximum of ${selectedRoomCapacity} guests.`
     if (roomAvailability.loading || roomAvailability.error) nextErrors.room_name = roomAvailability.error || 'Wait for the availability check to finish.'
-    if (!roomAvailability.availableNames.has(String(form.room_name || '').trim().toLowerCase())) nextErrors.room_name = 'This room is already booked for the selected dates.'
+    if (!roomAvailability.availableIds.has(Number(form.room_id))) nextErrors.room_name = 'This room is already booked for the selected dates.'
 
     setErrors(nextErrors)
     const first = Object.keys(nextErrors)[0]
@@ -1153,7 +1149,7 @@ function EditBookingModal({ booking, rooms, bookings, onClose, onSave }) {
   const handleSubmit = (event) => {
     event.preventDefault()
     if (!validate()) return
-    onSave(booking.id, form)
+    onSave(booking.id, { ...form, room_id: Number(selectedRoom?.id || 0), room_name: selectedRoom?.room_name || form.room_name })
   }
 
   return (
@@ -1195,10 +1191,11 @@ function EditBookingModal({ booking, rooms, bookings, onClose, onSave }) {
           </div>
           <div className="space-y-2 md:col-span-2">
             <Label>Room *</Label>
-            <select ref={fieldRefs.room_name} value={form.room_name} onChange={(event) => updateField('room_name', event.target.value)} className={`h-10 w-full rounded-lg border px-3 text-sm shadow-sm focus:outline-none focus:ring-2 ${errorClass(Boolean(errors.room_name))}`}>
+            <select ref={fieldRefs.room_name} value={form.room_id || ''} onChange={(event) => { const room = rooms.find((item) => Number(item.id) === Number(event.target.value)); updateField('room_id', Number(event.target.value)); updateField('room_name', room?.room_name || '') }} className={`h-10 w-full rounded-lg border px-3 text-sm shadow-sm focus:outline-none focus:ring-2 ${errorClass(Boolean(errors.room_name))}`}>
+              <option value="">Select a room</option>
               {rooms.map((room) => {
-                const unavailable = roomAvailability.loading || !roomAvailability.availableNames.has(String(room.room_name || '').trim().toLowerCase())
-                return <option key={room.id || room.room_name} value={room.room_name} disabled={unavailable}>{room.room_name}{unavailable ? ' — unavailable' : ''}</option>
+                const unavailable = roomAvailability.loading || !roomAvailability.availableIds.has(Number(room.id))
+                return <option key={room.id || room.room_name} value={room.id} disabled={unavailable}>{room.room_name}{unavailable ? ' — unavailable' : ''}</option>
               })}
             </select>
             <FieldError message={errors.room_name || roomAvailability.error} />
@@ -1264,7 +1261,7 @@ function EditBookingModal({ booking, rooms, bookings, onClose, onSave }) {
 }
 
 function BookingDetailsModal({ booking, rooms, onClose }) {
-  const room = getRoom(booking.room_id, booking.room_name, rooms)
+  const room = getRoom(booking.room_id, rooms)
   const groupRooms = Array.isArray(booking.group_rooms) ? booking.group_rooms : []
   const isGroupBooking = Boolean(booking.booking_group_id && groupRooms.length > 0)
 

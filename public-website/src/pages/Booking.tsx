@@ -216,6 +216,7 @@ export default function Booking() {
         full_name: `${form.firstName} ${form.lastName}`.trim(),
         email: form.email,
         phone: form.phone,
+        room_id: selectedRoom.id,
         room_name: selectedRoom.name,
         check_in_date: form.checkIn,
         check_out_date: form.checkOut,

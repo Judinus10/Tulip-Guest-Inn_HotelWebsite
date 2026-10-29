@@ -106,13 +106,13 @@ try {
         $conflictStmt = $pdo->prepare(
             "SELECT id FROM bookings
              WHERE (booking_group_id IS NULL OR booking_group_id <> :group_id)
-               AND room_name = :room_name
+               AND (room_id = :room_id OR room_id IS NULL)
                " . active_booking_conflict_sql() . "
                AND :check_in < check_out_date AND :check_out > check_in_date
              LIMIT 1 FOR UPDATE"
         );
         $conflictStmt->execute([
-            ':group_id' => $groupId, ':room_name' => $room['room_name'],
+            ':group_id' => $groupId, ':room_id' => (int) $room['id'],
             ':hold_cutoff' => booking_hold_cutoff_datetime(), ':check_in' => $checkInDate, ':check_out' => $checkOutDate,
         ]);
         if ($conflictStmt->fetch() || ics_room_conflict($pdo, $roomId, $checkInDate, $checkOutDate)) {
@@ -173,7 +173,7 @@ try {
 
     $updateStmt = $pdo->prepare(
         'UPDATE bookings SET is_group_primary=:is_primary, full_name=:full_name, email=:email, phone=:phone,
-         room_name=:room_name, check_in_date=:check_in, check_out_date=:check_out, guests=:guests,
+         room_id=:room_id, room_name=:room_name, check_in_date=:check_in, check_out_date=:check_out, guests=:guests,
          message=:message, subtotal_amount=:subtotal, discount_amount=:discount, applied_offer_id=:offer_id,
          applied_offer_title=:offer_title, offer_snapshot_json=:offer_snapshot, amount=:amount, currency=:currency, updated_at=NOW() WHERE id=:id'
     );
@@ -181,11 +181,11 @@ try {
         "INSERT INTO bookings
         (booking_group_id, is_group_primary, full_name, email, phone, is_booking_for_other,
          staying_guest_name, staying_guest_email, staying_guest_phone, staying_guest_note,
-         room_name, check_in_date, check_out_date, guests, message, status, payment_status,
+         room_id, room_name, check_in_date, check_out_date, guests, message, status, payment_status,
          subtotal_amount, discount_amount, applied_offer_id, applied_offer_title, offer_snapshot_json,
          amount, currency, email_status, ip_address, user_agent, created_at, updated_at)
         VALUES (:group_id, 0, :full_name, :email, :phone, 0, NULL, NULL, NULL, NULL,
-         :room_name, :check_in, :check_out, :guests, :message, :status, :payment_status,
+         :room_id, :room_name, :check_in, :check_out, :guests, :message, :status, :payment_status,
          :subtotal, :discount, :offer_id, :offer_title, :offer_snapshot,
          :amount, :currency, 'Pending', :ip_address, :user_agent, NOW(), NOW())"
     );
@@ -199,14 +199,14 @@ try {
             $updateStmt->execute($priceParams + [
                 ':is_primary' => $bookingId === $primaryBookingId ? 1 : 0,
                 ':full_name' => $fullName, ':email' => $email, ':phone' => $phone,
-                ':room_name' => $room['room_name'], ':check_in' => $checkInDate, ':check_out' => $checkOutDate,
+                ':room_id' => (int) $room['id'], ':room_name' => $room['room_name'], ':check_in' => $checkInDate, ':check_out' => $checkOutDate,
                 ':guests' => $guests, ':message' => $message !== '' ? $message : null,
                 ':amount' => $amount, ':currency' => $room['currency'] ?: ($primary['currency'] ?? 'LKR'), ':id' => $bookingId,
             ]);
         } else {
             $insertStmt->execute($priceParams + [
                 ':group_id' => $groupId, ':full_name' => $fullName, ':email' => $email, ':phone' => $phone,
-                ':room_name' => $room['room_name'], ':check_in' => $checkInDate, ':check_out' => $checkOutDate,
+                ':room_id' => (int) $room['id'], ':room_name' => $room['room_name'], ':check_in' => $checkInDate, ':check_out' => $checkOutDate,
                 ':guests' => $guests, ':message' => $message !== '' ? $message : null,
                 ':status' => $primary['status'], ':payment_status' => $primary['payment_status'], ':amount' => $amount,
                 ':currency' => $room['currency'] ?: ($primary['currency'] ?? 'LKR'),

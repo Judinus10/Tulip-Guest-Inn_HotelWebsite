@@ -73,14 +73,12 @@ function calculateNights(checkIn, checkOut) {
   return Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000))
 }
 
-function getRoomByName(roomName) {
-  return bookingRooms.find((room) => room.room_name.toLowerCase() === String(roomName || '').toLowerCase())
-}
-
 export function normalizeBooking(booking) {
   const isExternal = String(booking.source || '').trim().toLowerCase() === 'booking.com'
   const roomName = booking.room_name || booking.roomName || booking.room || ''
-  const room = getRoomByName(roomName)
+  const room = Number(booking.room_id) > 0
+    ? bookingRooms.find((item) => Number(item.id) === Number(booking.room_id))
+    : undefined
   const checkIn = booking.check_in || booking.check_in_date || booking.checkIn || booking.arrival_date || booking.arrival || ''
   const checkOut = booking.check_out || booking.check_out_date || booking.checkOut || booking.departure_date || booking.departure || ''
   const guests = Number(booking.guests || booking.guest_count || booking.no_of_guests || booking.adults || 1)
@@ -163,6 +161,7 @@ export async function createManualBooking(formData) {
     full_name: formData.full_name,
     email: formData.email,
     phone: formData.phone,
+    room_id: Number(formData.room_id || 0),
     room_name: formData.room_name,
     check_in_date: formData.check_in_date,
     check_out_date: formData.check_out_date,
@@ -293,6 +292,7 @@ export async function updateBookingDetails(bookingId, updates) {
       full_name: updates.full_name,
       email: updates.email,
       phone: updates.phone,
+      room_id: Number(updates.room_id || 0),
       room_name: updates.room_name,
       check_in_date: updates.check_in_date,
       check_out_date: updates.check_out_date,

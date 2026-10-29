@@ -126,7 +126,7 @@ try {
 
         $conflict = $pdo->prepare(
             "SELECT id FROM bookings
-             WHERE room_name = :room_name
+             WHERE (room_id = :room_id OR room_id IS NULL)
                " . active_booking_conflict_sql() . "
                AND :requested_check_in < check_out_date
                AND :requested_check_out > check_in_date
@@ -134,7 +134,7 @@ try {
              FOR UPDATE"
         );
         $conflict->execute([
-            ':room_name' => $selectedRoom['room_name'],
+            ':room_id' => (int) $selectedRoom['id'],
             ':hold_cutoff' => booking_hold_cutoff_datetime(),
             ':requested_check_in' => $checkInDate,
             ':requested_check_out' => $checkOutDate,
@@ -188,13 +188,13 @@ try {
             'INSERT INTO bookings
                 (booking_group_id, is_group_primary, full_name, email, phone,
                  is_booking_for_other, staying_guest_name, staying_guest_email, staying_guest_phone, staying_guest_note,
-                 room_name, check_in_date, check_out_date, guests, message, status, payment_status,
+                 room_id, room_name, check_in_date, check_out_date, guests, message, status, payment_status,
                  subtotal_amount, discount_amount, applied_offer_id, applied_offer_title, offer_snapshot_json,
                  amount, currency, email_status, ip_address, user_agent, created_at, updated_at)
              VALUES
                 (:booking_group_id, :is_group_primary, :full_name, :email, :phone,
                  0, NULL, NULL, NULL, NULL,
-                 :room_name, :check_in_date, :check_out_date, :guests, :message, \'Pending\', \'Payment Pending\',
+                 :room_id, :room_name, :check_in_date, :check_out_date, :guests, :message, \'Pending\', \'Payment Pending\',
                  :subtotal_amount, :discount_amount, :applied_offer_id, :applied_offer_title, :offer_snapshot_json,
                  :amount, :currency, \'Pending\', :ip_address, :user_agent, NOW(), NOW())'
         );
@@ -204,7 +204,7 @@ try {
             ':full_name' => $fullName,
             ':email' => $email,
             ':phone' => $phone,
-            ':room_name' => $selectedRoom['room_name'],
+            ':room_id' => (int) $selectedRoom['id'], ':room_name' => $selectedRoom['room_name'],
             ':check_in_date' => $checkInDate,
             ':check_out_date' => $checkOutDate,
             ':guests' => $selectedRoom['allocated_guests'],

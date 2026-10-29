@@ -32,6 +32,8 @@ $stayingGuestName = clean_string($data['staying_guest_name'] ?? '', 150);
 $stayingGuestEmail = strtolower(clean_string($data['staying_guest_email'] ?? '', 190));
 $stayingGuestPhone = clean_string($data['staying_guest_phone'] ?? '', 50);
 $stayingGuestNote = clean_string($data['staying_guest_note'] ?? '', 3000);
+$roomId = (int) ($data['room_id'] ?? 0);
+if ($roomId < 1) json_response(false, 'Please refresh the page and select a valid room before saving.', 422);
 $roomName = clean_string($data['room_name'] ?? '', 150);
 $checkInDate = clean_string($data['check_in_date'] ?? '', 20);
 $checkOutDate = clean_string($data['check_out_date'] ?? '', 20);
@@ -58,7 +60,7 @@ if ($isOnlinePayment && !payment_runtime()['payhere_enabled']) {
     ]);
 }
 
-if ($fullName === '' || $email === '' || $phone === '' || $roomName === '' || $checkInDate === '' || $checkOutDate === '' || $guests < 1) {
+if ($fullName === '' || $email === '' || $phone === '' || $roomId < 1 || $checkInDate === '' || $checkOutDate === '' || $guests < 1) {
     json_response(false, 'Please complete all required booking details.', 422, ['error_code' => 'MISSING_REQUIRED_FIELDS']);
 }
 
@@ -108,13 +110,6 @@ if ($guests > 20) {
 
 protect_public_booking($data, $email, $phone, $checkInDate, $checkOutDate);
 
-$subtotalAmount = calculate_booking_amount($roomName, $checkInDate, $checkOutDate);
-$amount = $subtotalAmount;
-
-if ($amount <= 0) {
-    json_response(false, 'Unable to calculate booking amount for the selected room.', 422);
-}
-
 $bookingId = 0;
 $bookingCommitted = false;
 
@@ -123,8 +118,6 @@ try {
     lock_booking_inventory($pdo);
     offer_ensure_booking_snapshot_schema($pdo);
     $nights = max(1, (int) $checkIn->diff($checkOut)->days);
-    $offerPrice = offer_best_price($pdo, $subtotalAmount, $checkInDate, $nights, 1, $guests);
-    $amount = $offerPrice['total'];
     expire_pending_bookings($pdo, null, true);
 
     // Initialize the ICS tables before starting the booking transaction.
@@ -136,9 +129,11 @@ try {
 
     $pdo->beginTransaction();
 
-    $roomStmt = $pdo->prepare("SELECT id, max_guests, status FROM rooms WHERE room_name = :room_name LIMIT 1 FOR UPDATE");
-    $roomStmt->execute([':room_name' => $roomName]);
-    $room = $roomStmt->fetch();
+    $room = booking_selected_room($pdo, $roomId, $roomName, true);
+    if ($room) {
+        $roomId = (int) $room['id'];
+        $roomName = (string) $room['room_name'];
+    }
 
     if (!$room || ($room['status'] ?? '') !== 'Available') {
         $pdo->rollBack();
@@ -153,14 +148,14 @@ try {
     $conflict = $pdo->prepare(
         "SELECT id, check_in_date, check_out_date
          FROM bookings
-         WHERE room_name = :room_name
+         WHERE (room_id = :room_id OR room_id IS NULL)
            " . active_booking_conflict_sql() . "
            AND :requested_check_in < check_out_date
            AND :requested_check_out > check_in_date
          LIMIT 1"
     );
     $conflict->execute([
-        ':room_name' => $roomName,
+        ':room_id' => $roomId,
         ':hold_cutoff' => booking_hold_cutoff_datetime(),
         ':requested_check_in' => $checkInDate,
         ':requested_check_out' => $checkOutDate,
@@ -170,6 +165,14 @@ try {
         $pdo->rollBack();
         json_response(false, 'This room was just booked for the selected dates. Please choose another room or change your dates.', 409, ['available' => false, 'error_code' => 'ROOM_UNAVAILABLE']);
     }
+
+    $subtotalAmount = round((float) $room['base_price'] * $nights, 2);
+    if ($subtotalAmount <= 0) {
+        $pdo->rollBack();
+        json_response(false, 'Unable to calculate booking amount for the selected room.', 422);
+    }
+    $offerPrice = offer_best_price($pdo, $subtotalAmount, $checkInDate, $nights, 1, $guests);
+    $amount = $offerPrice['total'];
 
     $columnStmt = $pdo->query('SHOW COLUMNS FROM bookings');
     $bookingColumns = array_flip(array_column($columnStmt->fetchAll(), 'Field'));
@@ -183,6 +186,7 @@ try {
         'staying_guest_email' => $stayingGuestEmail !== '' ? $stayingGuestEmail : null,
         'staying_guest_phone' => $stayingGuestPhone !== '' ? $stayingGuestPhone : null,
         'staying_guest_note' => $stayingGuestNote !== '' ? $stayingGuestNote : null,
+        'room_id' => $roomId,
         'room_name' => $roomName,
         'check_in_date' => $checkInDate,
         'check_out_date' => $checkOutDate,
@@ -272,6 +276,7 @@ try {
     // after the booking and Cash payment are committed so optional side effects
     // can never roll back or implicitly commit the core booking transaction.
     booking_audit_log($pdo, $bookingId, 'booking_created', 'Booking Created', 'Customer submitted booking details and a pending booking was created.', [
+        'room_id' => $roomId,
         'room_name' => $roomName,
         'amount' => $amount,
         'currency' => PAYMENT_CURRENCY,

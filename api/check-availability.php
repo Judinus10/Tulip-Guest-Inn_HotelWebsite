@@ -36,37 +36,22 @@ try {
     $pdo = get_db_connection();
     expire_pending_bookings($pdo, null, false);
 
-    if ($roomId > 0) {
-        $roomStmt = $pdo->prepare('SELECT id, room_name, status FROM rooms WHERE id = :id LIMIT 1');
-        $roomStmt->execute([':id' => $roomId]);
-        $room = $roomStmt->fetch();
-
-        if (!$room) {
-            json_response(false, 'Room not found.', 404);
-        }
-
-        $roomName = (string) $room['room_name'];
-    } else {
-        $roomStmt = $pdo->prepare('SELECT id, room_name, status FROM rooms WHERE room_name = :room_name LIMIT 1');
-        $roomStmt->execute([':room_name' => $roomName]);
-        $room = $roomStmt->fetch();
-        if (!$room) {
-            json_response(false, 'Room not found.', 404);
-        }
-        $roomId = (int) $room['id'];
-    }
+    $room = booking_selected_room($pdo, $roomId, $roomName);
+    if (!$room) json_response(false, 'Room not found or room name is ambiguous.', 404);
+    $roomId = (int) $room['id'];
+    $roomName = (string) $room['room_name'];
 
     $stmt = $pdo->prepare(
         "SELECT id, check_in_date, check_out_date, status, payment_status, created_at
          FROM bookings
-         WHERE room_name = :room_name
+         WHERE (room_id = :room_id OR room_id IS NULL)
            " . active_booking_conflict_sql() . "
            AND :requested_check_in < check_out_date
            AND :requested_check_out > check_in_date
          LIMIT 1"
     );
     $stmt->execute([
-        ':room_name' => $roomName,
+        ':room_id' => $roomId,
         ':hold_cutoff' => booking_hold_cutoff_datetime(),
         ':requested_check_in' => $checkInDate,
         ':requested_check_out' => $availabilityCheckOutDate,
@@ -77,6 +62,7 @@ try {
 
     json_response(true, $unavailable ? 'Room is unavailable for the selected dates.' : 'Room is available.', 200, [
         'available' => !$unavailable,
+        'room_id' => $roomId,
         'room_name' => $roomName,
         'conflict' => $conflict ?: ($bookingComConflict ? ['source' => 'booking.com'] : null),
     ]);

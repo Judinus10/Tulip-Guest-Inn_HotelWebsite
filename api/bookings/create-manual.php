@@ -22,6 +22,8 @@ $stayingGuestName = clean_string($data['staying_guest_name'] ?? '', 150);
 $stayingGuestEmail = strtolower(clean_string($data['staying_guest_email'] ?? '', 190));
 $stayingGuestPhone = clean_string($data['staying_guest_phone'] ?? '', 50);
 $stayingGuestNote = clean_string($data['staying_guest_note'] ?? '', 3000);
+$roomId = (int) ($data['room_id'] ?? 0);
+if ($roomId < 1) json_response(false, 'Please refresh the page and select a valid room before saving.', 422);
 $roomName = clean_string($data['room_name'] ?? '', 150);
 $checkInDate = clean_string($data['check_in_date'] ?? '', 20);
 $checkOutDate = clean_string($data['check_out_date'] ?? '', 20);
@@ -50,7 +52,7 @@ if (!isset($statusMap[$statusKey]) || !in_array($paymentMethod, ['Cash','Manual'
 if (!isset($statusMap[$statusKey])) json_response(false, 'Invalid payment status.', 422);
 if (!in_array($paymentMethod, ['Cash', 'Manual', 'Bank Transfer', 'Card', 'No Pay', 'Other'], true)) json_response(false, 'Manual bookings require an offline payment method. PayHere results must come from verified checkout notifications.', 422);
 
-if ($fullName === '' || $email === '' || $phone === '' || $roomName === '' || $checkInDate === '' || $checkOutDate === '' || $guests < 1) {
+if ($fullName === '' || $email === '' || $phone === '' || $roomId < 1 || $checkInDate === '' || $checkOutDate === '' || $guests < 1) {
     json_response(false, 'Please fill in all required fields.', 422);
 }
 
@@ -103,9 +105,11 @@ try {
     if (ics_enabled()) ensure_ics_schema($pdo);
     $pdo->beginTransaction();
 
-    $roomStmt = $pdo->prepare('SELECT id, room_name, max_guests, status FROM rooms WHERE room_name = :room_name LIMIT 1 FOR UPDATE');
-    $roomStmt->execute([':room_name' => $roomName]);
-    $room = $roomStmt->fetch();
+    $room = booking_selected_room($pdo, $roomId, $roomName, true);
+    if ($room) {
+        $roomId = (int) $room['id'];
+        $roomName = (string) $room['room_name'];
+    }
 
     if (!$room || ($room['status'] ?? '') !== 'Available') {
         $pdo->rollBack();
@@ -120,14 +124,14 @@ try {
     $conflict = $pdo->prepare(
         "SELECT id
          FROM bookings
-         WHERE room_name = :room_name
+         WHERE (room_id = :room_id OR room_id IS NULL)
            " . active_booking_conflict_sql() . "
            AND :requested_check_in < check_out_date
            AND :requested_check_out > check_in_date
          LIMIT 1"
     );
     $conflict->execute([
-        ':room_name' => $roomName,
+        ':room_id' => $roomId,
         ':hold_cutoff' => booking_hold_cutoff_datetime(),
         ':requested_check_in' => $checkInDate,
         ':requested_check_out' => $checkOutDate,
@@ -138,7 +142,7 @@ try {
         json_response(false, 'This room is not available for the selected dates.', 409, ['available' => false]);
     }
 
-    $amount = calculate_booking_amount($roomName, $checkInDate, $checkOutDate);
+    $amount = round((float) $room['base_price'] * calculate_nights($checkInDate, $checkOutDate), 2);
 
     if ($amount <= 0) {
         $pdo->rollBack();
@@ -150,9 +154,9 @@ try {
 
     $stmt = $pdo->prepare(
         'INSERT INTO bookings
-        (full_name, email, phone, is_booking_for_other, staying_guest_name, staying_guest_email, staying_guest_phone, staying_guest_note, room_name, check_in_date, check_out_date, guests, message, status, payment_status, amount, currency, ip_address, user_agent, created_at, updated_at)
+        (full_name, email, phone, is_booking_for_other, staying_guest_name, staying_guest_email, staying_guest_phone, staying_guest_note, room_id, room_name, check_in_date, check_out_date, guests, message, status, payment_status, amount, currency, ip_address, user_agent, created_at, updated_at)
         VALUES
-        (:full_name, :email, :phone, :is_booking_for_other, :staying_guest_name, :staying_guest_email, :staying_guest_phone, :staying_guest_note, :room_name, :check_in_date, :check_out_date, :guests, :message, :status, :payment_status, :amount, :currency, :ip_address, :user_agent, NOW(), NOW())'
+        (:full_name, :email, :phone, :is_booking_for_other, :staying_guest_name, :staying_guest_email, :staying_guest_phone, :staying_guest_note, :room_id, :room_name, :check_in_date, :check_out_date, :guests, :message, :status, :payment_status, :amount, :currency, :ip_address, :user_agent, NOW(), NOW())'
     );
     $stmt->execute([
         ':full_name' => $fullName,
@@ -163,6 +167,7 @@ try {
         ':staying_guest_email' => $stayingGuestEmail !== '' ? $stayingGuestEmail : null,
         ':staying_guest_phone' => $stayingGuestPhone !== '' ? $stayingGuestPhone : null,
         ':staying_guest_note' => $stayingGuestNote !== '' ? $stayingGuestNote : null,
+        ':room_id' => $roomId,
         ':room_name' => $roomName,
         ':check_in_date' => $checkInDate,
         ':check_out_date' => $checkOutDate,
@@ -207,6 +212,7 @@ try {
         'staying_guest_email' => $stayingGuestEmail,
         'staying_guest_phone' => $stayingGuestPhone,
         'staying_guest_note' => $stayingGuestNote,
+        'room_id' => $roomId,
         'room_name' => $roomName,
         'check_in_date' => $checkInDate,
         'check_out_date' => $checkOutDate,

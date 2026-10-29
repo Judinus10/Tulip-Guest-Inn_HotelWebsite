@@ -45,6 +45,8 @@ export function useRoomAvailability(checkIn, checkOut, excludeBookingId = 0) {
   return {
     loading: valid && (!current || result.loading),
     error: current ? result.error : '',
+    availableIds: new Set(rows.filter((room) => room.available).map((room) => Number(room.room_id))),
+    unavailableIds: new Set(rows.filter((room) => !room.available).map((room) => Number(room.room_id))),
     availableNames: new Set(rows.filter((room) => room.available).map((room) => room.room_name.trim().toLowerCase())),
     unavailableNames: new Set(rows.filter((room) => !room.available).map((room) => room.room_name.trim().toLowerCase())),
   }

@@ -70,14 +70,14 @@ function get_public_base_url(): string
     return rtrim((string) $publicBaseUrl, '/');
 }
 
-function build_room_details_url(PDO $pdo, string $roomName, int $bookingId, string $orderId, string $paymentState): string
+function build_room_details_url(PDO $pdo, int $roomId, int $bookingId, string $orderId, string $paymentState): string
 {
     $publicBaseUrl = get_public_base_url();
     $roomPath = '/rooms';
 
     try {
-        $roomStmt = $pdo->prepare('SELECT slug, id FROM rooms WHERE room_name = :room_name LIMIT 1');
-        $roomStmt->execute([':room_name' => $roomName]);
+        $roomStmt = $pdo->prepare('SELECT slug, id FROM rooms WHERE id = :room_id LIMIT 1');
+        $roomStmt->execute([':room_id' => $roomId]);
         $room = $roomStmt->fetch();
 
         if ($room) {
@@ -184,7 +184,7 @@ try {
         0.0
     );
     if ($amount <= 0 && count($paymentBookings) === 1) {
-        $amount = calculate_booking_amount((string) ($booking['room_name'] ?? ''), $checkInDate, $checkOutDate);
+        $amount = calculate_booking_amount((int) ($booking['room_id'] ?? 0), $checkInDate, $checkOutDate);
     }
 
     if ($amount <= 0) {
@@ -194,12 +194,16 @@ try {
 
     foreach ($paymentBookings as $paymentBooking) {
         $currentBookingId = (int) ($paymentBooking['id'] ?? 0);
-        $currentRoomName = (string) ($paymentBooking['room_name'] ?? '');
+        $roomId = (int) ($paymentBooking['room_id'] ?? 0);
+        if ($roomId < 1 || !booking_selected_room($pdo, $roomId, '', true)) {
+            $pdo->rollBack();
+            json_response(false, 'This booking needs a valid room assignment. Please contact reception.', 409);
+        }
         $conflict = $pdo->prepare(
             "SELECT id FROM bookings
              WHERE id <> :booking_id
                AND (:group_id_filter = 0 OR COALESCE(booking_group_id, 0) <> :group_id_compare)
-               AND room_name = :room_name
+               AND (room_id = :room_id OR room_id IS NULL)
                " . active_booking_conflict_sql() . "
                AND :requested_check_in < check_out_date
                AND :requested_check_out > check_in_date
@@ -209,15 +213,11 @@ try {
             ':booking_id' => $currentBookingId,
             ':group_id_filter' => $groupId,
             ':group_id_compare' => $groupId,
-            ':room_name' => $currentRoomName,
+            ':room_id' => $roomId,
             ':hold_cutoff' => booking_hold_cutoff_datetime(),
             ':requested_check_in' => $checkInDate,
             ':requested_check_out' => $checkOutDate,
         ]);
-
-        $roomIdStmt = $pdo->prepare('SELECT id FROM rooms WHERE room_name = :room_name LIMIT 1');
-        $roomIdStmt->execute([':room_name' => $currentRoomName]);
-        $roomId = (int) ($roomIdStmt->fetchColumn() ?: 0);
 
         if ($conflict->fetch() || ($roomId > 0 && ics_room_conflict($pdo, $roomId, $checkInDate, $checkOutDate))) {
             $pdo->rollBack();
@@ -231,7 +231,7 @@ try {
 
     $checkoutToken = create_checkout_token($orderId, $bookingId, $amountFormatted);
     $returnUrl = build_booking_bill_url($bookingId, $orderId, $checkoutToken);
-    $cancelUrl = build_room_details_url($pdo, $roomName, $bookingId, $orderId, 'failed');
+    $cancelUrl = build_room_details_url($pdo, (int) ($booking['room_id'] ?? 0), $bookingId, $orderId, 'failed');
     $notifyUrl = (API_BASE_URL !== '' ? API_BASE_URL : '') . '/payments/payhere-notify.php';
 
     $checkoutPayload = [

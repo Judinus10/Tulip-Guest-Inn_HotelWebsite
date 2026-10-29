@@ -42,17 +42,17 @@ function dashboard_daily_room_summary(PDO $pdo): array
     $available = 0;
     $occupied = 0;
     $bookingConflict = $pdo->prepare("SELECT id FROM bookings
-        WHERE room_name = :room_name " . active_booking_conflict_sql() . "
+        WHERE (room_id = :room_id OR room_id IS NULL) " . active_booking_conflict_sql() . "
           AND :check_in < check_out_date AND :check_out > check_in_date LIMIT 1");
     $confirmedStay = $pdo->prepare("SELECT id FROM bookings
-        WHERE room_name = :room_name
+        WHERE (room_id = :room_id OR room_id IS NULL)
           AND (status IN ('Confirmed', 'Checked In') OR (status = 'Pending' AND payment_status = 'Paid'))
           AND :check_in < check_out_date AND :check_out > check_in_date LIMIT 1");
     $externalConflict = $hasExternal ? $pdo->prepare("SELECT id FROM external_calendar_events
         WHERE room_id = :room_id AND provider = 'booking.com' AND is_active = 1
           AND :check_in < end_date AND :check_out > start_date LIMIT 1") : null;
     foreach ($rooms as $room) {
-        $params = [':room_name' => $room['room_name'], ':check_in' => $date, ':check_out' => $tomorrow];
+        $params = [':room_id' => $room['id'], ':check_in' => $date, ':check_out' => $tomorrow];
         $bookingConflict->execute($params + [':hold_cutoff' => $cutoff]);
         $blocked = (bool) $bookingConflict->fetchColumn();
         $confirmedStay->execute($params);

@@ -662,12 +662,12 @@ function calculate_nights(string $checkInDate, string $checkOutDate): int
     return max(1, (int) $checkIn->diff($checkOut)->days);
 }
 
-function get_room_base_price(string $roomName): float
+function get_room_base_price(int $roomId): float
 {
     try {
         $pdo = get_db_connection();
-        $stmt = $pdo->prepare("SELECT base_price FROM rooms WHERE room_name = :room_name AND status = 'Available' LIMIT 1");
-        $stmt->execute([':room_name' => $roomName]);
+        $stmt = $pdo->prepare("SELECT base_price FROM rooms WHERE id = :room_id AND status = 'Available' LIMIT 1");
+        $stmt->execute([':room_id' => $roomId]);
         $price = $stmt->fetchColumn();
 
         if ($price !== false && is_numeric($price)) {
@@ -681,7 +681,7 @@ function get_room_base_price(string $roomName): float
     return 0.0;
 }
 
-function calculate_booking_amount(string $roomName, string $checkInDate, string $checkOutDate): float
+function calculate_booking_amount(int $roomId, string $checkInDate, string $checkOutDate): float
 {
-    return get_room_base_price($roomName) * calculate_nights($checkInDate, $checkOutDate);
+    return get_room_base_price($roomId) * calculate_nights($checkInDate, $checkOutDate);
 }
