@@ -18,3 +18,11 @@ export async function previewBookingEmail(type, content, scenario = 'single', si
   })
   return (await readJsonResponse(response)).data
 }
+
+export async function sendBookingEmailTest(type, content, scenario, recipient) {
+  const response = await apiFetch(buildApiUrl('/settings/booking-email-test.php'), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type, content, scenario, recipient }),
+  })
+  return (await readJsonResponse(response)).data
+}

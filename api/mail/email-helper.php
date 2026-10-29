@@ -9,6 +9,7 @@ require_once __DIR__ . '/../bookings/booking-audit-helper.php';
 
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../bookings/guest-display-helper.php';
+require_once __DIR__ . '/booking-template-delivery.php';
 require_once __DIR__ . '/../security/public-token-helper.php';
 
 $contactHelpers = __DIR__ . '/../settings/contact_helpers.php';
@@ -457,6 +458,7 @@ function email_asset_file(array $relativePaths): string
 function email_logo_path(): string
 {
     return email_asset_file([
+        'api/invoices/assets/tulip-logo-full.jpg',
         'assets/logo.jpeg',
         'assets/logo.jpg',
         'assets/logo.png',
@@ -2178,14 +2180,28 @@ function enqueue_email(
         $availableAt = date('Y-m-d H:i:s');
     }
 
+    try {
+        $customTemplate = tulip_booking_email_for_queue($pdo, $relatedType, $relatedId, $to, $emailType);
+        if ($customTemplate !== null) {
+            $subject = $customTemplate['subject'];
+            $htmlBody = $customTemplate['html'];
+        }
+    } catch (Throwable $templateError) {
+        error_log('Booking email template rendering failed for booking #' . (string) $relatedId . ': ' . $templateError->getMessage());
+        return false;
+    }
+    // Freeze customized booking content when first queued, including duplicate workflow calls.
+    $duplicateSubject = $customTemplate !== null ? 'subject' : 'VALUES(subject)';
+    $duplicateBody = $customTemplate !== null ? 'body_html' : 'VALUES(body_html)';
+
     $stmt = $pdo->prepare(
         "INSERT INTO email_queue
             (related_type, related_id, recipient_email, reply_to_email, from_email, from_name, subject, body_html, email_type, status, attempts, max_attempts, available_at, created_at, updated_at)
          VALUES
             (:related_type, :related_id, :recipient_email, :reply_to_email, :from_email, :from_name, :subject, :body_html, :email_type, 'pending', 0, :max_attempts, :available_at, NOW(), NOW())
          ON DUPLICATE KEY UPDATE
-            subject = VALUES(subject),
-            body_html = VALUES(body_html),
+            subject = $duplicateSubject,
+            body_html = $duplicateBody,
             reply_to_email = VALUES(reply_to_email),
             from_email = VALUES(from_email),
             from_name = VALUES(from_name),

@@ -1,3 +1,4 @@
+import BookingEmailTest from '@/components/ui/BookingEmailTest'
 import { useEffect, useRef, useState } from 'react'
 import { AlertCircle, Loader2, Monitor, RefreshCw, Smartphone } from 'lucide-react'
 import { SectionCard } from '@/components/ui/page-header'
@@ -58,5 +59,6 @@ export default function BookingEmailPreview({ type, content }) {
       </div>
       <p className="mt-3 text-xs leading-5 text-text-secondary">Links are inactive in the preview. Previewing does not save changes or send an email.</p>
     </> : <div className="flex min-h-[420px] items-center justify-center rounded-xl border border-dashed border-border bg-slate-50 p-6 text-center text-sm text-text-secondary">{busy ? 'Preparing your email preview...' : 'Complete the required fields to see the email preview.'}</div>}
+    <BookingEmailTest type={type} content={content} scenario={scenario} />
   </SectionCard>
 }
