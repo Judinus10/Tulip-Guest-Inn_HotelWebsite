@@ -230,9 +230,22 @@ export default function BookingBill() {
                     <img src={roomImage} alt={booking.room_name} className="h-[145px] w-full rounded-[5px] object-cover md:h-[150px] lg:h-[150px]" />
                     <div>
                       <h4 className="mt-4 font-serif text-[20px] font-semibold leading-tight text-[#14251f] md:mt-1 lg:mt-4">{booking.room_name}</h4>
+                      <div className="mt-3 rounded border border-[#e2ddd5] bg-[#faf8f4] p-3 text-[12px]">
+                        <p className="font-bold text-[#14251f]">Assigned room {(booking.room_assignments?.length || 0) > 1 ? 'numbers' : 'number'}</p>
+                        {booking.room_assignments?.length ? (
+                          <ul className="mt-2 space-y-2">
+                            {booking.room_assignments.map((room) => (
+                              <li key={room.booking_id} className="break-words text-[#4f5d57]">
+                                <span className="font-semibold text-[#14251f]">{room.room_number?.trim() || 'Not available'}</span>
+                                {booking.room_assignments!.length > 1 && <span> — {room.room_name}</span>}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : <p className="mt-1 text-[#4f5d57]">Not available</p>}
+                      </div>
                       <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] text-[#42504a]">
                         <span className="inline-flex items-center gap-1.5"><Users size={13} className="text-[#b78335]" /> {booking.guests} Guests</span>
-                        <span className="inline-flex items-center gap-1.5"><BedDouble size={13} className="text-[#b78335]" /> 1 Room</span>
+                        <span className="inline-flex items-center gap-1.5"><BedDouble size={13} className="text-[#b78335]" /> {booking.room_assignments?.length || 1} {(booking.room_assignments?.length || 1) === 1 ? 'Room' : 'Rooms'}</span>
                         <span className="inline-flex items-center gap-1.5"><CalendarDays size={13} className="text-[#b78335]" /> {nights} {nights === 1 ? 'Night' : 'Nights'}</span>
                       </div>
                       <div className="mt-5 grid gap-3 border-t border-[#eee8df] pt-4 text-[12px] sm:grid-cols-2 lg:grid-cols-1">

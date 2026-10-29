@@ -61,6 +61,11 @@ export type BookingPaymentStatus = {
   email: string;
   phone: string;
   room_name: string;
+  room_assignments?: Array<{
+    booking_id: number;
+    room_name: string;
+    room_number: string;
+  }>;
   check_in_date: string;
   check_out_date: string;
   guests: number;

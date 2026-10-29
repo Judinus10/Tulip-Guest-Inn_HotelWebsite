@@ -1320,6 +1320,7 @@ function BookingDetailsModal({ booking, rooms, onClose }) {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-bold text-text-primary">{groupRoom.room_name || 'Unknown room'}</p>
+                          <p className="mt-2 text-sm font-semibold text-blue-700">Assigned room number: {groupRoom.room_number || 'Not available'}</p>
                           <p className="mt-1 text-xs text-text-secondary">{groupRoom.guests} guest{Number(groupRoom.guests) === 1 ? '' : 's'} · Capacity {groupRoom.capacity || '-'}</p>
                         </div>
                         <p className="text-sm font-bold text-text-primary">{formatMoney(groupRoom.amount)}</p>
@@ -1337,6 +1338,7 @@ function BookingDetailsModal({ booking, rooms, onClose }) {
                   <div><p className="text-sm font-bold text-text-primary">{room?.room_name || booking.room_name || 'Unknown room'}</p><p className="text-sm text-text-secondary">{room?.room_type || booking.room_type} · Capacity {room?.capacity || '-'}</p></div>
                 </div>
                 <div className="mt-5 grid gap-3 text-sm">
+                  <div className="flex justify-between gap-3 rounded-lg bg-blue-50 p-3"><span className="font-semibold text-text-secondary">Assigned room number</span><span className="font-bold text-blue-700">{booking.room_number || 'Not available'}</span></div>
                   <div className="flex justify-between border-t border-border pt-4"><span className="text-text-secondary">Price per night</span><span className="font-semibold text-text-primary">{formatMoney(room?.price_per_night)}</span></div>
                   <div className="flex justify-between"><span className="text-text-secondary">Total amount</span><span className="text-lg font-bold text-text-primary">{formatMoney(booking.total_amount)}</span></div>
                 </div>

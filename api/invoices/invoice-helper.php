@@ -218,6 +218,17 @@ function invoice_settings(PDO $pdo): array
     return $defaults;
 }
 
+// Resolve current room numbers without inventing a number from an internal ID.
+function invoice_room_assignments(PDO $pdo, int $bookingId, int $groupId = 0): array
+{
+    $where = $groupId > 0 ? 'b.booking_group_id = :assignment_id' : 'b.id = :assignment_id';
+    $stmt = $pdo->prepare("SELECT b.id AS booking_id, b.room_name, COALESCE(r.room_number, '') AS room_number
+        FROM bookings b LEFT JOIN rooms r ON r.room_name = b.room_name
+        WHERE " . $where . " ORDER BY b.is_group_primary DESC, b.id ASC");
+    $stmt->execute([':assignment_id' => $groupId > 0 ? $groupId : $bookingId]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
 function build_invoice_data_for_booking(PDO $pdo, int $bookingId, array $payment = []): ?array
 {
     $booking = get_booking_by_id($pdo, $bookingId);
@@ -293,6 +304,7 @@ function build_invoice_data_for_booking(PDO $pdo, int $bookingId, array $payment
         'rooms' => max(1, (int) ($booking['rooms'] ?? 1)),
         'nights' => $nights,
         'room_image_path' => $roomImage,
+        'room_assignments' => invoice_room_assignments($pdo, $bookingId, $bookingGroupId),
         'business_name' => $settings['business_name'],
         'business_address' => $settings['address'],
         'business_phone' => $settings['phone'],
@@ -340,6 +352,8 @@ function create_invoice_pdf_binary(array $invoice): string
     $guestEmail = (string) ($invoice['guest_email'] ?? $customerEmail);
     $guestPhone = (string) ($invoice['guest_phone'] ?? $customerPhone);
     $roomName = (string) ($invoice['room_name'] ?? '-');
+    $roomNumbers = array_map(static fn(array $room): string => trim((string) ($room['room_number'] ?? '')) ?: 'Not available', $invoice['room_assignments'] ?? []);
+    $roomNumberText = 'Assigned room ' . (count($roomNumbers) > 1 ? 'numbers: ' : 'number: ') . ($roomNumbers ? implode(', ', $roomNumbers) : 'Not available');
     $guests = max(1, (int) ($invoice['guests'] ?? 1));
     $nights = max(1, (int) ($invoice['nights'] ?? 1));
     $currency = (string) ($invoice['currency'] ?? 'LKR');
@@ -415,7 +429,8 @@ function create_invoice_pdf_binary(array $invoice): string
     pdf_add_rect($content, 38, 395, 519, 184, $line, null, 0.7);
     pdf_add_text($content, 52, 553, 'BOOKING DETAILS', 13, 'F2', $navy);
     // Keep the downloaded bill independent from local/remote room-image paths.
-    pdf_add_wrapped_text($content, 52, 516, $roomName, 14, 242, 17, 'F2', $navy, 2);
+    pdf_add_wrapped_text($content, 52, 535, $roomNumberText, 8, 242, 10, 'F2', $navy, 2);
+    pdf_add_wrapped_text($content, 52, 510, $roomName, 14, 242, 17, 'F2', $navy, 2);
     pdf_add_line($content, 304, 470, 304, 564, $line, 0.7);
     pdf_add_text($content, 318, 553, 'GUEST DETAILS', 11, 'F2', $navy);
     pdf_add_wrapped_text($content, 318, 533, $guestName, 10, 220, 12, 'F2', $navy, 2);

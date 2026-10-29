@@ -218,6 +218,7 @@ try {
             'email' => (string) ($record['email'] ?? ''),
             'phone' => (string) ($record['phone'] ?? ''),
             'room_name' => $displayRoomName,
+            'room_assignments' => invoice_room_assignments($pdo, $bookingId, $bookingGroupId),
             'check_in_date' => (string) ($record['check_in_date'] ?? ''),
             'check_out_date' => (string) ($record['check_out_date'] ?? ''),
             'guests' => $displayGuests,
