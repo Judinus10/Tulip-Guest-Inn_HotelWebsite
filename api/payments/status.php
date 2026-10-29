@@ -186,9 +186,8 @@ try {
     $displayRoomName = $groupRooms
         ? implode(', ', array_map(static fn(array $room): string => (string) $room['room_name'], $groupRooms))
         : (string) ($record['room_name'] ?? '');
-    $displayGuests = $groupRooms
-        ? array_sum(array_map(static fn(array $room): int => (int) $room['guests'], $groupRooms))
-        : (int) ($record['guests'] ?? 0);
+    $assignments = invoice_room_assignments($pdo, $bookingId, $bookingGroupId);
+    $party = booking_guest_totals($assignments);
 
     $expiresAt = booking_expires_at($record);
     $secondsRemaining = $paymentStatus === 'Payment Pending' ? booking_seconds_remaining($record) : 0;
@@ -218,10 +217,13 @@ try {
             'email' => (string) ($record['email'] ?? ''),
             'phone' => (string) ($record['phone'] ?? ''),
             'room_name' => $displayRoomName,
-            'room_assignments' => invoice_room_assignments($pdo, $bookingId, $bookingGroupId),
+            'room_assignments' => $assignments,
             'check_in_date' => (string) ($record['check_in_date'] ?? ''),
             'check_out_date' => (string) ($record['check_out_date'] ?? ''),
-            'guests' => $displayGuests,
+            'guests' => $party['guests'],
+            'adults' => $party['adults'],
+            'children' => $party['children'],
+            'children_ages' => $party['children_ages'],
             'booking_status' => (string) ($record['status'] ?? 'Pending'),
             'payment_status' => $paymentStatus,
             'amount' => (float) ($record['paid_amount'] ?? $record['amount'] ?? 0),
@@ -245,6 +247,7 @@ try {
                 'room_id' => (int) ($room['room_id'] ?? 0),
                 'room_name' => (string) $room['room_name'],
                 'guests' => (int) $room['guests'],
+                ...booking_stored_party($room),
                 'amount' => (float) $room['amount'],
                 'currency' => (string) $room['currency'],
             ], $groupRooms),

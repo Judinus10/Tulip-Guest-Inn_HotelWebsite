@@ -1,3 +1,4 @@
+import type { StoredGuestParty } from './guestDisplay';
 import { getBotToken } from './botProtection';
 import { requestJson } from './apiClient';
 
@@ -57,7 +58,7 @@ export type PaymentHistoryItem = {
   updated_at: string;
 };
 
-export type BookingPaymentStatus = {
+export type BookingPaymentStatus = StoredGuestParty & {
   id: number;
   booking_no: string;
   booking_access_token: string;
@@ -65,7 +66,7 @@ export type BookingPaymentStatus = {
   email: string;
   phone: string;
   room_name: string;
-  room_assignments?: Array<{
+  room_assignments?: Array<StoredGuestParty & {
     booking_id: number;
     room_name: string;
     room_number: string;

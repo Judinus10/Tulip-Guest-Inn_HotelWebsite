@@ -1,3 +1,4 @@
+import { guestSummary, childAgeSummary } from '@/services/guestDisplay'
 import BookingGuestFields from '@/components/ui/BookingGuestFields'
 import { occupancy, partyError, partyTotal, partyRequest, roomOccupancyLabel } from '@/services/bookingOccupancy'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -1292,7 +1293,8 @@ function BookingDetailsModal({ booking, rooms, onClose }) {
             <div className="grid gap-4 sm:grid-cols-2">
               <div><p className="text-xs font-semibold uppercase text-text-secondary">Check-in</p><p className="mt-1 font-semibold text-text-primary">{formatDate(booking.check_in)}</p></div>
               <div><p className="text-xs font-semibold uppercase text-text-secondary">Check-out</p><p className="mt-1 font-semibold text-text-primary">{formatDate(booking.check_out)}</p></div>
-              <div><p className="text-xs font-semibold uppercase text-text-secondary">Guests</p><p className="mt-1 font-semibold text-text-primary">{booking.guests}</p></div>
+              <div><p className="text-xs font-semibold uppercase text-text-secondary">Guests</p><p className="mt-1 font-semibold text-text-primary">{booking.is_external ? 'Not available from imported calendar' : guestSummary(booking)}</p>
+                {!booking.is_external && Number(booking.children) > 0 && <p className="mt-1 text-sm text-text-secondary">Child ages at check-in (years): {childAgeSummary(booking)}</p>}</div>
               <div><p className="text-xs font-semibold uppercase text-text-secondary">Total nights</p><p className="mt-1 font-semibold text-text-primary">{booking.total_nights}</p></div>
               {isGroupBooking ? <div><p className="text-xs font-semibold uppercase text-text-secondary">Rooms</p><p className="mt-1 font-semibold text-text-primary">{groupRooms.length}</p></div> : null}
             </div>
@@ -1319,10 +1321,11 @@ function BookingDetailsModal({ booking, rooms, onClose }) {
                         <div>
                           <p className="text-sm font-bold text-text-primary">{groupRoom.room_name || 'Unknown room'}</p>
                           <p className="mt-2 text-sm font-semibold text-blue-700">Assigned room number: {groupRoom.room_number || 'Not available'}</p>
-                          <p className="mt-1 text-xs text-text-secondary">{groupRoom.guests} guest{Number(groupRoom.guests) === 1 ? '' : 's'} · Capacity {groupRoom.capacity || '-'}</p>
+                          <p className="mt-1 text-xs text-text-secondary">{guestSummary(groupRoom)} · Capacity {groupRoom.capacity || '-'}</p>
                         </div>
                         <p className="text-sm font-bold text-text-primary">{formatMoney(groupRoom.amount)}</p>
                       </div>
+                      {Number(groupRoom.children) > 0 && <p className="mt-2 text-xs text-text-secondary">Child ages at check-in (years): {childAgeSummary(groupRoom)}</p>}
                       <p className="mt-2 text-xs text-text-secondary">{formatMoney(groupRoom.price_per_night)} per night</p>
                     </div>
                   ))}

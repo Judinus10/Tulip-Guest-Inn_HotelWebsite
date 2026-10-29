@@ -53,8 +53,6 @@ function admin_booking_email_html(string $state, array $booking, array $payment 
     $brand = email_brand_name();
     $bookingRef = booking_reference($booking);
     $guestName = booking_guest_name($booking);
-    $guestCount = (int) ($booking['guests'] ?? 0);
-    $guests = $guestCount > 0 ? $guestCount . ($guestCount === 1 ? ' Guest' : ' Guests') : '-';
     $roomType = trim((string) ($booking['room_name'] ?? $booking['room_type'] ?? '-'));
     $amount = format_money_amount((float) ($payment['amount'] ?? $booking['amount'] ?? 0));
     $paymentStatus = status_label_for_email((string) ($payment['status'] ?? $booking['payment_status'] ?? ''));
@@ -78,7 +76,7 @@ function admin_booking_email_html(string $state, array $booking, array $payment 
         'Guest Name' => $guestName,
         'Check-in' => $formatDate($booking['check_in_date'] ?? ''),
         'Check-out' => $formatDate($booking['check_out_date'] ?? ''),
-        'Guests' => $guests,
+        ...booking_guest_detail_rows($booking),
         'Room Type' => $roomType,
         'Total Amount' => $amount,
         'Payment Status' => $paymentStatus,

@@ -1,3 +1,4 @@
+import { guestSummary, childAgeSummary } from '../services/guestDisplay';
 import { getContactPhones } from '../hooks/useContactPhones';
 import { useHotelPolicies } from '../hooks/useHotelPolicies';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -237,17 +238,22 @@ export default function BookingBill() {
                             {booking.room_assignments.map((room) => (
                               <li key={room.booking_id} className="break-words text-muted">
                                 <span className="font-semibold text-dark">{room.room_number?.trim() || 'Not available'}</span>
-                                {booking.room_assignments!.length > 1 && <span> — {room.room_name}</span>}
+                                {booking.room_assignments!.length > 1 && <>
+                                  <span> — {room.room_name}</span>
+                                  <p className="mt-1">{guestSummary(room)}</p>
+                                  {Number(room.children) > 0 && <p>Child ages at check-in (years): {childAgeSummary(room)}</p>}
+                                </>}
                               </li>
                             ))}
                           </ul>
                         ) : <p className="mt-1 text-muted">Not available</p>}
                       </div>
                       <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] text-muted">
-                        <span className="inline-flex items-center gap-1.5"><Users size={13} className="text-gold-dark" /> {booking.guests} Guests</span>
+                        <span className="inline-flex items-center gap-1.5"><Users size={13} className="text-gold-dark" /> {guestSummary(booking)}</span>
                         <span className="inline-flex items-center gap-1.5"><BedDouble size={13} className="text-gold-dark" /> {booking.room_assignments?.length || 1} {(booking.room_assignments?.length || 1) === 1 ? 'Room' : 'Rooms'}</span>
                         <span className="inline-flex items-center gap-1.5"><CalendarDays size={13} className="text-gold-dark" /> {nights} {nights === 1 ? 'Night' : 'Nights'}</span>
                       </div>
+                      {Number(booking.children) > 0 && <p className="mt-2 break-words text-[12px] text-muted">Child ages at check-in (years): {childAgeSummary(booking)}</p>}
                       <div className="mt-5 grid gap-3 border-t border-border pt-4 text-[12px] sm:grid-cols-2 lg:grid-cols-1">
                         <div>
                           <p className="font-bold text-dark">Check-in</p>

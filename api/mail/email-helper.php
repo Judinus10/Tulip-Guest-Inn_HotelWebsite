@@ -8,6 +8,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../bookings/booking-audit-helper.php';
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../bookings/guest-display-helper.php';
 require_once __DIR__ . '/../security/public-token-helper.php';
 
 $contactHelpers = __DIR__ . '/../settings/contact_helpers.php';
@@ -784,6 +785,7 @@ function booking_admin_summary_rows(array $booking, array $payment = []): array
         'Phone Number' => $isOther ? ($booking['staying_guest_phone'] ?? $booking['phone'] ?? '') : ($booking['phone'] ?? ''),
         'Email' => $isOther ? ($booking['staying_guest_email'] ?? $booking['email'] ?? '') : ($booking['email'] ?? ''),
         'Room' => $booking['room_name'] ?? '',
+        ...booking_guest_detail_rows($booking),
         'Dates' => trim((string) ($booking['check_in_date'] ?? '') . ' to ' . (string) ($booking['check_out_date'] ?? '')),
         'Amount' => $amount !== null && $amount !== '' ? format_money_amount((float) $amount) : '',
         'Payment Status' => status_label_for_email($paymentStatus),
@@ -800,7 +802,7 @@ function booking_details_html(array $booking): string
         'Room' => $booking['room_name'] ?? '',
         'Check-in' => $booking['check_in_date'] ?? '',
         'Check-out' => $booking['check_out_date'] ?? '',
-        'Guests' => (string) ($booking['guests'] ?? ''),
+        ...booking_guest_detail_rows($booking),
         'Amount' => isset($booking['amount']) ? format_money_amount((float) $booking['amount']) : '',
         'Booking Status' => status_label_for_email($booking['status'] ?? $booking['booking_status'] ?? ''),
         'Payment Status' => status_label_for_email($booking['payment_status'] ?? ''),
@@ -1074,7 +1076,7 @@ function booking_email_html(string $state, array $booking, array $payment = [], 
         'Room Type' => $booking['room_name'] ?? '',
         'Check-in' => $booking['check_in_date'] ?? '',
         'Check-out' => $booking['check_out_date'] ?? '',
-        'Guests' => !empty($booking['guests']) ? ((string) $booking['guests'] . ' Guests') : '',
+        ...booking_guest_detail_rows($booking),
     ];
 
     if ($admin) {
@@ -1166,6 +1168,7 @@ function booking_staying_guest_intro(array $booking): string
 
 function send_staying_guest_booking_email(PDO $pdo, array $booking, string $state, array $payment = [], string $emailType = 'staying_guest_booking_notification', string $subjectPrefix = 'Room booked for you'): bool
 {
+    $booking = booking_with_guest_details($pdo, $booking);
     $bookingId = (int) ($booking['id'] ?? 0);
     $guestEmail = booking_staying_guest_email($booking);
 
@@ -1219,6 +1222,7 @@ function send_staying_guest_booking_email(PDO $pdo, array $booking, string $stat
 
 function queue_staying_guest_booking_email(PDO $pdo, array $booking, string $state, array $payment = [], string $emailType = 'staying_guest_booking_notification', string $subjectPrefix = 'Room booked for you'): bool
 {
+    $booking = booking_with_guest_details($pdo, $booking);
     $bookingId = (int) ($booking['id'] ?? 0);
     $guestEmail = booking_staying_guest_email($booking);
 
@@ -1272,6 +1276,7 @@ function queue_staying_guest_booking_email(PDO $pdo, array $booking, string $sta
 /** Manual bookings use their actual status and payment method, and remain queued. */
 function queue_booking_received_emails(PDO $pdo, array $booking): int
 {
+    $booking = booking_with_guest_details($pdo, $booking);
     $id = (int) ($booking['id'] ?? 0);
     if ($id < 1) return 0;
     $payment = ['amount' => $booking['amount'] ?? 0, 'status' => $booking['payment_status'] ?? 'Payment Pending',
@@ -1291,6 +1296,7 @@ function queue_booking_received_emails(PDO $pdo, array $booking): int
 
 function send_booking_received_emails(PDO $pdo, array $booking): void
 {
+    $booking = booking_with_guest_details($pdo, $booking);
     $bookingId = (int) ($booking['id'] ?? 0);
     $payment = [
         'amount' => $booking['amount'] ?? 0,
@@ -1338,6 +1344,7 @@ function send_booking_received_emails(PDO $pdo, array $booking): void
 
 function send_booking_confirmed_email(PDO $pdo, array $booking): void
 {
+    $booking = booking_with_guest_details($pdo, $booking);
     // Invoice download buttons are intentionally not included in booking emails.
     $invoiceLink = '';
 
@@ -1387,6 +1394,7 @@ function booking_email_sent(PDO $pdo, int $bookingId, array $emailTypes): bool
 
 function send_booking_payment_pending_emails_once(PDO $pdo, array $booking, array $payment = []): void
 {
+    $booking = booking_with_guest_details($pdo, $booking);
     $bookingId = (int) ($booking['id'] ?? 0);
 
     if ($bookingId < 1) {
@@ -1450,6 +1458,7 @@ function send_booking_payment_pending_emails_once(PDO $pdo, array $booking, arra
 
 function send_booking_expired_emails_once(PDO $pdo, array $booking): void
 {
+    $booking = booking_with_guest_details($pdo, $booking);
     $bookingId = (int) ($booking['id'] ?? 0);
 
     if ($bookingId < 1) {
@@ -1495,6 +1504,7 @@ function send_booking_expired_emails_once(PDO $pdo, array $booking): void
 
 function send_booking_cancelled_emails(PDO $pdo, array $booking): void
 {
+    $booking = booking_with_guest_details($pdo, $booking);
     $bookingId = (int) ($booking['id'] ?? 0);
     $subjectCustomer = 'Booking cancelled - Tulip Guest Inn #' . $bookingId;
 
@@ -1513,6 +1523,7 @@ function send_booking_cancelled_emails(PDO $pdo, array $booking): void
 
 function send_payment_success_emails(PDO $pdo, array $booking, array $payment): void
 {
+    $booking = booking_with_guest_details($pdo, $booking);
     // Invoice download buttons are intentionally not included in booking emails.
     $invoiceLink = '';
     $amount = format_money_amount((float) ($payment['amount'] ?? $booking['amount'] ?? 0));
@@ -1542,6 +1553,7 @@ function send_payment_success_emails(PDO $pdo, array $booking, array $payment): 
 
 function send_payment_failed_email(PDO $pdo, array $booking): void
 {
+    $booking = booking_with_guest_details($pdo, $booking);
     $bookingId = (int) ($booking['id'] ?? 0);
 
     if ($bookingId < 1) {
@@ -1606,6 +1618,7 @@ function email_queue_job_exists(PDO $pdo, string $relatedType, int $relatedId, s
 
 function queue_booking_pending_emails(PDO $pdo, array $booking, array $payment = [], int $delayMinutes = 10): int
 {
+    $booking = booking_with_guest_details($pdo, $booking);
     $bookingId = (int) ($booking['id'] ?? 0);
     if ($bookingId < 1 || (string) ($booking['status'] ?? '') !== 'Pending' || (string) ($booking['payment_status'] ?? '') !== 'Payment Pending') {
         return 0;
@@ -1695,6 +1708,7 @@ function is_booking_pending_queue_email(string $emailType): bool
 
 function queue_payment_success_emails(PDO $pdo, array $booking, array $payment): int
 {
+    $booking = booking_with_guest_details($pdo, $booking);
     $queued = 0;
     // Invoice download buttons are intentionally not included in booking emails.
     $invoiceLink = '';
@@ -1762,6 +1776,7 @@ function queue_payment_success_emails(PDO $pdo, array $booking, array $payment):
 
 function queue_payment_failed_email(PDO $pdo, array $booking): int
 {
+    $booking = booking_with_guest_details($pdo, $booking);
     $queued = 0;
     $bookingId = (int) ($booking['id'] ?? 0);
 
@@ -1820,6 +1835,7 @@ function queue_payment_failed_email(PDO $pdo, array $booking): int
 
 function send_booking_status_changed_email(PDO $pdo, array $booking, string $oldStatus, string $newStatus): void
 {
+    $booking = booking_with_guest_details($pdo, $booking);
     $label = status_label_for_email($newStatus);
     $tone = strtolower($label) === 'confirmed' ? 'green' : (strtolower($label) === 'cancelled' ? 'red' : 'blue');
     $bookingId = (int) ($booking['id'] ?? 0);
@@ -1836,6 +1852,7 @@ function send_booking_status_changed_email(PDO $pdo, array $booking, string $old
 
 function send_payment_status_changed_email(PDO $pdo, array $booking, array $payment, string $oldStatus, string $newStatus): void
 {
+    $booking = booking_with_guest_details($pdo, $booking);
     $label = status_label_for_email($newStatus);
     $tone = strtolower($label) === 'paid' ? 'green' : (strtolower($label) === 'failed' ? 'red' : 'gold');
     $amount = format_money_amount((float) ($payment['amount'] ?? $booking['amount'] ?? 0));
@@ -1854,6 +1871,7 @@ function send_payment_status_changed_email(PDO $pdo, array $booking, array $paym
 
 function send_combined_status_changed_email(PDO $pdo, array $booking, array $payment, string $oldBookingStatus, string $newBookingStatus, string $oldPaymentStatus, string $newPaymentStatus): void
 {
+    $booking = booking_with_guest_details($pdo, $booking);
     $bookingLabel = status_label_for_email($newBookingStatus);
     $paymentLabel = status_label_for_email($newPaymentStatus);
     $amount = format_money_amount((float) ($payment['amount'] ?? $booking['amount'] ?? 0));

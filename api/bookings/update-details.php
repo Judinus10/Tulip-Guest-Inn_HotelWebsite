@@ -264,6 +264,7 @@ try {
     $emailQueued = false;
     if ($sendEmail) {
         try {
+            $updatedBooking = booking_with_guest_details($pdo, $updatedBooking);
             $subject = 'Booking details updated - Tulip Guest Inn #' . $id;
             $html = booking_email_html(
                 'updated',

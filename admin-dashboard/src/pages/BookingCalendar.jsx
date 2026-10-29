@@ -1,3 +1,4 @@
+import { childAgeSummary } from '@/services/guestDisplay'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
@@ -243,6 +244,7 @@ function FloatingBookingTooltip({ tooltip }) {
         <dt className="font-semibold text-slate-500">Nights</dt><dd>{booking.total_nights}</dd>
         <dt className="font-semibold text-slate-500">Adults</dt><dd>{booking.adults}</dd>
         <dt className="font-semibold text-slate-500">Children</dt><dd>{booking.children}</dd>
+        {Number(booking.children) > 0 && <><dt className="font-semibold text-slate-500">Ages at check-in (years)</dt><dd>{childAgeSummary(booking)}</dd></>}
         <dt className="font-semibold text-slate-500">Payment</dt><dd>{normalizeStatus(booking.payment_status)}</dd>
         <dt className="font-semibold text-slate-500">Amount</dt><dd>{isBookingComBooking(booking) ? 'Managed in Booking.com' : currencyFormatter.format(booking.total_amount)}</dd>
       </dl>
@@ -316,6 +318,7 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, onMarkPaid, upd
               <p><span className="font-semibold text-slate-500">Phone:</span> {booking.guest_phone}</p>
               <p><span className="font-semibold text-slate-500">Adults:</span> {booking.adults}</p>
               <p><span className="font-semibold text-slate-500">Children:</span> {booking.children}</p>
+              {Number(booking.children) > 0 && <p><span className="font-semibold text-slate-500">Child ages at check-in (years):</span> {childAgeSummary(booking)}</p>}
               <p><span className="font-semibold text-slate-500">Check-in:</span> {formatDate(booking.check_in)}</p>
               <p><span className="font-semibold text-slate-500">Check-out:</span> {formatDate(booking.check_out)}</p>
               <p><span className="font-semibold text-slate-500">Total nights:</span> {booking.total_nights}</p>
