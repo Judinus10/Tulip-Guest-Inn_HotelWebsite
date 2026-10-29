@@ -70,6 +70,10 @@ function ensure_room_ical_column(PDO $pdo): void
 
 function save_room_ical_url(PDO $pdo, int $roomId, string $url): void
 {
+    $current = $pdo->prepare('SELECT booking_ical_url FROM rooms WHERE id = ?');
+    $current->execute([$roomId]);
+    $row = $current->fetch(PDO::FETCH_ASSOC);
+    if ($row && trim((string) ($row['booking_ical_url'] ?? '')) === trim($url)) return;
     require_calendar_permission($pdo, $roomId, $url);
     $url = trim($url);
     if ($url !== '') {
@@ -314,10 +318,10 @@ function get_room_payload(PDO $pdo, bool $publicOnly = false): array
     );
 }
 
-function save_room_images(PDO $pdo, int $roomId, array $files): void
+function save_room_images(PDO $pdo, int $roomId, array $files): array
 {
     ensure_room_images_table($pdo);
-    if (!isset($files['name']) || $files['name'] === []) return;
+    if (!isset($files['name']) || $files['name'] === []) return [];
 
     $uploadDir = __DIR__ . '/../uploads/rooms';
     if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
@@ -337,6 +341,7 @@ function save_room_images(PDO $pdo, int $roomId, array $files): void
     $hasMainStmt->execute([':room_id' => $roomId]);
     $hasMain = (int) $hasMainStmt->fetchColumn() > 0;
 
+    $savedIds = [];
     foreach ($names as $index => $originalName) {
         if (($errors[$index] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) continue;
         $tmpName = $tmpNames[$index] ?? '';
@@ -359,8 +364,10 @@ function save_room_images(PDO $pdo, int $roomId, array $files): void
             ':sort_order' => $sortOrder,
         ]);
         } catch (Throwable $e) { @unlink($uploadDir . '/' . $filename); throw $e; }
+        $savedIds[$index] = (int) $pdo->lastInsertId();
         $hasMain = true;
     }
+    return $savedIds;
 }
 
 function room_input_data(): array
@@ -400,4 +407,49 @@ function parse_amenities_input(mixed $value): array
     $decoded = json_decode((string) $value, true);
     if (is_array($decoded)) return array_values(array_filter(array_map('trim', array_map('strval', $decoded))));
     return array_values(array_filter(array_map('trim', explode(',', (string) $value))));
+}
+
+// Validate the full room-photo manifest before changing room details.
+function room_image_order_input(PDO $pdo, int $roomId, array $data, array $files): ?array
+{
+    if (!array_key_exists('image_order', $data)) return null;
+    $order = is_string($data['image_order']) ? json_decode($data['image_order'], true) : $data['image_order'];
+    if (!is_array($order) || !array_is_list($order)) throw new InvalidArgumentException('Invalid photo order.');
+    $existing = []; $uploads = [];
+    foreach ($order as $entry) {
+        if (!is_array($entry) || count($entry) !== 1) throw new InvalidArgumentException('Invalid photo order entry.');
+        if (isset($entry['id']) && is_int($entry['id']) && $entry['id'] > 0) $existing[] = $entry['id'];
+        elseif (isset($entry['upload_index']) && is_int($entry['upload_index']) && $entry['upload_index'] >= 0) $uploads[] = $entry['upload_index'];
+        else throw new InvalidArgumentException('Invalid photo identifier.');
+    }
+    $stmt = $pdo->prepare('SELECT id FROM room_images WHERE room_id = ?');
+    $stmt->execute([$roomId]);
+    $current = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    sort($existing, SORT_NUMERIC); sort($current, SORT_NUMERIC); sort($uploads, SORT_NUMERIC);
+    $count = isset($files['name']) ? (is_array($files['name']) ? count($files['name']) : 1) : 0;
+    $expectedUploads = $count ? range(0, $count - 1) : [];
+    if ($existing !== $current || $uploads !== $expectedUploads) throw new InvalidArgumentException('Room photos changed or the order is incomplete. Reopen the room and try again.');
+    return $order;
+}
+
+function apply_room_image_order(PDO $pdo, int $roomId, ?array $order, array $uploadedIds): void
+{
+    if ($order === null) return;
+    $ids = [];
+    foreach ($order as $entry) {
+        $id = isset($entry['id']) ? $entry['id'] : ($uploadedIds[$entry['upload_index']] ?? 0);
+        if ($id < 1) throw new InvalidArgumentException('A photo upload did not complete. Reopen the room before saving its order.');
+        $ids[] = $id;
+    }
+    $pdo->beginTransaction();
+    try {
+        $stmt = $pdo->prepare('SELECT id FROM room_images WHERE room_id = ? FOR UPDATE');
+        $stmt->execute([$roomId]);
+        $current = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        $sorted = $ids; sort($sorted, SORT_NUMERIC); sort($current, SORT_NUMERIC);
+        if ($sorted !== $current) throw new InvalidArgumentException('Room photos changed while saving. Reopen the room and try again.');
+        $update = $pdo->prepare('UPDATE room_images SET sort_order = ?, is_main = ? WHERE id = ? AND room_id = ?');
+        foreach ($ids as $index => $id) $update->execute([$index + 1, $index === 0 ? 1 : 0, $id, $roomId]);
+        $pdo->commit();
+    } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
 }

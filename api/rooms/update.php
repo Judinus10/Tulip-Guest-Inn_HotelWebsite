@@ -14,9 +14,22 @@ try {
     ensure_room_images_table($pdo);
     ensure_amenity_tables($pdo);
     $data = room_input_data();
-    if (array_key_exists('booking_ical_url', $data)) require_calendar_permission($pdo, (int)($data['id'] ?? 0), (string)$data['booking_ical_url']);
     $id = (int) ($data['id'] ?? $_GET['id'] ?? 0);
     if ($id <= 0) json_response(false, 'Room id is required.', 422);
+    $calendarStmt = $pdo->prepare('SELECT booking_ical_url FROM rooms WHERE id = ?');
+    $calendarStmt->execute([$id]);
+    $currentCalendar = $calendarStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$currentCalendar) json_response(false, 'Room not found.', 404);
+    // Old clients may resend an unchanged legacy/test feed. Do not revalidate it
+    // or write it while saving unrelated room fields.
+    if (array_key_exists('booking_ical_url', $data)) {
+        if (trim((string) $data['booking_ical_url']) === trim((string) ($currentCalendar['booking_ical_url'] ?? ''))) {
+            unset($data['booking_ical_url']);
+        } else {
+            require_calendar_permission($pdo, $id, (string) $data['booking_ical_url']);
+        }
+    }
+    $imageOrder = room_image_order_input($pdo, $id, $data, $_FILES['images'] ?? []);
     // Validate calendar ownership before updating any room fields or media.
     $calendarUrl = trim((string) ($data['booking_ical_url'] ?? ''));
     if ($calendarUrl !== '') {
@@ -58,7 +71,8 @@ try {
     ]);
     replace_room_amenities($pdo, $id, $amenityIds);
     if (array_key_exists('booking_ical_url', $data)) save_room_ical_url($pdo, $id, (string)$data['booking_ical_url']);
-    save_room_images($pdo, $id, $_FILES['images'] ?? []);
+    $uploadedImageIds = save_room_images($pdo, $id, $_FILES['images'] ?? []);
+    apply_room_image_order($pdo, $id, $imageOrder, $uploadedImageIds);
     if (!empty($data['remove_video'])) {
         $old = $pdo->prepare('SELECT video_path FROM rooms WHERE id = :id');
         $old->execute([':id' => $id]);

@@ -1,3 +1,4 @@
+import GalleryOrderEditor from '@/components/ui/GalleryOrderEditor'
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Eye, Folder, Images, Pencil, Plus, Search, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
 import { PageHeader } from '@/components/ui/page-header'
@@ -72,6 +73,8 @@ export default function Gallery() {
   const [folderModal, setFolderModal] = useState(null)
   const [imageModal, setImageModal] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [ordering, setOrdering] = useState(false)
+  useEffect(() => { setOrdering(false) }, [activeFolderId])
 
   const activeFolder = folders.find((folder) => folder.id === activeFolderId) || null
 
@@ -385,6 +388,11 @@ export default function Gallery() {
 
       {!loading && activeFolder ? (
         <>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-text-secondary">Photo order is saved separately for each folder.</p>
+            <Button variant="outline" disabled={ordering || images.filter(image => image.folder_id === activeFolderId).length < 2} onClick={() => setOrdering(true)}><SlidersHorizontal className="h-4 w-4" />Arrange Photos</Button>
+          </div>
+          {ordering && <GalleryOrderEditor key={activeFolderId} folder={activeFolder} images={images} onClose={() => setOrdering(false)} onSaved={() => { setOrdering(false); showToast('Photo order saved.'); loadGallery() }} />}
           <Card>
             <CardContent className="p-4">
               <div className="grid gap-3 lg:grid-cols-[1fr_180px]">

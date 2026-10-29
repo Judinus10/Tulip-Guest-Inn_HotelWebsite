@@ -77,3 +77,12 @@ export async function deleteGalleryImage(id) {
   })
   return readJsonResponse(response)
 }
+
+export async function reorderGalleryImages(data) {
+  const response = await apiFetch(`${API_BASE_URL}/reorder-images.php`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  return readJsonResponse(response)
+}

@@ -179,10 +179,9 @@ export default function Gallery() {
           {!loading && !error && filtered.length > 0 && (
             <motion.div layout className="space-y-3">
               <AnimatePresence mode="popLayout">
-                {galleryGroups.map((group, groupIndex) => {
+                {galleryGroups.map((group) => {
                   const big = group[0];
                   const small = group.slice(1);
-                  const bigOnLeft = groupIndex % 2 === 1;
                   return <motion.div
                     key={group.map((item) => item.image.id).join('-')}
                     layout
@@ -192,11 +191,11 @@ export default function Gallery() {
                     transition={{ duration: 0.4 }}
                     className="grid grid-cols-1 gap-3 md:grid-cols-2"
                   >
-                    {big && <button type="button" onClick={() => openLightbox(big.index)} className={`group relative aspect-square overflow-hidden ${bigOnLeft ? 'md:order-1' : 'md:order-2'}`}>
+                    {big && <button type="button" onClick={() => openLightbox(big.index)} className="group relative aspect-square overflow-hidden md:order-1">
                       <img src={big.image.src} alt={big.image.alt} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy" />
                       <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-[9px] font-medium uppercase tracking-[0.25em] text-white opacity-0 transition-all duration-300 group-hover:bg-black/35 group-hover:opacity-100">View</span>
                     </button>}
-                    <div className={`grid aspect-square grid-cols-2 grid-rows-2 gap-3 ${bigOnLeft ? 'md:order-2' : 'md:order-1'}`}>
+                    <div className="grid aspect-square grid-cols-2 grid-rows-2 gap-3 md:order-2">
                       {small.map(({ image, index }) => <button type="button" key={image.id} onClick={() => openLightbox(index)} className="group relative min-h-0 overflow-hidden">
                         <img src={image.src} alt={image.alt} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" loading="lazy" />
                         <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-[9px] font-medium uppercase tracking-[0.25em] text-white opacity-0 transition-all duration-300 group-hover:bg-black/35 group-hover:opacity-100">View</span>

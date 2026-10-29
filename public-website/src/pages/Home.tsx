@@ -53,14 +53,6 @@ const welcomeFeatures = [
   { icon: Coffee, label: "Peaceful Garden" },
 ];
 
-const galleryCategoryOrder = [
-  "rooms",
-  "pool",
-  "garden",
-  "exterior",
-  "facilities",
-] as const;
-
 type HomeGalleryImage = GalleryImage;
 
 function normalizeGalleryCategory(
@@ -79,35 +71,6 @@ function normalizeGalleryCategory(
   )
     return "exterior";
   return "facilities";
-}
-
-function pickRandomGalleryPreview(
-  images: HomeGalleryImage[],
-  limit = 10,
-): HomeGalleryImage[] {
-  if (images.length <= limit) return images;
-
-  const selected: HomeGalleryImage[] = [];
-  const selectedIds = new Set<string>();
-
-  galleryCategoryOrder.forEach((category) => {
-    const categoryImages = images.filter(
-      (image) => image.category === category,
-    );
-    if (categoryImages.length === 0) return;
-
-    const randomImage =
-      categoryImages[Math.floor(Math.random() * categoryImages.length)];
-    selected.push(randomImage);
-    selectedIds.add(randomImage.id);
-  });
-
-  const remainingImages = images.filter((image) => !selectedIds.has(image.id));
-  const shuffledRemaining = [...remainingImages].sort(
-    () => Math.random() - 0.5,
-  );
-
-  return [...selected, ...shuffledRemaining].slice(0, limit);
 }
 
 type LoadStatus = 'loading' | 'ready' | 'error';
@@ -179,7 +142,7 @@ export default function Home() {
   const homeStatistics = statisticsResource.data ?? [];
 
   const previewImages = useMemo(
-    () => pickRandomGalleryPreview(homeGalleryImages, 10),
+    () => homeGalleryImages.slice(0, 10),
     [homeGalleryImages],
   );
   const previewGroups = useMemo(() => {
@@ -503,10 +466,9 @@ export default function Home() {
           <SectionTitle eyebrow="Photo Gallery" title="A Glimpse of Tulip" />
           <HomeSectionState status={galleryResource.status} empty={previewImages.length === 0} label="gallery photos" emptyMessage="No gallery photos have been published yet." onRetry={galleryResource.retry} />
           <div className="space-y-3">
-            {previewGroups.map((group, groupIndex) => {
+            {previewGroups.map((group) => {
               const big = group[0];
               const small = group.slice(1);
-              const bigOnLeft = groupIndex % 2 === 1;
               return <motion.div
                 key={group.map((image) => image.id).join("-")}
                 initial={{ opacity: 0, scale: 0.97 }}
@@ -515,11 +477,11 @@ export default function Home() {
                 transition={{ duration: 0.5 }}
                 className="grid grid-cols-1 gap-3 md:grid-cols-2"
               >
-                {big && <button type="button" onClick={() => setLightbox(big.src)} className={`group relative aspect-square overflow-hidden ${bigOnLeft ? "md:order-1" : "md:order-2"}`}>
+                {big && <button type="button" onClick={() => setLightbox(big.src)} className="group relative aspect-square overflow-hidden md:order-1">
                   <img src={big.src} alt={big.alt} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy" />
                   <span className="absolute inset-0 bg-black/0 transition-colors duration-300 group-hover:bg-black/30" />
                 </button>}
-                <div className={`grid aspect-square grid-cols-2 grid-rows-2 gap-3 ${bigOnLeft ? "md:order-2" : "md:order-1"}`}>
+                <div className="grid aspect-square grid-cols-2 grid-rows-2 gap-3 md:order-2">
                   {small.map((img) => <button type="button" key={img.id} onClick={() => setLightbox(img.src)} className="group relative min-h-0 overflow-hidden">
                     <img src={img.src} alt={img.alt} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" loading="lazy" />
                     <span className="absolute inset-0 bg-black/0 transition-colors duration-300 group-hover:bg-black/30" />

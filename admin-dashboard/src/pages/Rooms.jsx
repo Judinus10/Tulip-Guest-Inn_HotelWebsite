@@ -1,3 +1,4 @@
+import RoomPhotoOrder from '@/components/ui/RoomPhotoOrder'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bath,
@@ -503,6 +504,23 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
   const [form, setForm] = useState(() => room || emptyForm)
   const [errors, setErrors] = useState({})
   const [selectedFiles, setSelectedFiles] = useState([])
+  const [photoOrder, setPhotoOrder] = useState([])
+  const fileKeys = useRef(new WeakMap())
+  const [filePreviews, setFilePreviews] = useState([])
+  useEffect(() => {
+    const previews = selectedFiles.map((file, index) => {
+      if (!fileKeys.current.has(file)) fileKeys.current.set(file, `new-${crypto.randomUUID()}`)
+      return { key: fileKeys.current.get(file), src: URL.createObjectURL(file), title: file.name, upload_index: index }
+    })
+    setFilePreviews(previews)
+    return () => previews.forEach(item => URL.revokeObjectURL(item.src))
+  }, [selectedFiles])
+  const photoItems = useMemo(() => {
+    const saved = (form.image_records || []).map(image => ({ key: `saved-${image.id || image.image_id}`, id: Number(image.id || image.image_id), src: resolveImageSrc(image), title: 'Room photo', raw: image }))
+    const all = [...saved, ...filePreviews]
+    const positions = new Map(photoOrder.map((key, index) => [key, index]))
+    return all.sort((a, b) => (positions.get(a.key) ?? Number.MAX_SAFE_INTEGER) - (positions.get(b.key) ?? Number.MAX_SAFE_INTEGER))
+  }, [form.image_records, filePreviews, photoOrder])
   const [selectedVideo, setSelectedVideo] = useState(null)
   const videoInputRef = useRef(null)
   const [removeVideo, setRemoveVideo] = useState(false)
@@ -603,7 +621,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
     if (isProcessingImages || isSubmitting) return
 
     const nextErrors = {}
-    if (form.booking_ical_url?.trim() && !/^https:\/\/(ical|admin)\.booking\.com\//i.test(form.booking_ical_url.trim())) nextErrors.booking_ical_url = 'Enter a Booking.com iCal URL.'
+    if (String(form.booking_ical_url || '').trim() !== String(room?.booking_ical_url || '').trim() && form.booking_ical_url?.trim() && !/^https:\/\/(ical|admin)\.booking\.com\//i.test(form.booking_ical_url.trim())) nextErrors.booking_ical_url = 'Enter a Booking.com iCal URL.'
     if (!String(form.room_number || '').trim()) nextErrors.room_number = 'Room number is required.'
     if (!form.room_name.trim()) nextErrors.room_name = 'Room name is required.'
     if (!form.room_type.trim()) nextErrors.room_type = 'Room type is required.'
@@ -629,6 +647,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
         capacity: Number(form.capacity),
         room_size: Number(form.room_size),
         images: selectedFiles,
+        image_order: photoItems.map(item => item.upload_index !== undefined ? { upload_index: item.upload_index } : { id: item.id }),
         video: selectedVideo,
         remove_video: removeVideo,
       })
@@ -763,6 +782,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
               <Input id="booking_ical_url" type="url" value={form.booking_ical_url || ''}
                 placeholder="https://ical.booking.com/v1/export?t=..."
                 onChange={(event) => updateField('booking_ical_url', event.target.value)} disabled={isSubmitting} />
+              <p className="text-xs text-text-secondary">Optional. Keep the existing link to leave calendar sync unchanged. Clear it only to disconnect the calendar.</p>
               {errors.booking_ical_url && <p className="text-xs text-red-600">{errors.booking_ical_url}</p>}
             </div>
 
@@ -841,7 +861,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
                 <div>
                   <p className="text-sm font-semibold text-text-primary">Room media preview</p>
                   <p className="text-xs text-text-secondary">
-                    Use the arrows or thumbnails to review photos. Use the delete button to remove a specific image.
+                    Drag the handles or use the arrows to arrange photos. The first photo is the cover. Save Changes to publish the order. Deleting a saved photo is immediate after confirmation.
                   </p>
                 </div>
                 {selectedFiles.length > 0 && (
@@ -849,25 +869,9 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
                 )}
               </div>
 
-              {selectedFiles.length > 0 ? (
-                <ImageCarousel
-                  room={{
-                    ...form,
-                    images: selectedFiles.map((file) => URL.createObjectURL(file)),
-                    image_records: [],
-                    image: null,
-                  }}
-                  heightClass="h-56"
-                  onDeleteImage={removeSelectedFile}
-                />
-              ) : (
-                <ImageCarousel
-                  room={form}
-                  heightClass="h-56"
-                  onDeleteImage={removeExistingImage}
-                  deletingImageId={deletingImageId}
-                />
-              )}
+              <RoomPhotoOrder items={photoItems} onChange={items => setPhotoOrder(items.map(item => item.key))}
+                disabled={isSubmitting || isProcessingImages || deletingImageId !== null}
+                onRemove={item => item.upload_index !== undefined ? removeSelectedFile(null, item.upload_index) : removeExistingImage(item)} />
               {errors.images && <p className="mt-3 text-xs font-medium text-red-600">{errors.images}</p>}
               {(selectedVideo || (room?.video_url && !removeVideo)) && (
                 <RoomVideoPreview
@@ -1112,7 +1116,9 @@ export default function Rooms() {
     if (formMode === 'edit') payload.append('id', selectedRoom.id)
     payload.append('room_name', form.room_name)
     payload.append('room_number', form.room_number)
-    payload.append('booking_ical_url', form.booking_ical_url || '')
+    if (String(form.booking_ical_url || '').trim() !== String(selectedRoom?.booking_ical_url || '').trim() || formMode !== 'edit') {
+      payload.append('booking_ical_url', form.booking_ical_url || '')
+    }
     payload.append('description', form.description)
     payload.append('max_guests', form.capacity)
     payload.append('capacity', form.capacity)
@@ -1128,6 +1134,7 @@ export default function Rooms() {
     payload.append('show_unavailable_amenities', form.show_unavailable_amenities ? '1' : '0')
     payload.append('status', form.status)
     payload.append('sort_order', form.sort_order || 0)
+    payload.append('image_order', JSON.stringify(form.image_order || []))
 
     ;(form.images || []).forEach((file) => payload.append('images[]', file))
     if (form.video) payload.append('video', form.video)

@@ -14,6 +14,7 @@ try {
     ensure_amenity_tables($pdo);
     $data = room_input_data();
     if (array_key_exists('booking_ical_url', $data)) require_calendar_permission($pdo, (int)($data['id'] ?? 0), (string)$data['booking_ical_url']);
+    $imageOrder = room_image_order_input($pdo, 0, $data, $_FILES['images'] ?? []);
     $roomNumber = room_number_input($pdo, $data, 0);
     $roomName = clean_string($data['room_name'] ?? '', 150);
     if ($roomName === '') json_response(false, 'Room name is required.', 422);
@@ -44,7 +45,8 @@ try {
     $roomId = (int) $pdo->lastInsertId();
     replace_room_amenities($pdo, $roomId, $amenityIds);
     save_room_ical_url($pdo, $roomId, (string) ($data['booking_ical_url'] ?? ''));
-    save_room_images($pdo, $roomId, $_FILES['images'] ?? []);
+    $uploadedImageIds = save_room_images($pdo, $roomId, $_FILES['images'] ?? []);
+    apply_room_image_order($pdo, $roomId, $imageOrder, $uploadedImageIds);
     save_room_video($pdo, $roomId, $_FILES['video'] ?? [], $preparedVideo);
     $preparedVideo = null;
     $rooms = get_room_payload($pdo, false);
