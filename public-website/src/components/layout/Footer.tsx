@@ -1,3 +1,4 @@
+import { getContactPhones } from '../../hooks/useContactPhones';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Phone, Mail, MapPin } from 'lucide-react';
@@ -19,8 +20,8 @@ const quickLinks = [
 const fallbackContactSettings: ContactSettings = {
   business_name: 'Tulip Guest Inn',
   address: '189 V.M. Road\nPoint Pedro\nNorthern Province, Sri Lanka',
-  phone: '0212 261 186',
-  reception_contact_number: '0212 261 186',
+  phone: '',
+  reception_contact_number: '',
   whatsapp_reservation_number: '',
   email: 'info@tulipguestinn.com',
   business_hours: 'Reception: 24 Hours, 7 Days',
@@ -30,11 +31,6 @@ const fallbackContactSettings: ContactSettings = {
   instagram_link: '',
   map_embed_url: '',
 };
-
-function telephoneHref(phone: string): string {
-  const normalized = phone.replace(/[^+\d]/g, '');
-  return normalized ? `tel:${normalized}` : '#';
-}
 
 function mailHref(email: string): string {
   return email ? `mailto:${email}` : '#';
@@ -79,7 +75,7 @@ export default function Footer() {
 
   const socialLinks = getSocialLinks(contactSettings);
   const businessName = contactSettings.business_name || fallbackContactSettings.business_name;
-  const displayPhone = contactSettings.reception_contact_number || contactSettings.phone || fallbackContactSettings.phone;
+  const phones = getContactPhones(contactSettings);
   const displayEmail = contactSettings.email || fallbackContactSettings.email;
   const displayAddress = contactSettings.address || fallbackContactSettings.address;
   const openingHours = contactSettings.business_hours || fallbackContactSettings.business_hours;
@@ -170,15 +166,14 @@ export default function Footer() {
               Contact Us
             </h3>
             <ul className="space-y-4">
-              <li className="flex items-center gap-3">
-                <Phone size={15} className="text-gold shrink-0" />
-                <a
-                  href={telephoneHref(displayPhone)}
-                  className="text-sm text-gray-400 hover:text-white transition-colors duration-200"
-                >
-                  {displayPhone}
-                </a>
-              </li>
+              {phones.map((phone) => (
+                <li key={phone.href} className="flex items-center gap-3">
+                  <Phone size={15} className="text-gold shrink-0" />
+                  <a href={phone.href} className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
+                    {phone.number}
+                  </a>
+                </li>
+              ))}
               <li className="flex items-center gap-3">
                 <Mail size={15} className="text-gold shrink-0" />
                 <a

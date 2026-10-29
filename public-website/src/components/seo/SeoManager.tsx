@@ -1,3 +1,4 @@
+import { useContactPhones } from '../../hooks/useContactPhones';
 import { useHotelPolicies } from '../../hooks/useHotelPolicies';
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
@@ -66,7 +67,7 @@ const pages: Record<string, SeoConfig> = {
   '/contact': {
     title: 'Contact Tulip Guest Inn | Point Pedro',
     description:
-      'Contact Tulip Guest Inn in Point Pedro for room enquiries, directions and direct reservations. Call 0212 261 186.',
+      'Contact Tulip Guest Inn in Point Pedro for room enquiries, directions and direct reservations.',
   },
   '/booking': {
     title: 'Book a Room in Point Pedro | Tulip Guest Inn',
@@ -135,6 +136,7 @@ function removeJsonLd(id: string) {
 export default function SeoManager() {
   const { pathname } = useLocation();
   const stayPolicies = useHotelPolicies();
+  const phoneNumbers = useContactPhones().map((phone) => phone.number).join(" | ");
 
   useEffect(() => {
     const normalizedPath = pathname !== '/' ? pathname.replace(/\/+$/, '') : '/';
@@ -184,7 +186,7 @@ export default function SeoManager() {
       logo: DEFAULT_IMAGE,
       description:
         'A family-run guest house offering clean, comfortable rooms in Point Pedro, Northern Province, Sri Lanka.',
-      telephone: '+94 21 226 1186',
+      ...(phoneNumbers ? { telephone: phoneNumbers.split(' | ') } : {}),
       address: {
         '@type': 'PostalAddress',
         streetAddress: '189 V.M. Road',
@@ -259,7 +261,7 @@ export default function SeoManager() {
     } else {
       removeJsonLd('faq');
     }
-  }, [pathname, stayPolicies.check_in, stayPolicies.check_out]);
+  }, [pathname, stayPolicies.check_in, stayPolicies.check_out, phoneNumbers]);
 
   return null;
 }

@@ -1,3 +1,4 @@
+import { useContactPhones } from '../hooks/useContactPhones';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Calendar, Users, Home, Check, Phone, Mail } from 'lucide-react';
@@ -42,6 +43,7 @@ interface BookingForm {
 
 export default function Booking() {
   const toast = useToast();
+  const phones = useContactPhones();
   const [searchParams] = useSearchParams();
 
   const readBookingParams = (): Pick<BookingForm, 'checkIn' | 'checkOut' | 'guests' | 'rooms' | 'roomType'> => ({
@@ -286,17 +288,22 @@ export default function Booking() {
                 Thank you, {form.firstName}. Your booking request has been received. Our team will review it and send a confirmation to{' '}
                 <strong>{form.email}</strong> within 2–4 hours.
               </p>
-              <p className="text-sm text-gray-400 mb-8">
+              {phones.length > 0 && <p className="text-sm text-gray-400 mb-8">
                 For immediate assistance, please call us at{' '}
-                <a href="tel:+94212261186" className="text-gold hover:underline">
-                  0212 261 186
-                </a>
-              </p>
+                {phones.map((phone, index) => (
+                  <span key={phone.href}>
+                    {index > 0 && ' or '}
+                    <a href={phone.href} className="text-gold hover:underline">{phone.number}</a>
+                  </span>
+                ))}
+              </p>}
               <div className="flex flex-wrap items-center justify-center gap-4">
-                <a href="tel:+94212261186" className="btn-primary">
-                  <Phone size={14} />
-                  Call Reception
-                </a>
+                {phones.map((phone) => (
+                  <a key={phone.href} href={phone.href} className="btn-primary">
+                    <Phone size={14} />
+                    {phone.number}
+                  </a>
+                ))}
                 <a href="mailto:info@tulipguestinn.com" className="btn-outline">
                   <Mail size={14} />
                   Email Us
@@ -662,13 +669,13 @@ export default function Booking() {
                   {/* Contact */}
                   <div className="border border-border p-7">
                     <p className="text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-4">Need Help?</p>
-                    <a
-                      href="tel:+94212261186"
-                      className="flex items-center gap-3 text-dark hover:text-gold transition-colors duration-200 mb-3"
-                    >
-                      <Phone size={14} className="text-gold" />
-                      <span className="text-sm font-medium">0212 261 186</span>
-                    </a>
+                    {phones.map((phone) => (
+                      <a key={phone.href} href={phone.href}
+                        className="flex items-center gap-3 text-dark hover:text-gold transition-colors duration-200 mb-3">
+                        <Phone size={14} className="text-gold" />
+                        <span className="text-sm font-medium">{phone.number}</span>
+                      </a>
+                    ))}
                     <a
                       href="mailto:info@tulipguestinn.com"
                       className="flex items-center gap-3 text-dark hover:text-gold transition-colors duration-200"

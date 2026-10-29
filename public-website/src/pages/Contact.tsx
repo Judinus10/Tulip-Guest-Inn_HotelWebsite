@@ -1,3 +1,4 @@
+import { getContactPhones } from '../hooks/useContactPhones';
 import { useEffect, useMemo, useState } from 'react';
 import { Phone, Mail, MapPin, Clock, Send } from 'lucide-react';
 import PageHero from '../components/ui/PageHero';
@@ -11,9 +12,9 @@ const contactCards = [
   {
     icon: Phone,
     label: 'Phone',
-    value: '0212 261 186',
-    subValue: '+94 212 261 186',
-    href: 'tel:+94212261186',
+    value: '',
+    subValue: '',
+    href: '',
   },
   {
     icon: Mail,
@@ -38,9 +39,9 @@ const contactCards = [
 const fallbackContactSettings: ContactSettings = {
   business_name: 'Tulip Guest Inn',
   address: '189 V.M. Road\nPoint Pedro\nNorthern Province, Sri Lanka',
-  phone: '+94 212 261 186',
-  reception_contact_number: '+94 212 261 186',
-  whatsapp_reservation_number: '+94 212 261 186',
+  phone: '',
+  reception_contact_number: '',
+  whatsapp_reservation_number: '',
   email: 'info@tulipguestinn.com',
   business_hours: 'Open 24 Hours',
   business_hours_mode: '24_7',
@@ -76,10 +77,6 @@ function getOpeningHours(settings: ContactSettings) {
   } catch {
     return [{ day: 'Every Day', time: settings.business_hours || 'Open 24 Hours' }];
   }
-}
-
-function cleanPhoneForLink(phone: string) {
-  return phone.replace(/[^+0-9]/g, '');
 }
 
 function isValidUrl(url: string) {
@@ -159,12 +156,11 @@ export default function Contact() {
     };
   }, []);
 
-  const activePhone = settings.phone || settings.reception_contact_number || fallbackContactSettings.phone;
+  const phones = getContactPhones(settings);
   const activeEmail = settings.email || fallbackContactSettings.email;
   const activeAddress = settings.address || fallbackContactSettings.address;
   const customHours = settings.business_hours_mode === 'custom';
   const activeHours = customHours ? 'Weekly Schedule' : (settings.business_hours || fallbackContactSettings.business_hours);
-  const phoneHref = `tel:${cleanPhoneForLink(activePhone)}`;
   const emailHref = `mailto:${activeEmail}`;
   const mapHref = getMapOpenUrl(activeAddress, settings.map_embed_url || '');
   const mapEmbedUrl = getMapEmbedUrl(activeAddress, settings.map_embed_url || '');
@@ -173,7 +169,7 @@ export default function Contact() {
 
   const dynamicContactCards = contactCards.map((card) => {
     if (card.label === 'Phone') {
-      return { ...card, value: activePhone, subValue: settings.reception_contact_number || undefined, href: phoneHref };
+      return { ...card, value: '', subValue: undefined, href: '' };
     }
     if (card.label === 'Email') {
       return { ...card, value: activeEmail, href: emailHref };
@@ -260,7 +256,12 @@ export default function Contact() {
                   <card.icon size={22} className="text-gold group-hover:text-white transition-colors duration-300" />
                 </div>
                 <p className="text-[9px] tracking-[0.25em] uppercase text-gray-400 font-medium mb-2">{card.label}</p>
-                {card.href ? (
+                {card.label === 'Phone' ? (
+                  <div className="space-y-2">
+                    {phones.map((phone) => <a key={phone.href} href={phone.href} className="font-serif text-lg font-light text-dark hover:text-gold transition-colors duration-200 block">{phone.number}</a>)}
+                    {phones.length === 0 && <p className="text-sm text-gray-400">Phone details unavailable</p>}
+                  </div>
+                ) : card.href ? (
                   <a
                     href={card.href}
                     className={`font-serif text-lg font-light text-dark hover:text-gold transition-colors duration-200 block mb-1 ${'multiline' in card && card.multiline ? 'whitespace-pre-line' : ''}`}
@@ -467,10 +468,12 @@ export default function Contact() {
                   <p className="text-sm text-gray-500 mb-5">
                     Call us directly or use our online booking form for the fastest response.
                   </p>
-                  <a href={phoneHref} className="btn-dark w-full justify-center mb-3" aria-label={`Call ${activePhone}`}>
-                    <Phone size={14} />
-                    Call Now
-                  </a>
+                  {phones.map((phone) => (
+                    <a key={phone.href} href={phone.href} className="btn-dark w-full justify-center mb-3" aria-label={`Call ${phone.number}`}>
+                      <Phone size={14} />
+                      {phone.number}
+                    </a>
+                  ))}
                 </div>
               </AnimatedSection>
             </div>

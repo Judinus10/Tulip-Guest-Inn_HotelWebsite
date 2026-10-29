@@ -1,3 +1,4 @@
+import { getContactPhones } from '../hooks/useContactPhones';
 import { useHotelPolicies } from '../hooks/useHotelPolicies';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -157,10 +158,9 @@ export default function BookingBill() {
   const isPaid = booking?.payment_status?.toLowerCase() === 'paid';
   const isCashPayment = booking?.payment_method?.toLowerCase() === 'cash';
   const heroImage = bannerBooking;
-  const supportPhone = contactSettings?.reception_contact_number || contactSettings?.phone || '0212 261 186';
+  const phones = getContactPhones(contactSettings);
   const supportEmail = contactSettings?.email || 'info@tulipguestinn.com';
-  const whatsappNumber = contactSettings?.whatsapp_reservation_number || supportPhone;
-  const phoneHref = `tel:${supportPhone.replace(/[^+\d]/g, '')}`;
+  const whatsappNumber = contactSettings?.whatsapp_reservation_number?.trim() || phones[0]?.number || '';
   const whatsappHref = `https://wa.me/${whatsappNumber.replace(/\D/g, '')}`;
 
   return (
@@ -352,9 +352,9 @@ export default function BookingBill() {
                   <h3 className="mb-3 font-serif text-[21px] font-semibold text-[#14251f]">Need Help?</h3>
                   <p className="mb-5 text-[12px] leading-relaxed text-[#4f5d57]">If you have any questions or need assistance, our support team is here to help.</p>
                   <div className="space-y-4 text-[12px] text-[#35463f]">
-                    <a href={phoneHref} className="flex items-center gap-3 hover:text-[#b78335]"><Phone size={14} className="text-[#b78335]" /> {supportPhone}</a>
+                    {phones.map((phone) => <a key={phone.href} href={phone.href} className="flex items-center gap-3 hover:text-[#b78335]"><Phone size={14} className="text-[#b78335]" /> {phone.number}</a>)}
                     <a href={`mailto:${supportEmail}`} className="flex items-center gap-3 hover:text-[#b78335]"><Mail size={14} className="text-[#b78335]" /> {supportEmail}</a>
-                    <a href={whatsappHref} target="_blank" rel="noreferrer" className="flex items-center gap-3 hover:text-[#b78335]"><UserRound size={14} className="text-[#b78335]" /> WhatsApp Chat</a>
+                    {whatsappNumber && <a href={whatsappHref} target="_blank" rel="noreferrer" className="flex items-center gap-3 hover:text-[#b78335]"><UserRound size={14} className="text-[#b78335]" /> WhatsApp Chat</a>}
                   </div>
                   <Link to="/contact" className="mt-6 flex h-11 w-full items-center justify-center rounded-[4px] bg-[#c99d53] text-[10px] font-bold uppercase tracking-[0.22em] text-white transition hover:bg-[#19352b]">
                     Contact Support
