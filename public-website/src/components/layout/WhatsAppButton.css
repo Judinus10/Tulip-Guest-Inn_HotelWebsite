@@ -1,0 +1,41 @@
+.tulip-whatsapp-float {
+  isolation: isolate;
+  animation: tulip-whatsapp-float 3s ease-in-out infinite;
+  box-shadow: 0 8px 24px rgb(18 140 126 / 28%);
+}
+
+.tulip-whatsapp-float::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
+  z-index: -1;
+  border-radius: 50%;
+  background: rgb(37 211 102 / 14%);
+  box-shadow: 0 0 0 5px rgb(37 211 102 / 5%);
+  pointer-events: none;
+  animation: tulip-whatsapp-halo 2.4s ease-in-out infinite;
+}
+
+.tulip-whatsapp-float:hover,
+.tulip-whatsapp-float:focus-visible,
+.tulip-whatsapp-float:hover::before,
+.tulip-whatsapp-float:focus-visible::before {
+  animation-play-state: paused;
+}
+
+@keyframes tulip-whatsapp-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes tulip-whatsapp-halo {
+  0%, 100% { transform: scale(0.95); opacity: 0.7; }
+  50% { transform: scale(1.12); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tulip-whatsapp-float,
+  .tulip-whatsapp-float::before {
+    animation: none;
+  }
+}

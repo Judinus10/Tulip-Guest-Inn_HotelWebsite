@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
+import WhatsAppButton from './components/layout/WhatsAppButton';
 import ScrollToTop, { ScrollRestorer } from './components/layout/ScrollToTop';
 import SeoManager from './components/seo/SeoManager';
 import AutoTranslate from './i18n/AutoTranslate';
@@ -76,6 +77,7 @@ function AppLayout() {
         </Suspense>
       </PageWrapper>
       <Footer />
+      <WhatsAppButton />
       <ScrollToTop />
     </>
   );
