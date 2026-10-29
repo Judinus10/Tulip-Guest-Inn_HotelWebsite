@@ -75,7 +75,16 @@ function verify_bot_challenge(array $data, string $action): void {
     $raw = curl_exec($curl); $status = curl_getinfo($curl, CURLINFO_HTTP_CODE); curl_close($curl);
     $result = is_string($raw) ? json_decode($raw, true) : null;
     $host = strtolower((string) parse_url(FRONTEND_URL, PHP_URL_HOST));
-    if ($status !== 200 || !is_array($result) || ($result['success'] ?? false) !== true || ($result['action'] ?? '') !== $action || strtolower((string) ($result['hostname'] ?? '')) !== $host) {
+    if ($status !== 200 || !is_array($result) || ($result['success'] ?? false) !== true) {
+        json_response(false, 'Security check failed or expired. Please try again.', 422);
+    }
+    // Cloudflare test tokens return synthetic action/hostname metadata. Accept
+    // that metadata only with the official passing test secret in local mode,
+    // after successful server-side verification. Real tokens keep strict checks.
+    $localTestToken = APP_ENV === 'local'
+        && hash_equals('1x0000000000000000000000000000000AA', $secret)
+        && hash_equals('XXXX.DUMMY.TOKEN.XXXX', $token);
+    if (!$localTestToken && (($result['action'] ?? '') !== $action || strtolower((string) ($result['hostname'] ?? '')) !== $host)) {
         json_response(false, 'Security check failed or expired. Please try again.', 422);
     }
 }
