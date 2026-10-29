@@ -58,7 +58,7 @@ export default function CTASection({
               {btnLabel}
             </Link>
             {secondBtnLabel && secondBtnPath && (
-              <Link to={secondBtnPath} className="btn-outline border-white text-white hover:bg-white hover:text-dark">
+              <Link to={secondBtnPath} className="btn-outline border-white text-white hover:bg-surface hover:text-dark">
                 {secondBtnLabel}
               </Link>
             )}

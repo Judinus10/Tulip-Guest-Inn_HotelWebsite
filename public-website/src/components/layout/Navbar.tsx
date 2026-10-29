@@ -44,7 +44,7 @@ export default function Navbar() {
         animate={{ y: 0 }}
         transition={{ duration: 0.6, ease: 'easeOut' }}
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-          scrolled ? 'bg-white shadow-luxury border-b border-border' : 'bg-transparent'
+          scrolled ? 'bg-surface shadow-luxury border-b border-border' : 'bg-transparent'
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -126,7 +126,7 @@ export default function Navbar() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ duration: 0.35, ease: 'easeOut' }}
-              className="fixed top-0 right-0 h-full w-[280px] bg-white z-50 lg:hidden shadow-luxury-lg flex flex-col"
+              className="fixed top-0 right-0 h-full w-[280px] bg-surface z-50 lg:hidden shadow-luxury-lg flex flex-col"
             >
               <div className="flex items-center justify-between p-6 border-b border-border">
                 <Link to="/" aria-label="Tulip Guest Inn home">

@@ -117,7 +117,7 @@ function HomeSectionState({ status, empty, label, emptyMessage, onRetry, dark = 
 }) {
   if (status === 'ready' && !empty) return null;
   return (
-    <div role="status" className={`rounded border p-6 text-center text-sm ${dark ? 'border-white/20 text-gray-300' : 'border-border text-gray-500'}`}>
+    <div role="status" className={`rounded border p-6 text-center text-sm ${dark ? 'border-white/20 text-gray-300' : 'border-border text-muted'}`}>
       <p>{status === 'loading' ? `Loading ${label}…` : status === 'error' ? `We couldn't load ${label}. Please try again.` : emptyMessage}</p>
       {status === 'error' && <button type="button" onClick={onRetry} className="mt-4 font-semibold text-gold underline underline-offset-4">Try again<span className="sr-only"> loading {label}</span></button>}
     </div>
@@ -243,7 +243,7 @@ export default function Home() {
             </Link>
             <Link
               to="/rooms"
-              className="btn-outline border-white text-white hover:bg-white hover:text-dark"
+              className="btn-outline border-white text-white hover:bg-surface hover:text-dark"
             >
               Explore Rooms
             </Link>
@@ -306,13 +306,13 @@ export default function Home() {
                   Tulip Guest Inn
                 </h2>
                 <div className="gold-line-left" />
-                <p className="text-sm text-gray-500 leading-relaxed mb-5">
+                <p className="text-sm text-muted leading-relaxed mb-5">
                   Located at 189 V.M. Road in Point Pedro, Northern Province,
                   Tulip Guest Inn is a family-run guest house designed for
                   guests who appreciate genuine comfort, thoughtful service and
                   serene surroundings.
                 </p>
-                <p className="text-sm text-gray-500 leading-relaxed mb-8">
+                <p className="text-sm text-muted leading-relaxed mb-8">
                   From our practical shared kitchen and lush tropical gardens to
                   our elegantly appointed rooms, every detail has been carefully
                   considered to ensure a stay that is as restful as it is
@@ -322,7 +322,7 @@ export default function Home() {
                   {welcomeFeatures.map(({ icon: Icon, label }) => (
                     <div key={label} className="flex items-center gap-3">
                       <Icon size={15} className="text-gold shrink-0" />
-                      <span className="text-sm text-gray-600">{label}</span>
+                      <span className="text-sm text-muted">{label}</span>
                     </div>
                   ))}
                 </div>
@@ -369,7 +369,7 @@ export default function Home() {
       </section>
 
       {/* ── WHY CHOOSE US ─────────────────────────────────── */}
-      <section className="section-padding bg-white">
+      <section className="section-padding bg-surface">
         <div className="container-custom">
           <SectionTitle
             eyebrow="Our Promise"
@@ -423,7 +423,7 @@ export default function Home() {
             />
           </div>
           {/* Content Side */}
-          <div className="bg-deep-green flex items-center px-10 lg:px-16 py-16">
+          <div className="bg-deep-green theme-secondary flex items-center px-10 lg:px-16 py-16">
             <AnimatedSection direction="right" className="max-w-md">
               <p className="text-[10px] tracking-[0.35em] uppercase text-gold font-medium mb-5">
                 Luxury Experience
@@ -449,7 +449,7 @@ export default function Home() {
       </section>
 
       {/* ── TESTIMONIALS ──────────────────────────────────── */}
-      <section className="section-padding bg-white">
+      <section className="section-padding bg-surface">
         <div className="container-custom">
           <SectionTitle
             eyebrow="Guest Reviews"
@@ -499,7 +499,7 @@ export default function Home() {
       </section>
 
       {/* ── ATTRACTIONS PREVIEW ───────────────────────────── */}
-      <section className="section-padding bg-white">
+      <section className="section-padding bg-surface">
         <div className="container-custom">
           <SectionTitle
             eyebrow="Explore"
@@ -542,7 +542,7 @@ export default function Home() {
       </section>}
 
       {/* ── STATISTICS ────────────────────────────────────── */}
-      {(statisticsResource.status !== 'ready' || homeStatistics.length > 0) && <section className="bg-dark py-20">
+      {(statisticsResource.status !== 'ready' || homeStatistics.length > 0) && <section className="bg-footer theme-secondary [--theme-on-secondary:var(--theme-on-footer)] py-20">
         <div className="container-custom">
           <HomeSectionState status={statisticsResource.status} empty={homeStatistics.length === 0} label="hotel statistics" emptyMessage="" onRetry={statisticsResource.retry} dark />
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-12">

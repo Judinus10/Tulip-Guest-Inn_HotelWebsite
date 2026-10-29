@@ -49,14 +49,14 @@ export default function TestimonialSlider() {
       {/* Nav Arrows */}
       <button
         onClick={prev}
-        className="absolute left-0 top-1/2 -translate-y-1/2 w-10 h-10 border border-border flex items-center justify-center text-gray-400 hover:border-gold hover:text-gold transition-all duration-300"
+        className="absolute left-0 top-1/2 -translate-y-1/2 w-10 h-10 border border-border flex items-center justify-center text-muted hover:border-gold hover:text-gold transition-all duration-300"
         aria-label="Previous testimonial"
       >
         <ChevronLeft size={18} />
       </button>
       <button
         onClick={next}
-        className="absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 border border-border flex items-center justify-center text-gray-400 hover:border-gold hover:text-gold transition-all duration-300"
+        className="absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 border border-border flex items-center justify-center text-muted hover:border-gold hover:text-gold transition-all duration-300"
         aria-label="Next testimonial"
       >
         <ChevronRight size={18} />
@@ -94,7 +94,7 @@ export default function TestimonialSlider() {
               </div>
               <div className="text-left">
                 <p className="font-medium text-dark text-sm">{testimonial.name}</p>
-                <p className="text-xs text-gray-400 tracking-wide">{testimonial.country}</p>
+                <p className="text-xs text-muted tracking-wide">{testimonial.country}</p>
               </div>
             </div>
           </motion.div>

@@ -46,7 +46,7 @@ export default function RoomCard({ room, index = 0, bookingPath }: RoomCardProps
       }}
       role="button"
       tabIndex={0}
-      className="group bg-white border border-border shadow-luxury hover:shadow-luxury-lg transition-shadow duration-500 cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-gold/50"
+      className="group bg-surface border border-border shadow-luxury hover:shadow-luxury-lg transition-shadow duration-500 cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-gold/50"
     >
       {/* Image */}
       <div className="relative h-64 overflow-hidden">
@@ -63,8 +63,8 @@ export default function RoomCard({ room, index = 0, bookingPath }: RoomCardProps
           </span>
         </div>
         <div className="absolute top-4 right-4">
-          <span className="bg-white/95 text-dark text-xs font-medium px-3 py-1.5">
-            From {formatMoney(room.currency, room.price)}<span className="text-gray-400 text-[10px]">/night</span>
+          <span className="bg-surface/95 text-dark text-xs font-medium px-3 py-1.5">
+            From {formatMoney(room.currency, room.price)}<span className="text-muted text-[10px]">/night</span>
           </span>
         </div>
       </div>
@@ -73,19 +73,19 @@ export default function RoomCard({ room, index = 0, bookingPath }: RoomCardProps
       <div className="p-7">
         <h3 className="font-serif text-2xl text-dark font-light mb-2">{room.name}</h3>
         <div className="w-8 h-[1px] bg-gold mb-4" />
-        <p className="text-sm text-gray-500 leading-relaxed mb-6">{room.description}</p>
+        <p className="text-sm text-muted leading-relaxed mb-6">{room.description}</p>
 
         {/* Room Details */}
         <div className="flex items-center gap-6 mb-7 pt-4 border-t border-border">
-          <div className="flex items-center gap-1.5 text-gray-500">
+          <div className="flex items-center gap-1.5 text-muted">
             <Users size={14} className="text-gold" />
             <span className="text-xs">{room.guests} Guests</span>
           </div>
-          <div className="flex items-center gap-1.5 text-gray-500">
+          <div className="flex items-center gap-1.5 text-muted">
             <BedDouble size={14} className="text-gold" />
             <span className="text-xs">{room.beds}</span>
           </div>
-          <div className="flex items-center gap-1.5 text-gray-500">
+          <div className="flex items-center gap-1.5 text-muted">
             <Maximize size={14} className="text-gold" />
             <span className="text-xs">{room.size} m²</span>
           </div>

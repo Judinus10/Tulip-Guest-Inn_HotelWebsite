@@ -9,10 +9,10 @@ dialog.tulip-verification {
   max-height: calc(100dvh - 24px);
   overflow: auto;
   padding: clamp(16px, 4vw, 28px);
-  border: 1px solid #e7e2d8;
+  border: 1px solid var(--theme-border);
   border-radius: 16px;
-  background: #fff;
-  color: #19372c;
+  background: var(--theme-surface);
+  color: var(--theme-text);
   box-shadow: 0 24px 80px rgb(0 0 0 / 24%);
   font-family: Inter, Arial, sans-serif;
   text-align: left;
@@ -23,21 +23,21 @@ dialog.tulip-verification::backdrop {
 }
 .tulip-verification__label {
   margin: 0 0 10px;
-  color: #8b6b2d;
+  color: var(--theme-primary-dark);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: .18em;
 }
 .tulip-verification h2 {
   margin: 0;
-  color: #19372c;
+  color: var(--theme-text);
   font-size: 21px;
   font-weight: 600;
   line-height: 1.35;
 }
 .tulip-verification__description {
   margin: 10px 0 20px;
-  color: #647067;
+  color: var(--theme-muted);
   font-size: 14px;
   line-height: 1.6;
 }
@@ -52,18 +52,18 @@ dialog.tulip-verification::backdrop {
   width: 100%;
   margin-top: 20px;
   padding: 11px 16px;
-  border: 1px solid #d7ddd9;
+  border: 1px solid var(--theme-border);
   border-radius: 8px;
-  background: #fff;
-  color: #19372c;
+  background: var(--theme-surface);
+  color: var(--theme-text);
   font: inherit;
   font-size: 14px;
   font-weight: 600;
   line-height: 1.5;
   cursor: pointer;
 }
-.tulip-verification__cancel:hover { background: #f3f6f3; }
+.tulip-verification__cancel:hover { background: var(--theme-background); }
 .tulip-verification__cancel:focus-visible {
-  outline: 2px solid #8b6b2d;
+  outline: 2px solid var(--theme-primary-dark);
   outline-offset: 3px;
 }

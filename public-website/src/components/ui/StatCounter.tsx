@@ -40,7 +40,7 @@ export default function StatCounter({ stat }: StatCounterProps) {
         <span className="text-gold">{stat.suffix}</span>
       </p>
       <div className="w-8 h-[1px] bg-gold/40 mx-auto mb-3" />
-      <p className="text-xs tracking-[0.2em] uppercase text-gray-400 font-medium">{stat.label}</p>
+      <p className="text-xs tracking-[0.2em] uppercase text-muted font-medium">{stat.label}</p>
     </div>
   );
 }

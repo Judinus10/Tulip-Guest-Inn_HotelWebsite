@@ -40,19 +40,19 @@ export default function PointPedroAccommodation() {
         image={bannerRooms}
       />
 
-      <section className="section-padding bg-white">
+      <section className="section-padding bg-surface">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <div>
             <p className="text-[10px] tracking-[0.3em] uppercase text-gold mb-4">Stay in Point Pedro</p>
             <h2 className="font-serif text-4xl md:text-5xl font-light text-dark leading-tight mb-6">
               Rooms for a comfortable stay in Point Pedro
             </h2>
-            <p className="text-gray-500 leading-relaxed mb-5">
+            <p className="text-muted leading-relaxed mb-5">
               Tulip Guest Inn is a family-run guest house offering practical room accommodation at
               189 V.M. Road, Point Pedro. It is a convenient base for guests visiting Point Pedro and
               the surrounding Northern Province.
             </p>
-            <p className="text-gray-500 leading-relaxed mb-8">
+            <p className="text-muted leading-relaxed mb-8">
               Choose a room that suits your stay, review the available facilities, and book directly
               through the website. {stayTimes}
             </p>
@@ -81,17 +81,17 @@ export default function PointPedroAccommodation() {
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {facts.map(({ icon: Icon, title, text }) => (
-              <article key={title} className="bg-white border border-border p-7">
+              <article key={title} className="bg-surface border border-border p-7">
                 <Icon className="text-gold mb-5" size={24} aria-hidden="true" />
                 <h3 className="font-serif text-xl text-dark mb-3">{title}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{text === '__STAY_TIMES__' ? stayTimes : text}</p>
+                <p className="text-sm text-muted leading-relaxed">{text === '__STAY_TIMES__' ? stayTimes : text}</p>
               </article>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="section-padding bg-white">
+      <section className="section-padding bg-surface">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <p className="text-[10px] tracking-[0.3em] uppercase text-gold mb-4 text-center">Common Questions</p>
           <h2 className="font-serif text-4xl font-light text-dark text-center mb-10">Point Pedro stay FAQs</h2>
@@ -99,7 +99,7 @@ export default function PointPedroAccommodation() {
             {faqs.map((faq) => (
               <details key={faq.question} className="border border-border bg-cream p-6 group">
                 <summary className="font-serif text-lg text-dark cursor-pointer">{faq.question}</summary>
-                <p className="text-sm text-gray-500 leading-relaxed mt-4">{faq.answer === '__STAY_TIMES__' ? stayTimes : faq.answer}</p>
+                <p className="text-sm text-muted leading-relaxed mt-4">{faq.answer === '__STAY_TIMES__' ? stayTimes : faq.answer}</p>
               </details>
             ))}
           </div>

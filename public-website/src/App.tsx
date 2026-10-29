@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
+import WebsiteTheme from './components/theme/WebsiteTheme';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import WhatsAppButton from './components/layout/WhatsAppButton';
@@ -49,13 +50,14 @@ function AppLayout() {
   const location = useLocation();
   return (
     <>
+      <WebsiteTheme />
       <ScrollRestorer />
       <SeoManager />
       <AutoTranslate />
       <TranslationNotice />
       <Navbar />
       <PageWrapper key={location.pathname}>
-        <Suspense fallback={<div className="min-h-screen bg-white" aria-label="Loading page" />}>
+        <Suspense fallback={<div className="min-h-screen bg-surface" aria-label="Loading page" />}>
         <Routes location={location}>
           <Route path="/" element={<Home />} />
           <Route path="/rooms" element={<Rooms />} />

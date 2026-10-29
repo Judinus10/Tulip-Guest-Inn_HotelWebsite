@@ -250,16 +250,16 @@ export default function Contact() {
               <AnimatedSection
                 key={card.label}
                 delay={i * 0.1}
-                className="bg-white border border-border p-8 text-center hover:border-gold hover:shadow-luxury transition-all duration-400 group"
+                className="bg-surface border border-border p-8 text-center hover:border-gold hover:shadow-luxury transition-all duration-400 group"
               >
                 <div className="w-14 h-14 border border-gold/30 group-hover:bg-gold group-hover:border-gold flex items-center justify-center mx-auto mb-5 transition-all duration-300">
                   <card.icon size={22} className="text-gold group-hover:text-white transition-colors duration-300" />
                 </div>
-                <p className="text-[9px] tracking-[0.25em] uppercase text-gray-400 font-medium mb-2">{card.label}</p>
+                <p className="text-[9px] tracking-[0.25em] uppercase text-muted font-medium mb-2">{card.label}</p>
                 {card.label === 'Phone' ? (
                   <div className="space-y-2">
                     {phones.map((phone) => <a key={phone.href} href={phone.href} className="font-serif text-lg font-light text-dark hover:text-gold transition-colors duration-200 block">{phone.number}</a>)}
-                    {phones.length === 0 && <p className="text-sm text-gray-400">Phone details unavailable</p>}
+                    {phones.length === 0 && <p className="text-sm text-muted">Phone details unavailable</p>}
                   </div>
                 ) : card.href ? (
                   <a
@@ -272,7 +272,7 @@ export default function Contact() {
                   <p className={`font-serif text-lg font-light text-dark mb-1 ${'multiline' in card && card.multiline ? 'whitespace-pre-line' : ''}`}>{card.value}</p>
                 )}
                 {card.subValue && (
-                  <p className="text-xs text-gray-400">{card.subValue}</p>
+                  <p className="text-xs text-muted">{card.subValue}</p>
                 )}
               </AnimatedSection>
             ))}
@@ -281,7 +281,7 @@ export default function Contact() {
       </section>
 
       {/* Form & Info */}
-      <section className="section-padding bg-white">
+      <section className="section-padding bg-surface">
         <div className="container-custom">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
             {/* Form */}
@@ -297,7 +297,7 @@ export default function Contact() {
                       <Send size={20} className="text-white" />
                     </div>
                     <h3 className="font-serif text-2xl font-light text-dark mb-3">Message Sent</h3>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted">
                       Thank you for getting in touch. Our team will respond within 24 hours.
                     </p>
                   </div>
@@ -305,7 +305,7 @@ export default function Contact() {
                   <form onSubmit={handleSubmit} className="space-y-5">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <div>
-                        <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 font-medium mb-2">
+                        <label className="block text-[9px] tracking-[0.2em] uppercase text-muted font-medium mb-2">
                           Full Name *
                         </label>
                         <input
@@ -323,7 +323,7 @@ export default function Contact() {
                         {fieldErrors.name && <p id="contact-name-error" className="mt-1.5 text-xs text-red-600">{fieldErrors.name}</p>}
                       </div>
                       <div>
-                        <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 font-medium mb-2">
+                        <label className="block text-[9px] tracking-[0.2em] uppercase text-muted font-medium mb-2">
                           Email Address *
                         </label>
                         <input
@@ -344,7 +344,7 @@ export default function Contact() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <div>
-                        <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 font-medium mb-2">
+                        <label className="block text-[9px] tracking-[0.2em] uppercase text-muted font-medium mb-2">
                           Phone Number
                         </label>
                         <input
@@ -364,7 +364,7 @@ export default function Contact() {
                         {fieldErrors.phone && <p id="contact-phone-error" className="mt-1.5 text-xs text-red-600">{fieldErrors.phone}</p>}
                       </div>
                       <div>
-                        <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 font-medium mb-2">
+                        <label className="block text-[9px] tracking-[0.2em] uppercase text-muted font-medium mb-2">
                           Subject
                         </label>
                         <select
@@ -383,7 +383,7 @@ export default function Contact() {
                     </div>
 
                     <div>
-                      <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 font-medium mb-2">
+                      <label className="block text-[9px] tracking-[0.2em] uppercase text-muted font-medium mb-2">
                         Message *
                       </label>
                       <textarea
@@ -419,23 +419,23 @@ export default function Contact() {
                   <div className="space-y-3">
                     {dynamicOpeningHours.map((h) => (
                       <div key={h.day} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500">{h.day}</span>
+                        <span className="text-muted">{h.day}</span>
                         <span className="text-gold font-medium text-xs">{h.time}</span>
                       </div>
                     ))}
                   </div>
                   <div className="mt-5 pt-5 border-t border-border">
-                    <p className="text-xs text-gray-400 leading-relaxed">
+                    <p className="text-xs text-muted leading-relaxed">
                       {customHours ? 'Opening times are managed by the hotel and may change when required.' : 'Our reception team is available 24 hours a day, 7 days a week to assist you.'}
                     </p>
                   </div>
                 </div>
 
                 {/* Social */}
-                {socialLinks.length > 0 && <div className="bg-deep-green p-8">
+                {socialLinks.length > 0 && <div className="bg-deep-green theme-secondary p-8">
                   <h3 className="font-serif text-xl font-light text-white mb-4">Follow Us</h3>
                   <div className="w-8 h-[1px] bg-gold mb-5" />
-                  <p className="text-gray-400 text-sm mb-6">
+                  <p className="text-muted text-sm mb-6">
                     Stay connected and follow our latest updates on social media.
                   </p>
                   {socialLinks.length > 0 ? (
@@ -448,7 +448,7 @@ export default function Contact() {
                             href={social.href}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="w-10 h-10 border border-white/20 flex items-center justify-center text-gray-400 hover:border-gold hover:text-gold transition-all duration-300"
+                            className="w-10 h-10 border border-white/20 flex items-center justify-center text-muted hover:border-gold hover:text-gold transition-all duration-300"
                             aria-label={social.label}
                           >
                             <Icon size={16} />
@@ -457,7 +457,7 @@ export default function Contact() {
                       })}
                     </div>
                   ) : (
-                    <p className="text-xs text-gray-500">Social links are not available yet.</p>
+                    <p className="text-xs text-muted">Social links are not available yet.</p>
                   )}
                 </div>}
 
@@ -465,7 +465,7 @@ export default function Contact() {
                 <div className="border border-gold p-8">
                   <p className="text-[9px] tracking-[0.25em] uppercase text-gold font-medium mb-3">Quick Booking</p>
                   <h3 className="font-serif text-xl font-light text-dark mb-3">Ready to Book?</h3>
-                  <p className="text-sm text-gray-500 mb-5">
+                  <p className="text-sm text-muted mb-5">
                     Call us directly or use our online booking form for the fastest response.
                   </p>
                   {phones.map((phone) => (

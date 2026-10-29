@@ -3,7 +3,7 @@ import { useLanguage } from './LanguageContext';
 export default function TranslationNotice() {
   const { language, translating, translationError, setLanguage } = useLanguage();
   if (language.code === 'en') return null;
-  return <aside data-no-translate dir="ltr" translate="no" className="fixed bottom-4 left-4 z-[100] max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-white px-4 py-3 text-xs text-dark shadow-lg" aria-live="polite">
+  return <aside data-no-translate dir="ltr" translate="no" className="fixed bottom-4 left-4 z-[100] max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-surface px-4 py-3 text-xs text-dark shadow-lg" aria-live="polite">
     {translationError ? <>
       <p role="alert" className="max-w-sm text-red-700">{translationError}</p>
       <button type="button" className="mt-2 underline" onClick={() => setLanguage('en')}>Use English</button>

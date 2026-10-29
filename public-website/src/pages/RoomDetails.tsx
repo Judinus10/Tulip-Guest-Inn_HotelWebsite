@@ -376,7 +376,7 @@ export default function RoomDetails() {
               <AnimatedSection>
                 <Link
                   to={`/rooms${searchParams.toString() ? `?${searchParams.toString()}` : ''}`}
-                  className="inline-flex items-center gap-2 text-[10px] tracking-[0.18em] uppercase text-gray-400 hover:text-gold transition-colors duration-200 mb-6"
+                  className="inline-flex items-center gap-2 text-[10px] tracking-[0.18em] uppercase text-muted hover:text-gold transition-colors duration-200 mb-6"
                 >
                   <ChevronLeft size={12} />
                   All Rooms
@@ -386,26 +386,26 @@ export default function RoomDetails() {
 
                 {/* Stats Row */}
                 <div className="flex flex-wrap gap-8 py-6 border-y border-border mb-8">
-                  <div className="flex items-center gap-2 text-gray-600">
+                  <div className="flex items-center gap-2 text-muted">
                     <Users size={16} className="text-gold" />
                     <span className="text-sm">{room.guests} Guests</span>
                   </div>
-                  <div className="flex items-center gap-2 text-gray-600">
+                  <div className="flex items-center gap-2 text-muted">
                     <BedDouble size={16} className="text-gold" />
                     <span className="text-sm">{room.beds}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-gray-600">
+                  <div className="flex items-center gap-2 text-muted">
                     <Bath size={16} className="text-gold" />
                     <span className="text-sm">{room.bathrooms} Bathroom{room.bathrooms > 1 ? 's' : ''}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-gray-600">
+                  <div className="flex items-center gap-2 text-muted">
                     <Maximize size={16} className="text-gold" />
                     <span className="text-sm">{room.size} m²</span>
                   </div>
                 </div>
 
                 <h3 className="font-serif text-xl text-dark font-light mb-4">About This Room</h3>
-                <p className="text-sm text-gray-500 leading-relaxed mb-8">{room.longDescription}</p>
+                <p className="text-sm text-muted leading-relaxed mb-8">{room.longDescription}</p>
 
                 {/* Amenities */}
                 <h3 className="font-serif text-xl text-dark font-light mb-5">Room Amenities</h3>
@@ -414,18 +414,18 @@ export default function RoomDetails() {
                   {includedAmenities.map((amenity) => (
                     <div key={`${amenity.id}-${amenity.amenity_name}`} className="flex items-center gap-2.5">
                       <Check size={14} strokeWidth={2.5} className="text-emerald-600 shrink-0" />
-                      <span className="text-sm text-gray-600">{amenity.amenity_name}</span>
+                      <span className="text-sm text-muted">{amenity.amenity_name}</span>
                     </div>
                   ))}
                 </div>
 
                 {unavailableAmenities.length > 0 && <div className="mt-7 border-t border-border pt-6">
-                  <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.18em] text-gray-400">Not Included</p>
+                  <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.18em] text-muted">Not Included</p>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {unavailableAmenities.map((amenity) => (
                       <div key={`${amenity.id}-${amenity.amenity_name}`} className="flex items-center gap-2.5">
                         <X size={14} strokeWidth={2.2} className="text-red-500 shrink-0" />
-                        <span className="text-sm text-gray-400">{amenity.amenity_name}</span>
+                        <span className="text-sm text-muted">{amenity.amenity_name}</span>
                       </div>
                     ))}
                   </div>
@@ -437,11 +437,11 @@ export default function RoomDetails() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
                       {nearbyPlaces.map((place) => (
                         <div key={place.id} className="flex items-center justify-between gap-4 border-b border-border pb-3">
-                          <span className="flex items-center gap-2.5 text-sm text-gray-600">
+                          <span className="flex items-center gap-2.5 text-sm text-muted">
                             <MapPin size={14} className="text-gold shrink-0" />
                             {place.name}
                           </span>
-                          <span className="text-sm text-gray-600">{place.distance} {place.distance_unit}</span>
+                          <span className="text-sm text-muted">{place.distance} {place.distance_unit}</span>
                         </div>
                       ))}
                     </div>
@@ -452,17 +452,17 @@ export default function RoomDetails() {
 
             {/* Booking Card */}
             <AnimatedSection direction="right" className="lg:col-span-1">
-              <div className="bg-white border border-border shadow-luxury p-8 sticky top-28">
+              <div className="bg-surface border border-border shadow-luxury p-8 sticky top-28">
                 <p className="text-[9px] tracking-[0.25em] uppercase text-gold font-medium mb-2">Rate From</p>
                 <p className="font-serif text-4xl font-light text-dark mb-1">
                   {formatMoney(room.currency, room.price)}
-                  <span className="text-gray-400 text-base font-sans"> / night</span>
+                  <span className="text-muted text-base font-sans"> / night</span>
                 </p>
                 <div className="w-8 h-[1px] bg-gold my-5" />
 
                 <div className="space-y-4 mb-6">
                   <div className="flex flex-col">
-                    <label className="text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-1.5">Check In</label>
+                    <label className="text-[9px] tracking-[0.2em] uppercase text-muted mb-1.5">Check In</label>
                     <input
                       ref={(node) => { fieldRefs.current.checkIn = node; }}
                       type="date"
@@ -474,7 +474,7 @@ export default function RoomDetails() {
                     />
                   </div>
                   <div className="flex flex-col">
-                    <label className="text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-1.5">Check Out</label>
+                    <label className="text-[9px] tracking-[0.2em] uppercase text-muted mb-1.5">Check Out</label>
                     <input
                       ref={(node) => { fieldRefs.current.checkOut = node; }}
                       type="date"
@@ -486,7 +486,7 @@ export default function RoomDetails() {
                     />
                   </div>
                   <div className="flex flex-col">
-                    <label className="text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-1.5">Guests</label>
+                    <label className="text-[9px] tracking-[0.2em] uppercase text-muted mb-1.5">Guests</label>
                     <select
                       ref={(node) => { fieldRefs.current.guests = node; }}
                       name="guests"
@@ -519,11 +519,11 @@ export default function RoomDetails() {
                 <div className="mt-6 pt-6 border-t border-border">
                   <div className="flex items-start gap-2.5 mb-3">
                     <Check size={13} className="text-gold mt-0.5 shrink-0" />
-                    <span className="text-xs text-gray-500">Free cancellation available</span>
+                    <span className="text-xs text-muted">Free cancellation available</span>
                   </div>
                   <div className="flex items-start gap-2.5">
                     <Check size={13} className="text-gold mt-0.5 shrink-0" />
-                    <span className="text-xs text-gray-500">Direct booking — best rate guaranteed</span>
+                    <span className="text-xs text-muted">Direct booking — best rate guaranteed</span>
                   </div>
                 </div>
               </div>
@@ -534,7 +534,7 @@ export default function RoomDetails() {
 
       {/* Related Rooms */}
       {relatedRooms.length > 0 && (
-        <section className="section-padding bg-white">
+        <section className="section-padding bg-surface">
           <div className="container-custom">
             <h2 className="font-serif text-3xl font-light text-dark mb-2">You May Also Like</h2>
             <div className="w-10 h-[1px] bg-gold mb-10" />

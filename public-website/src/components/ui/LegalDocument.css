@@ -13,5 +13,5 @@
 .legal-document em, .legal-document i { font-style: italic; }
 .legal-document u { text-decoration: underline; }
 .legal-document s { text-decoration: line-through; }
-.legal-document a { color: #92703a; text-decoration: underline; }
-.legal-document blockquote { border-left: 3px solid #c5a56a; padding-left: 1em; margin: 1em 0; }
+.legal-document a { color: var(--theme-primary-dark); text-decoration: underline; }
+.legal-document blockquote { border-left: 3px solid var(--theme-primary); padding-left: 1em; margin: 1em 0; }

@@ -1,11 +1,8 @@
 .appearance-panel { color: #17243b; }
-.appearance-heading { display: flex; align-items: center; gap: 14px; padding: 24px; border: 1px solid #e2e8f0; background: white; border-radius: 16px; }
+.appearance-heading { margin-bottom: 24px; display: flex; align-items: center; gap: 14px; padding: 24px; border: 1px solid #e2e8f0; background: white; border-radius: 16px; }
 .appearance-heading-icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 12px; background: #eff6ff; color: #2563eb; flex-shrink: 0; }
 .appearance-heading h2 { font-size: 18px; font-weight: 700; }
 .appearance-heading p { color: #64748b; font-size: 13px; margin-top: 4px; }
-.appearance-step { margin-left: auto; white-space: nowrap; border-radius: 20px; background: #f1f5f9; padding: 6px 10px; font-size: 11px; color: #64748b; }
-.appearance-stage-note { display: flex; align-items: center; gap: 9px; background: #eff6ff; color: #1d4ed8; border: 1px solid #dbeafe; border-radius: 10px; margin: 16px 0 24px; padding: 13px 16px; font-size: 12px; }
-.appearance-stage-note svg { flex-shrink: 0; }
 .appearance-error, .appearance-success { border-radius: 10px; padding: 16px; margin: 16px 0; font-size: 13px; }
 .appearance-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #fef2f2; color: #b91c1c; }
 .appearance-success { background: #ecfdf5; color: #047857; }
@@ -57,4 +54,6 @@
 .appearance-actions > p { font-size: 11px; color: #64748b; margin-bottom: 16px; }
 .appearance-actions > div { display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap; }
 @media(max-width:1100px) { .appearance-layout { grid-template-columns: 1fr; } }
-@media(max-width:600px) { .appearance-heading { padding: 18px; flex-wrap: wrap; }.appearance-step { margin-left: 62px; }.appearance-colours,.appearance-preview-column { padding: 18px; }.appearance-colour-grid { grid-template-columns: 1fr; gap: 18px; }.appearance-colour-field > p { min-height: 0; }.appearance-actions > div { flex-direction: column; }.appearance-actions button { width: 100%; } }
+@media(max-width:600px) { .appearance-heading { padding: 18px; flex-wrap: wrap; }.appearance-colours,.appearance-preview-column { padding: 18px; }.appearance-colour-grid { grid-template-columns: 1fr; gap: 18px; }.appearance-colour-field > p { min-height: 0; }.appearance-actions > div { flex-direction: column; }.appearance-actions button { width: 100%; } }
+
+.appearance-site-preview h4 { color: inherit; }

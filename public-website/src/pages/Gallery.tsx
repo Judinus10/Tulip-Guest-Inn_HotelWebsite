@@ -123,7 +123,7 @@ export default function Gallery() {
         breadcrumb="Photo Gallery"
       />
 
-      <section className="bg-white border-b border-border sticky top-20 z-30">
+      <section className="bg-surface border-b border-border sticky top-20 z-30">
         <div className="container-custom">
           <div className="flex flex-wrap items-center gap-0">
             {categories.map((cat) => (
@@ -136,14 +136,14 @@ export default function Gallery() {
                 className={`px-7 py-5 text-[10px] tracking-[0.2em] uppercase font-medium transition-all duration-300 border-b-2 ${
                   active === cat.value
                     ? 'border-gold text-gold'
-                    : 'border-transparent text-gray-400 hover:text-dark hover:border-border'
+                    : 'border-transparent text-muted hover:text-dark hover:border-border'
                 }`}
               >
                 {cat.label}
               </button>
             ))}
 
-            <span data-no-translate className="ml-auto text-xs text-gray-400 pr-4 hidden sm:block">
+            <span data-no-translate className="ml-auto text-xs text-muted pr-4 hidden sm:block">
               {filtered.length} {filtered.length === 1 ? 'image' : 'images'}
             </span>
           </div>
@@ -153,7 +153,7 @@ export default function Gallery() {
       <section className="section-padding bg-background">
         <div className="container-custom">
           {loading && (
-            <div className="text-center py-20 text-gray-500 text-sm tracking-wide">
+            <div className="text-center py-20 text-muted text-sm tracking-wide">
               Loading gallery...
             </div>
           )}
@@ -161,7 +161,7 @@ export default function Gallery() {
           {!loading && error && (
             <div className="text-center py-20">
               <p className="text-red-500 text-sm">{error}</p>
-              <p className="text-gray-400 text-xs mt-2">
+              <p className="text-muted text-xs mt-2">
                 Check API URL, database connection, and gallery table data.
               </p>
             </div>
@@ -169,8 +169,8 @@ export default function Gallery() {
 
           {!loading && !error && filtered.length === 0 && (
             <div className="text-center py-20">
-              <p className="text-gray-500 text-sm">No gallery images found.</p>
-              <p className="text-gray-400 text-xs mt-2">
+              <p className="text-muted text-sm">No gallery images found.</p>
+              <p className="text-muted text-xs mt-2">
                 Add active folders and active images from the admin gallery.
               </p>
             </div>
@@ -270,7 +270,7 @@ export default function Gallery() {
 
             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-center">
               <p className="text-white/70 text-xs tracking-wide">{filtered[lightbox].alt}</p>
-              <p className="text-gray-600 text-[10px] mt-1">
+              <p className="text-muted text-[10px] mt-1">
                 {lightbox + 1} / {filtered.length}
               </p>
             </div>

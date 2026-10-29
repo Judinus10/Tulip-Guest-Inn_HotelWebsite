@@ -15,7 +15,7 @@ export default function OfferCard({ offer, index = 0 }: OfferCardProps) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-60px' }}
       transition={{ duration: 0.6, delay: index * 0.1 }}
-      className="group relative overflow-hidden bg-white border border-border shadow-luxury hover:shadow-luxury-lg transition-shadow duration-500"
+      className="group relative overflow-hidden bg-surface border border-border shadow-luxury hover:shadow-luxury-lg transition-shadow duration-500"
     >
       {/* Image */}
       <div className="relative h-52 overflow-hidden">
@@ -43,11 +43,11 @@ export default function OfferCard({ offer, index = 0 }: OfferCardProps) {
         </p>
         <h3 className="font-serif text-2xl font-light text-dark mb-2">{offer.name}</h3>
         <div className="w-8 h-[1px] bg-gold mb-4" />
-        <p className="text-sm text-gray-500 leading-relaxed mb-5">{offer.description}</p>
+        <p className="text-sm text-muted leading-relaxed mb-5">{offer.description}</p>
 
         <ul className="space-y-1.5 mb-6">
           {offer.details.map((detail) => (
-            <li key={detail} className="flex items-center gap-2 text-xs text-gray-500">
+            <li key={detail} className="flex items-center gap-2 text-xs text-muted">
               <span className="w-1 h-1 rounded-full bg-gold shrink-0" />
               {detail}
             </li>

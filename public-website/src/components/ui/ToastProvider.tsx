@@ -79,11 +79,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {toasts.map((toast) => {
         const design = designs[toast.type];
         const Icon = design.icon;
-        return <div key={toast.id} role={toast.type === 'error' ? 'alert' : 'status'} className={`pointer-events-auto border-l-4 ${design.accent} bg-white p-4 shadow-luxury ring-1 ring-black/5`}>
+        return <div key={toast.id} role={toast.type === 'error' ? 'alert' : 'status'} className={`pointer-events-auto border-l-4 ${design.accent} bg-surface p-4 shadow-luxury ring-1 ring-black/5`}>
           <div className="flex items-start gap-3">
             <Icon size={20} className={`mt-0.5 shrink-0 ${design.iconClass}`} />
-            <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-dark">{toast.title || design.title}</p><p className="mt-1 whitespace-pre-line text-sm leading-5 text-gray-500">{toast.message}</p></div>
-            <button type="button" onClick={() => dismiss(toast.id)} className="shrink-0 p-1 text-gray-400 hover:text-dark" aria-label="Dismiss message"><X size={17} /></button>
+            <div className="min-w-0 flex-1"><p className="text-sm font-semibold text-dark">{toast.title || design.title}</p><p className="mt-1 whitespace-pre-line text-sm leading-5 text-muted">{toast.message}</p></div>
+            <button type="button" onClick={() => dismiss(toast.id)} className="shrink-0 p-1 text-muted hover:text-dark" aria-label="Dismiss message"><X size={17} /></button>
           </div>
         </div>;
       })}

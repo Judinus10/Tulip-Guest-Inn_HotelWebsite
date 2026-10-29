@@ -81,7 +81,7 @@ export default function Footer() {
   const openingHours = contactSettings.business_hours || fallbackContactSettings.business_hours;
 
   return (
-    <footer className="bg-dark text-white">
+    <footer className="bg-footer text-on-footer">
       {/* Hero Strip */}
       <div className="relative h-56 overflow-hidden">
         <img
@@ -90,10 +90,10 @@ export default function Footer() {
           className="w-full h-full object-cover opacity-40"
           loading="lazy"
         />
-        <div className="absolute inset-0 bg-linear-to-b from-transparent to-dark" />
+        <div className="absolute inset-0 bg-linear-to-b from-transparent to-footer" />
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <p className="text-[10px] tracking-[0.35em] uppercase text-gold mb-3">Boutique Luxury</p>
-          <h2 className="font-serif text-4xl lg:text-5xl text-white font-light text-center">
+          <h2 className="font-serif text-4xl lg:text-5xl text-on-footer font-light text-center">
             {businessName}
           </h2>
         </div>
@@ -111,11 +111,11 @@ export default function Footer() {
                 className="h-16 w-auto object-contain"
               />
             </Link>
-            <p className="text-gray-400 text-sm leading-relaxed mb-6">
+            <p className="text-on-footer/70 text-sm leading-relaxed mb-6">
               A family-run guest house offering clean, comfortable accommodation and thoughtful service in Point Pedro.
             </p>
             {socialLinks.length > 0 && <div className="flex flex-wrap items-center gap-3">
-              {socialLinks.map((social, index) => <a key={`${social.href}-${index}`} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label} title={social.label} className="w-9 h-9 border border-white/20 flex items-center justify-center text-gray-400 hover:border-gold hover:text-gold transition-all duration-300"><social.icon size={15} /></a>)}
+              {socialLinks.map((social, index) => <a key={`${social.href}-${index}`} href={social.href} target="_blank" rel="noopener noreferrer" aria-label={social.label} title={social.label} className="w-9 h-9 border border-on-footer/20 flex items-center justify-center text-on-footer/70 hover:border-gold hover:text-gold transition-all duration-300"><social.icon size={15} /></a>)}
             </div>}
           </div>
 
@@ -129,7 +129,7 @@ export default function Footer() {
                 <li key={link.path}>
                   <Link
                     to={link.path}
-                    className="text-sm text-gray-400 hover:text-white transition-colors duration-200 flex items-center gap-2 group"
+                    className="text-sm text-on-footer/70 hover:text-on-footer transition-colors duration-200 flex items-center gap-2 group"
                   >
                     <span className="w-4 h-[1px] bg-gold/40 group-hover:bg-gold transition-colors duration-200" />
                     {link.label}
@@ -149,7 +149,7 @@ export default function Footer() {
                 <li key={link.path}>
                   <Link
                     to={link.path}
-                    className="text-sm text-gray-400 hover:text-white transition-colors duration-200 flex items-center gap-2 group"
+                    className="text-sm text-on-footer/70 hover:text-on-footer transition-colors duration-200 flex items-center gap-2 group"
                   >
                     <span className="w-4 h-[1px] bg-gold/40 group-hover:bg-gold transition-colors duration-200" />
                     {link.label}
@@ -169,7 +169,7 @@ export default function Footer() {
               {phones.map((phone) => (
                 <li key={phone.href} className="flex items-center gap-3">
                   <Phone size={15} className="text-gold shrink-0" />
-                  <a href={phone.href} className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
+                  <a href={phone.href} className="text-sm text-on-footer/70 hover:text-on-footer transition-colors duration-200">
                     {phone.number}
                   </a>
                 </li>
@@ -178,37 +178,37 @@ export default function Footer() {
                 <Mail size={15} className="text-gold shrink-0" />
                 <a
                   href={mailHref(displayEmail)}
-                  className="text-sm text-gray-400 hover:text-white transition-colors duration-200"
+                  className="text-sm text-on-footer/70 hover:text-on-footer transition-colors duration-200"
                 >
                   {displayEmail}
                 </a>
               </li>
               <li className="flex items-start gap-3">
                 <MapPin size={15} className="mt-0.5 text-gold shrink-0" />
-                <p className="whitespace-pre-line text-sm leading-relaxed text-gray-400">
+                <p className="whitespace-pre-line text-sm leading-relaxed text-on-footer/70">
                   {displayAddress}
                 </p>
               </li>
             </ul>
 
-            <div className="mt-8 pt-6 border-t border-white/10">
-              <p className="text-[10px] tracking-[0.15em] uppercase text-gray-500 mb-2">Opening Hours</p>
-              <p className="text-sm text-gray-400">{openingHours}</p>
+            <div className="mt-8 pt-6 border-t border-on-footer/10">
+              <p className="text-[10px] tracking-[0.15em] uppercase text-on-footer/70 mb-2">Opening Hours</p>
+              <p className="text-sm text-on-footer/70">{openingHours}</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Bottom Bar */}
-      <div className="border-t border-white/10">
+      <div className="border-t border-on-footer/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 grid grid-cols-1 items-center gap-4 text-center sm:grid-cols-3 sm:text-left">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-on-footer/70">
             &copy; {new Date().getFullYear()} Tulip Guest Inn. All Rights Reserved.
           </p>
 
           <a
             href="#"
-            className="flex items-center justify-center gap-3 text-[11px] text-gray-500 hover:text-gray-300 transition-colors duration-200"
+            className="flex items-center justify-center gap-3 text-[11px] text-on-footer/70 hover:text-on-footer/85 transition-colors duration-200"
             aria-label="Designed and developed by CompyX"
           >
             <span className="tracking-[0.08em]  whitespace-nowrap">Designed & Developed by</span>
@@ -220,14 +220,14 @@ export default function Footer() {
             />
           </a>
 
-          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-500 sm:justify-end">
-            <Link to="/refund-policy" className="hover:text-white transition-colors duration-200">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-on-footer/70 sm:justify-end">
+            <Link to="/refund-policy" className="hover:text-on-footer transition-colors duration-200">
               Refund Policy
             </Link>
-            <Link to="/privacy-policy" className="hover:text-white transition-colors duration-200">
+            <Link to="/privacy-policy" className="hover:text-on-footer transition-colors duration-200">
               Privacy Policy
             </Link>
-            <Link to="/terms-and-conditions" className="hover:text-white transition-colors duration-200">
+            <Link to="/terms-and-conditions" className="hover:text-on-footer transition-colors duration-200">
               Terms &amp; Conditions
             </Link>
           </div>

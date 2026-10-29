@@ -14,7 +14,7 @@ export default function AttractionCard({ attraction, index = 0 }: AttractionCard
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-60px' }}
       transition={{ duration: 0.6, delay: index * 0.1 }}
-      className="group bg-white border border-border shadow-luxury hover:shadow-luxury-lg transition-all duration-500 overflow-hidden"
+      className="group bg-surface border border-border shadow-luxury hover:shadow-luxury-lg transition-all duration-500 overflow-hidden"
     >
       {/* Image */}
       <div className="relative h-52 overflow-hidden">
@@ -36,17 +36,17 @@ export default function AttractionCard({ attraction, index = 0 }: AttractionCard
       <div className="p-7">
         <h3 className="font-serif text-xl font-light text-dark mb-2">{attraction.name}</h3>
         <div className="w-8 h-[1px] bg-gold mb-4" />
-        <p className="text-sm text-gray-500 leading-relaxed mb-5">{attraction.description}</p>
+        <p className="text-sm text-muted leading-relaxed mb-5">{attraction.description}</p>
         {(attraction.location || attraction.distance) && (
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-4 border-t border-border">
             {attraction.location && (
-              <div className="flex min-w-0 items-center gap-1.5 text-gray-400">
+              <div className="flex min-w-0 items-center gap-1.5 text-muted">
                 <MapPin size={13} className="text-gold shrink-0" aria-hidden="true" />
                 <span className="text-xs break-words" aria-label="Location">{attraction.location}</span>
               </div>
             )}
             {attraction.distance && (
-              <div className="flex min-w-0 items-center gap-1.5 text-gray-400">
+              <div className="flex min-w-0 items-center gap-1.5 text-muted">
                 <Navigation size={13} className="text-gold shrink-0" aria-hidden="true" />
                 <span className="text-xs break-words" aria-label="Distance">{attraction.distance}</span>
               </div>

@@ -284,11 +284,11 @@ export default function Booking() {
                 Booking Request Received
               </h2>
               <div className="w-12 h-[1px] bg-gold mx-auto mb-6" />
-              <p className="text-sm text-gray-500 leading-relaxed mb-4">
+              <p className="text-sm text-muted leading-relaxed mb-4">
                 Thank you, {form.firstName}. Your booking request has been received. Our team will review it and send a confirmation to{' '}
                 <strong>{form.email}</strong> within 2–4 hours.
               </p>
-              {phones.length > 0 && <p className="text-sm text-gray-400 mb-8">
+              {phones.length > 0 && <p className="text-sm text-muted mb-8">
                 For immediate assistance, please call us at{' '}
                 {phones.map((phone, index) => (
                   <span key={phone.href}>
@@ -316,14 +316,14 @@ export default function Booking() {
               <form onSubmit={handleSubmit} className="lg:col-span-2 space-y-10">
                 {/* Stay Details */}
                 <AnimatedSection>
-                  <div className="bg-white border border-border p-8">
+                  <div className="bg-surface border border-border p-8">
                     <h3 className="font-serif text-2xl font-light text-dark mb-5 flex items-center gap-3">
                       <Calendar size={18} className="text-gold" />
                       Stay Details
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <div>
-                        <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">Check In *</label>
+                        <label className="block text-[9px] tracking-[0.2em] uppercase text-muted mb-2">Check In *</label>
                         <input
                           type="date"
                           name="checkIn"
@@ -335,7 +335,7 @@ export default function Booking() {
                         />
                       </div>
                       <div>
-                        <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">Check Out *</label>
+                        <label className="block text-[9px] tracking-[0.2em] uppercase text-muted mb-2">Check Out *</label>
                         <input
                           type="date"
                           name="checkOut"
@@ -347,7 +347,7 @@ export default function Booking() {
                         />
                       </div>
                       <div>
-                        <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">
+                        <label className="block text-[9px] tracking-[0.2em] uppercase text-muted mb-2">
                           <Users size={10} className="inline mr-1" />
                           Guests *
                         </label>
@@ -363,7 +363,7 @@ export default function Booking() {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">
+                        <label className="block text-[9px] tracking-[0.2em] uppercase text-muted mb-2">
                           <Home size={10} className="inline mr-1" />
                           Rooms *
                         </label>
@@ -379,7 +379,7 @@ export default function Booking() {
                         </select>
                       </div>
                       <div className="md:col-span-2">
-                        <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">Room Type</label>
+                        <label className="block text-[9px] tracking-[0.2em] uppercase text-muted mb-2">Room Type</label>
                         <select
                           name="roomType"
                           value={form.roomType}
@@ -396,7 +396,7 @@ export default function Booking() {
                 </AnimatedSection>
 
                 <AnimatedSection delay={0.15}>
-                  <div className="bg-white border border-border p-8">
+                  <div className="bg-surface border border-border p-8">
                     <h3 className="font-serif text-2xl font-light text-dark mb-5">Payment Method</h3>
                     <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm text-dark">
                       {arrivalEnabled && <label className="flex cursor-pointer items-center gap-3">
@@ -423,7 +423,7 @@ export default function Booking() {
                       </label>}
                     </div>
                     {!arrivalEnabled && !onlinePaymentEnabled && <p className="mt-3 text-sm text-red-600">Booking is temporarily unavailable. Please contact the property.</p>}
-                    <p className="mt-3 text-[10px] leading-relaxed text-gray-400">
+                    <p className="mt-3 text-[10px] leading-relaxed text-muted">
                       {form.paymentMethod === 'Cash'
                         ? 'Booking request submitted successfully. A confirmation email will be sent to your email address shortly'
                         : 'You will continue to the secure PayHere payment page after submitting.'}
@@ -433,14 +433,14 @@ export default function Booking() {
 
                 {/* Guest Information */}
                 <AnimatedSection delay={0.1}>
-                  <div className="bg-white border border-border p-8">
+                  <div className="bg-surface border border-border p-8">
                     <h3 className="font-serif text-2xl font-light text-dark mb-5 flex items-center gap-3">
                       <Users size={18} className="text-gold" />
                       Guest Information
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <div>
-                        <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">First Name *</label>
+                        <label className="block text-[9px] tracking-[0.2em] uppercase text-muted mb-2">First Name *</label>
                         <input
                           type="text"
                           name="firstName"
@@ -452,7 +452,7 @@ export default function Booking() {
                         />
                       </div>
                       <div>
-                        <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">Last Name *</label>
+                        <label className="block text-[9px] tracking-[0.2em] uppercase text-muted mb-2">Last Name *</label>
                         <input
                           type="text"
                           name="lastName"
@@ -464,7 +464,7 @@ export default function Booking() {
                         />
                       </div>
                       <div>
-                        <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">Email Address *</label>
+                        <label className="block text-[9px] tracking-[0.2em] uppercase text-muted mb-2">Email Address *</label>
                         <input
                           type="email"
                           name="email"
@@ -476,7 +476,7 @@ export default function Booking() {
                         />
                       </div>
                       <div>
-                        <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">Phone Number *</label>
+                        <label className="block text-[9px] tracking-[0.2em] uppercase text-muted mb-2">Phone Number *</label>
                         <input
                           type="tel"
                           name="phone"
@@ -503,7 +503,7 @@ export default function Booking() {
                       {form.isBookingForOther && (
                         <>
                           <div>
-                            <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">Staying Guest Name *</label>
+                            <label className="block text-[9px] tracking-[0.2em] uppercase text-muted mb-2">Staying Guest Name *</label>
                             <input
                               type="text"
                               name="stayingGuestName"
@@ -515,7 +515,7 @@ export default function Booking() {
                             />
                           </div>
                           <div>
-                            <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">Staying Guest Phone (Optional)</label>
+                            <label className="block text-[9px] tracking-[0.2em] uppercase text-muted mb-2">Staying Guest Phone (Optional)</label>
                             <input
                               type="tel"
                               name="stayingGuestPhone"
@@ -526,7 +526,7 @@ export default function Booking() {
                             />
                           </div>
                           <div className="md:col-span-2">
-                            <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">Staying Guest Email (Optional)</label>
+                            <label className="block text-[9px] tracking-[0.2em] uppercase text-muted mb-2">Staying Guest Email (Optional)</label>
                             <input
                               type="email"
                               name="stayingGuestEmail"
@@ -535,10 +535,10 @@ export default function Booking() {
                               placeholder="guest@email.com"
                               className="w-full border border-border px-5 py-3.5 text-sm outline-hidden focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
                             />
-                            <p className="mt-2 text-[10px] leading-relaxed text-gray-400">If provided, booking updates will also be emailed to the staying guest.</p>
+                            <p className="mt-2 text-[10px] leading-relaxed text-muted">If provided, booking updates will also be emailed to the staying guest.</p>
                           </div>
                           <div className="md:col-span-2">
-                            <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">Staying Guest Note</label>
+                            <label className="block text-[9px] tracking-[0.2em] uppercase text-muted mb-2">Staying Guest Note</label>
                             <textarea
                               name="stayingGuestNote"
                               value={form.stayingGuestNote}
@@ -552,7 +552,7 @@ export default function Booking() {
                       )}
 
                       <div className="md:col-span-2">
-                        <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">Nationality</label>
+                        <label className="block text-[9px] tracking-[0.2em] uppercase text-muted mb-2">Nationality</label>
                         <input
                           type="text"
                           name="nationality"
@@ -563,7 +563,7 @@ export default function Booking() {
                         />
                       </div>
                       <div className="md:col-span-2">
-                        <label className="block text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-2">Special Requests</label>
+                        <label className="block text-[9px] tracking-[0.2em] uppercase text-muted mb-2">Special Requests</label>
                         <textarea
                           name="specialRequests"
                           value={form.specialRequests}
@@ -594,7 +594,7 @@ export default function Booking() {
               <AnimatedSection direction="right">
                 <div className="space-y-6 sticky top-28">
                   {/* Summary Card */}
-                  <div className="bg-white border border-border shadow-luxury p-8">
+                  <div className="bg-surface border border-border shadow-luxury p-8">
                     <p className="text-[9px] tracking-[0.25em] uppercase text-gold font-medium mb-4">
                       Price Summary
                     </p>
@@ -603,40 +603,40 @@ export default function Booking() {
 
                     <div className="space-y-4 mb-6">
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Room Type</span>
+                        <span className="text-muted">Room Type</span>
                         <span className="text-dark font-medium">
                           {selectedRoom ? selectedRoom.name : '—'}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Rate Per Night</span>
+                        <span className="text-muted">Rate Per Night</span>
                         <span className="text-dark font-medium">
                           {selectedRoom ? `${selectedRoom.currency ? `${selectedRoom.currency} ` : '$'}${selectedRoom.price}` : '—'}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Nights</span>
+                        <span className="text-muted">Nights</span>
                         <span className="text-dark font-medium">{nights || '—'}</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Rooms</span>
+                        <span className="text-muted">Rooms</span>
                         <span className="text-dark font-medium">{form.rooms}</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Guests</span>
+                        <span className="text-muted">Guests</span>
                         <span className="text-dark font-medium">{form.guests}</span>
                       </div>
                     </div>
 
                     <div className="border-t border-border pt-5">
                       <div className="flex justify-between items-baseline">
-                        <span className="text-[9px] tracking-[0.2em] uppercase text-gray-400">Estimated Total</span>
+                        <span className="text-[9px] tracking-[0.2em] uppercase text-muted">Estimated Total</span>
                         <span className="font-serif text-3xl font-light text-dark">
                           {total > 0 ? `${selectedRoom?.currency ? `${selectedRoom.currency} ` : '$'}${total}` : '—'}
                         </span>
                       </div>
                       {total > 0 && (
-                        <p className="text-[10px] text-gray-400 mt-1 text-right">
+                        <p className="text-[10px] text-muted mt-1 text-right">
                           {form.paymentMethod === 'Cash'
                             ? 'Final amount is verified by the property and collected on arrival'
                             : 'Final amount is verified by the backend before PayHere checkout'}
@@ -646,7 +646,7 @@ export default function Booking() {
                   </div>
 
                   {/* Why Book Direct */}
-                  <div className="bg-deep-green p-7">
+                  <div className="bg-deep-green theme-secondary p-7">
                     <p className="text-[9px] tracking-[0.25em] uppercase text-gold font-medium mb-4">
                       Book Direct Benefits
                     </p>
@@ -668,7 +668,7 @@ export default function Booking() {
 
                   {/* Contact */}
                   <div className="border border-border p-7">
-                    <p className="text-[9px] tracking-[0.2em] uppercase text-gray-400 mb-4">Need Help?</p>
+                    <p className="text-[9px] tracking-[0.2em] uppercase text-muted mb-4">Need Help?</p>
                     {phones.map((phone) => (
                       <a key={phone.href} href={phone.href}
                         className="flex items-center gap-3 text-dark hover:text-gold transition-colors duration-200 mb-3">

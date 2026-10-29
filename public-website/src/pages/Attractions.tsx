@@ -42,7 +42,7 @@ export default function Attractions() {
       />
 
       {/* Intro */}
-      <section className="section-padding bg-white">
+      <section className="section-padding bg-surface">
         <div className="container-custom">
           <div className="max-w-3xl mx-auto text-center">
             <AnimatedSection>
@@ -51,7 +51,7 @@ export default function Attractions() {
                 Point Pedro & Beyond
               </h2>
               <div className="w-12 h-[1px] bg-gold mx-auto mb-6" />
-              <p className="text-sm text-gray-500 leading-relaxed">
+              <p className="text-sm text-muted leading-relaxed">
                 Tulip Guest Inn sits at the northernmost tip of Sri Lanka, placing you at the heart of one of the country's most fascinating and unspoiled regions. Ancient temples, pristine beaches, sacred springs and historic landmarks are all within easy reach.
               </p>
             </AnimatedSection>
@@ -75,7 +75,7 @@ export default function Attractions() {
       </section>
 
       {/* Map Section */}
-      <section className="section-padding bg-white">
+      <section className="section-padding bg-surface">
         <div className="container-custom">
           <SectionTitle
             eyebrow="Find Us"
@@ -98,8 +98,8 @@ export default function Attractions() {
                   <MapPin size={28} className="text-white" />
                 </div>
                 <h3 className="font-serif text-2xl font-light text-dark mb-2">Tulip Guest Inn</h3>
-                <p className="text-sm text-gray-500 mb-1">V.M Road 189, Point Pedro</p>
-                <p className="text-sm text-gray-500 mb-6">Northern Sri Lanka</p>
+                <p className="text-sm text-muted mb-1">V.M Road 189, Point Pedro</p>
+                <p className="text-sm text-muted mb-6">Northern Sri Lanka</p>
                 <a
                   href="https://maps.google.com/?q=Point+Pedro+Sri+Lanka"
                   target="_blank"
@@ -112,11 +112,11 @@ export default function Attractions() {
             </div>
 
             {/* Location Note */}
-            <div className="bg-white border-t border-border px-6 py-5 text-center">
+            <div className="bg-surface border-t border-border px-6 py-5 text-center">
               <p className="text-[10px] tracking-[0.25em] uppercase text-gold font-medium mb-2">
                 Nearby Highlights
               </p>
-              <p className="text-sm text-gray-500 leading-relaxed max-w-3xl mx-auto">
+              <p className="text-sm text-muted leading-relaxed max-w-3xl mx-auto">
                 Explore temples, beaches, historic landmarks and island routes from Tulip Guest Inn.
                 Attraction distances are shown inside each attraction card where available.
               </p>

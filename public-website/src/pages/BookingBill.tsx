@@ -164,18 +164,18 @@ export default function BookingBill() {
   const whatsappHref = `https://wa.me/${whatsappNumber.replace(/\D/g, '')}`;
 
   return (
-    <main className="bg-[#faf8f4] text-[#14251f]">
+    <main className="bg-background text-dark">
       <section className="relative h-[300px] overflow-hidden md:h-[335px] lg:h-[360px]">
         <img src={heroImage} alt="Billing and Payment" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-[#071923]/70" />
-        <div className="absolute inset-x-0 bottom-0 h-28 bg-linear-to-b from-transparent to-[#faf8f4]" />
+        <div className="absolute inset-x-0 bottom-0 h-28 bg-linear-to-b from-transparent to-background" />
         <div className="relative z-10 mx-auto flex h-full max-w-7xl flex-col items-center justify-center px-4 pt-16 text-center">
           <h1 className="font-serif text-[38px] font-light leading-none text-white drop-shadow md:text-[48px] lg:text-[54px]">
             Billing &amp; Payment
           </h1>
           <div className="mt-5 flex items-center gap-2 text-[11px] font-medium text-white/90">
-            <Link to="/" className="hover:text-[#c99d53]">Home</Link>
-            <span className="text-[#c99d53]">›</span>
+            <Link to="/" className="hover:text-gold">Home</Link>
+            <span className="text-gold">›</span>
             <span>Billing &amp; Payment</span>
           </div>
         </div>
@@ -184,16 +184,16 @@ export default function BookingBill() {
       <section className="relative -mt-16 pb-14 md:-mt-20 lg:-mt-24">
         <div className="mx-auto max-w-[1050px] px-4 sm:px-6 lg:px-8">
           {loading ? (
-            <div className="rounded-[10px] border border-[#e7dfd3] bg-white py-16 text-center shadow-[0_18px_60px_rgba(20,30,25,0.10)]">
-              <Loader2 size={20} className="mx-auto mb-3 animate-spin text-[#c99d53]" />
-              <p className="text-[13px] text-[#53635c]">Loading payment status...</p>
+            <div className="rounded-[10px] border border-border bg-surface py-16 text-center shadow-[0_18px_60px_rgba(20,30,25,0.10)]">
+              <Loader2 size={20} className="mx-auto mb-3 animate-spin text-gold" />
+              <p className="text-[13px] text-muted">Loading payment status...</p>
             </div>
           ) : error ? (
-            <div className="rounded-[10px] border border-[#e7dfd3] bg-white px-6 py-14 text-center shadow-[0_18px_60px_rgba(20,30,25,0.10)]">
+            <div className="rounded-[10px] border border-border bg-surface px-6 py-14 text-center shadow-[0_18px_60px_rgba(20,30,25,0.10)]">
               <XCircle size={34} className="mx-auto mb-4 text-red-500" />
-              <h2 className="mb-3 font-serif text-3xl font-light text-[#14251f]">Payment Status Unavailable</h2>
-              <p className="mb-6 text-[13px] text-[#64726d]">{error}</p>
-              <Link to="/booking" className="inline-flex h-11 items-center justify-center rounded-[4px] bg-[#c99d53] px-8 text-[10px] font-bold uppercase tracking-[0.22em] text-white">
+              <h2 className="mb-3 font-serif text-3xl font-light text-dark">Payment Status Unavailable</h2>
+              <p className="mb-6 text-[13px] text-muted">{error}</p>
+              <Link to="/booking" className="inline-flex h-11 items-center justify-center rounded-[4px] bg-gold px-8 text-[10px] font-bold uppercase tracking-[0.22em] text-white">
                 Back to Booking
               </Link>
             </div>
@@ -224,50 +224,50 @@ export default function BookingBill() {
               </div>
 
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <article className="rounded-[8px] border border-[#e2ddd5] bg-white p-5 shadow-[0_10px_35px_rgba(20,30,25,0.04)]">
-                  <h3 className="mb-5 font-serif text-[21px] font-semibold text-[#14251f]">Booking Summary</h3>
+                <article className="rounded-[8px] border border-border bg-surface p-5 shadow-[0_10px_35px_rgba(20,30,25,0.04)]">
+                  <h3 className="mb-5 font-serif text-[21px] font-semibold text-dark">Booking Summary</h3>
                   <div className="grid gap-4 md:grid-cols-[260px_1fr] lg:block">
                     <img src={roomImage} alt={booking.room_name} className="h-[145px] w-full rounded-[5px] object-cover md:h-[150px] lg:h-[150px]" />
                     <div>
-                      <h4 className="mt-4 font-serif text-[20px] font-semibold leading-tight text-[#14251f] md:mt-1 lg:mt-4">{booking.room_name}</h4>
-                      <div className="mt-3 rounded border border-[#e2ddd5] bg-[#faf8f4] p-3 text-[12px]">
-                        <p className="font-bold text-[#14251f]">Assigned room {(booking.room_assignments?.length || 0) > 1 ? 'numbers' : 'number'}</p>
+                      <h4 className="mt-4 font-serif text-[20px] font-semibold leading-tight text-dark md:mt-1 lg:mt-4">{booking.room_name}</h4>
+                      <div className="mt-3 rounded border border-border bg-background p-3 text-[12px]">
+                        <p className="font-bold text-dark">Assigned room {(booking.room_assignments?.length || 0) > 1 ? 'numbers' : 'number'}</p>
                         {booking.room_assignments?.length ? (
                           <ul className="mt-2 space-y-2">
                             {booking.room_assignments.map((room) => (
-                              <li key={room.booking_id} className="break-words text-[#4f5d57]">
-                                <span className="font-semibold text-[#14251f]">{room.room_number?.trim() || 'Not available'}</span>
+                              <li key={room.booking_id} className="break-words text-muted">
+                                <span className="font-semibold text-dark">{room.room_number?.trim() || 'Not available'}</span>
                                 {booking.room_assignments!.length > 1 && <span> — {room.room_name}</span>}
                               </li>
                             ))}
                           </ul>
-                        ) : <p className="mt-1 text-[#4f5d57]">Not available</p>}
+                        ) : <p className="mt-1 text-muted">Not available</p>}
                       </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] text-[#42504a]">
-                        <span className="inline-flex items-center gap-1.5"><Users size={13} className="text-[#b78335]" /> {booking.guests} Guests</span>
-                        <span className="inline-flex items-center gap-1.5"><BedDouble size={13} className="text-[#b78335]" /> {booking.room_assignments?.length || 1} {(booking.room_assignments?.length || 1) === 1 ? 'Room' : 'Rooms'}</span>
-                        <span className="inline-flex items-center gap-1.5"><CalendarDays size={13} className="text-[#b78335]" /> {nights} {nights === 1 ? 'Night' : 'Nights'}</span>
+                      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] text-muted">
+                        <span className="inline-flex items-center gap-1.5"><Users size={13} className="text-gold-dark" /> {booking.guests} Guests</span>
+                        <span className="inline-flex items-center gap-1.5"><BedDouble size={13} className="text-gold-dark" /> {booking.room_assignments?.length || 1} {(booking.room_assignments?.length || 1) === 1 ? 'Room' : 'Rooms'}</span>
+                        <span className="inline-flex items-center gap-1.5"><CalendarDays size={13} className="text-gold-dark" /> {nights} {nights === 1 ? 'Night' : 'Nights'}</span>
                       </div>
-                      <div className="mt-5 grid gap-3 border-t border-[#eee8df] pt-4 text-[12px] sm:grid-cols-2 lg:grid-cols-1">
+                      <div className="mt-5 grid gap-3 border-t border-border pt-4 text-[12px] sm:grid-cols-2 lg:grid-cols-1">
                         <div>
-                          <p className="font-bold text-[#14251f]">Check-in</p>
-                          <p className="mt-1 text-[#4f5d57]">{formatDate(booking.check_in_date)}</p>
+                          <p className="font-bold text-dark">Check-in</p>
+                          <p className="mt-1 text-muted">{formatDate(booking.check_in_date)}</p>
                         </div>
                         <div>
-                          <p className="font-bold text-[#14251f]">Check-out</p>
-                          <p className="mt-1 text-[#4f5d57]">{formatDate(booking.check_out_date)}</p>
+                          <p className="font-bold text-dark">Check-out</p>
+                          <p className="mt-1 text-muted">{formatDate(booking.check_out_date)}</p>
                         </div>
                       </div>
                     </div>
                   </div>
                 </article>
 
-                <article className="rounded-[8px] border border-[#e2ddd5] bg-white p-5 shadow-[0_10px_35px_rgba(20,30,25,0.04)]">
-                  <h3 className="mb-6 font-serif text-[21px] font-semibold text-[#14251f]">Payment Summary</h3>
+                <article className="rounded-[8px] border border-border bg-surface p-5 shadow-[0_10px_35px_rgba(20,30,25,0.04)]">
+                  <h3 className="mb-6 font-serif text-[21px] font-semibold text-dark">Payment Summary</h3>
                   <div className="space-y-4 text-[12px]">
                     <div className="flex items-center justify-between gap-4">
-                      <span className="text-[#4f5d57]">Room Charges ({nights} {nights === 1 ? 'Night' : 'Nights'})</span>
-                      <span className="font-medium text-[#14251f]">{formatAmount(booking.subtotal_amount ?? booking.amount, booking.currency)}</span>
+                      <span className="text-muted">Room Charges ({nights} {nights === 1 ? 'Night' : 'Nights'})</span>
+                      <span className="font-medium text-dark">{formatAmount(booking.subtotal_amount ?? booking.amount, booking.currency)}</span>
                     </div>
                     {(booking.discount_amount ?? 0) > 0 && (
                       <div className="flex items-center justify-between gap-4 text-[#247a52]">
@@ -275,14 +275,14 @@ export default function BookingBill() {
                         <span className="font-semibold">-{formatAmount(booking.discount_amount ?? 0, booking.currency)}</span>
                       </div>
                     )}
-                    <div className="mt-8 border-t border-[#eee8df] pt-5">
+                    <div className="mt-8 border-t border-border pt-5">
                       <div className="flex items-center justify-between gap-4">
-                        <span className="font-serif text-[20px] font-bold text-[#14251f]">Total Amount</span>
-                        <span className="font-serif text-[23px] font-bold text-[#b78335]">{formatAmount(booking.amount, booking.currency)}</span>
+                        <span className="font-serif text-[20px] font-bold text-dark">Total Amount</span>
+                        <span className="font-serif text-[23px] font-bold text-gold-dark">{formatAmount(booking.amount, booking.currency)}</span>
                       </div>
                     </div>
-                    <div className="mt-7 rounded-[6px] border border-[#ead6b3] bg-[#fff7e9] p-4 text-[11px] leading-relaxed text-[#405049]">
-                      <p className="mb-2 font-serif text-[17px] font-semibold text-[#14251f]">Important Notes</p>
+                    <div className="mt-7 rounded-[6px] border border-gold/30 bg-gold/10 p-4 text-[11px] leading-relaxed text-muted">
+                      <p className="mb-2 font-serif text-[17px] font-semibold text-dark">Important Notes</p>
                       <ul className="space-y-1.5 pl-4">
                         <li className="list-disc">Check-in: {stayPolicies.check_in}.</li>
                         <li className="list-disc">Check-out: {stayPolicies.check_out}.</li>
@@ -293,32 +293,32 @@ export default function BookingBill() {
                   </div>
                 </article>
 
-                <article className="rounded-[8px] border border-[#e2ddd5] bg-white p-5 shadow-[0_10px_35px_rgba(20,30,25,0.04)]">
-                  <h3 className="mb-6 font-serif text-[21px] font-semibold text-[#14251f]">Payment Status</h3>
+                <article className="rounded-[8px] border border-border bg-surface p-5 shadow-[0_10px_35px_rgba(20,30,25,0.04)]">
+                  <h3 className="mb-6 font-serif text-[21px] font-semibold text-dark">Payment Status</h3>
                   <div className="mb-5 flex justify-center text-center">
                     <div>
-                      <CheckCircle2 size={34} className={isPaid ? 'mx-auto mb-2 text-[#2f8b47]' : 'mx-auto mb-2 text-[#b78335]'} />
+                      <CheckCircle2 size={34} className={isPaid ? 'mx-auto mb-2 text-[#2f8b47]' : 'mx-auto mb-2 text-[#b78335]' } />
                       <p className={isPaid ? 'font-sans text-[14px] font-bold text-[#2f8b47]' : 'font-sans text-[14px] font-bold text-[#b78335]'}>{statusLabel(booking.payment_status)}</p>
-                      <p className="mt-1 text-[11px] text-[#4f5d57]">
+                      <p className="mt-1 text-[11px] text-muted">
                         {isCashPayment ? 'Payment will be collected on arrival' : paidAt ? `Paid on ${formatDateTime(paidAt)}` : 'Latest status from PayHere'}
                       </p>
                     </div>
                   </div>
-                  <div className="rounded-[6px] border border-[#ead6b3] bg-[#fff7e9] p-5 text-[12px]">
+                  <div className="rounded-[6px] border border-gold/30 bg-gold/10 p-5 text-[12px]">
                     <div className="space-y-4">
                       <div>
-                        <p className="font-bold text-[#14251f]">Payment Method</p>
-                        <p className="mt-1 text-[#35463f]">{isCashPayment ? 'Pay on Arrival' : booking.payment_method || 'PayHere'}</p>
+                        <p className="font-bold text-dark">Payment Method</p>
+                        <p className="mt-1 text-muted">{isCashPayment ? 'Pay on Arrival' : booking.payment_method || 'PayHere'}</p>
                       </div>
                       {!isCashPayment && (
                         <>
                           <div>
-                            <p className="font-bold text-[#14251f]">Transaction ID</p>
-                            <p className="mt-1 break-all text-[#35463f]">{booking.payment_id || booking.order_id}</p>
+                            <p className="font-bold text-dark">Transaction ID</p>
+                            <p className="mt-1 break-all text-muted">{booking.payment_id || booking.order_id}</p>
                           </div>
                           <div>
-                            <p className="font-bold text-[#14251f]">Payment Gateway</p>
-                            <p className="mt-1 text-[#35463f]">PayHere</p>
+                            <p className="font-bold text-dark">Payment Gateway</p>
+                            <p className="mt-1 text-muted">PayHere</p>
                           </div>
                         </>
                       )}
@@ -328,8 +328,8 @@ export default function BookingBill() {
               </div>
 
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <article className="rounded-[8px] border border-[#e2ddd5] bg-white p-5 shadow-[0_10px_35px_rgba(20,30,25,0.04)] lg:col-span-2">
-                  <h3 className="mb-5 font-serif text-[21px] font-semibold text-[#14251f]">{isCashPayment ? 'Booking Timeline' : 'Payment Timeline'}</h3>
+                <article className="rounded-[8px] border border-border bg-surface p-5 shadow-[0_10px_35px_rgba(20,30,25,0.04)] lg:col-span-2">
+                  <h3 className="mb-5 font-serif text-[21px] font-semibold text-dark">{isCashPayment ? 'Booking Timeline' : 'Payment Timeline'}</h3>
                   <div className="space-y-0">
                     {(isCashPayment
                       ? [
@@ -346,30 +346,30 @@ export default function BookingBill() {
                         ]).map(([title, body, time], index) => (
                       <div key={`${title}-${index}`} className="grid grid-cols-[26px_120px_1fr] gap-3 text-[11px] sm:grid-cols-[26px_135px_1fr]">
                         <div className="flex flex-col items-center">
-                          <span className={index === 2 && isPaid ? 'flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[#4e9a55] text-white' : 'flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[#183548] text-white'}>
+                          <span className={index === 2 && isPaid ? 'flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[#4e9a55] text-white' : 'flex h-[18px] w-[18px] items-center justify-center rounded-full bg-deep-green text-white'}>
                             {index === 2 && isPaid ? <Check size={11} /> : <span className="text-[8px] font-bold">{index + 1}</span>}
                           </span>
-                          {index < 3 && <span className="h-9 w-px bg-[#d7ded8]" />}
+                          {index < 3 && <span className="h-9 w-px bg-border" />}
                         </div>
                         <div className="pb-4">
-                          <p className="font-bold leading-tight text-[#14251f]">{title}</p>
-                          <p className="mt-1 text-[10px] text-[#6b7771]">{formatDateTime(time)}</p>
+                          <p className="font-bold leading-tight text-dark">{title}</p>
+                          <p className="mt-1 text-[10px] text-muted">{formatDateTime(time)}</p>
                         </div>
-                        <p className="pb-4 leading-relaxed text-[#4f5d57]">{body}</p>
+                        <p className="pb-4 leading-relaxed text-muted">{body}</p>
                       </div>
                     ))}
                   </div>
                 </article>
 
-                <article className="rounded-[8px] border border-[#e2ddd5] bg-white p-5 shadow-[0_10px_35px_rgba(20,30,25,0.04)]">
-                  <h3 className="mb-3 font-serif text-[21px] font-semibold text-[#14251f]">Need Help?</h3>
-                  <p className="mb-5 text-[12px] leading-relaxed text-[#4f5d57]">If you have any questions or need assistance, our support team is here to help.</p>
-                  <div className="space-y-4 text-[12px] text-[#35463f]">
-                    {phones.map((phone) => <a key={phone.href} href={phone.href} className="flex items-center gap-3 hover:text-[#b78335]"><Phone size={14} className="text-[#b78335]" /> {phone.number}</a>)}
-                    <a href={`mailto:${supportEmail}`} className="flex items-center gap-3 hover:text-[#b78335]"><Mail size={14} className="text-[#b78335]" /> {supportEmail}</a>
-                    {whatsappNumber && <a href={whatsappHref} target="_blank" rel="noreferrer" className="flex items-center gap-3 hover:text-[#b78335]"><UserRound size={14} className="text-[#b78335]" /> WhatsApp Chat</a>}
+                <article className="rounded-[8px] border border-border bg-surface p-5 shadow-[0_10px_35px_rgba(20,30,25,0.04)]">
+                  <h3 className="mb-3 font-serif text-[21px] font-semibold text-dark">Need Help?</h3>
+                  <p className="mb-5 text-[12px] leading-relaxed text-muted">If you have any questions or need assistance, our support team is here to help.</p>
+                  <div className="space-y-4 text-[12px] text-muted">
+                    {phones.map((phone) => <a key={phone.href} href={phone.href} className="flex items-center gap-3 hover:text-gold-dark"><Phone size={14} className="text-gold-dark" /> {phone.number}</a>)}
+                    <a href={`mailto:${supportEmail}`} className="flex items-center gap-3 hover:text-gold-dark"><Mail size={14} className="text-gold-dark" /> {supportEmail}</a>
+                    {whatsappNumber && <a href={whatsappHref} target="_blank" rel="noreferrer" className="flex items-center gap-3 hover:text-gold-dark"><UserRound size={14} className="text-gold-dark" /> WhatsApp Chat</a>}
                   </div>
-                  <Link to="/contact" className="mt-6 flex h-11 w-full items-center justify-center rounded-[4px] bg-[#c99d53] text-[10px] font-bold uppercase tracking-[0.22em] text-white transition hover:bg-[#19352b]">
+                  <Link to="/contact" className="mt-6 flex h-11 w-full items-center justify-center rounded-[4px] bg-gold text-[10px] font-bold uppercase tracking-[0.22em] text-white transition hover:bg-deep-green">
                     Contact Support
                   </Link>
                 </article>
@@ -377,16 +377,16 @@ export default function BookingBill() {
 
               <div className={`grid grid-cols-1 gap-4 ${booking.can_retry_payment ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
                 {booking.can_retry_payment && (
-                  <button type="button" onClick={handleRetryPayment} disabled={retrying} className="flex h-11 items-center justify-center gap-2 rounded-[5px] border border-[#d8d2c8] bg-white text-[10px] font-bold uppercase tracking-[0.18em] text-[#14251f] transition hover:border-[#c99d53] hover:text-[#c99d53]">
+                  <button type="button" onClick={handleRetryPayment} disabled={retrying} className="flex h-11 items-center justify-center gap-2 rounded-[5px] border border-border bg-surface text-[10px] font-bold uppercase tracking-[0.18em] text-dark transition hover:border-gold hover:text-gold">
                     <RefreshCcw size={13} /> {retrying ? 'Restarting' : 'Retry Payment'}
                   </button>
                 )}
 
-                <a href={booking.invoice_download_url || '#'} className={booking.invoice_download_url ? 'flex h-11 items-center justify-center gap-2 rounded-[5px] border border-[#d8d2c8] bg-white text-[10px] font-bold uppercase tracking-[0.18em] text-[#14251f] transition hover:border-[#c99d53] hover:text-[#c99d53]' : 'pointer-events-none flex h-11 items-center justify-center gap-2 rounded-[5px] border border-[#d8d2c8] bg-white text-[10px] font-bold uppercase tracking-[0.18em] text-[#14251f] opacity-50'}>
+                <a href={booking.invoice_download_url || '#'} className={booking.invoice_download_url ? 'flex h-11 items-center justify-center gap-2 rounded-[5px] border border-border bg-surface text-[10px] font-bold uppercase tracking-[0.18em] text-dark transition hover:border-gold hover:text-gold' : 'pointer-events-none flex h-11 items-center justify-center gap-2 rounded-[5px] border border-border bg-surface text-[10px] font-bold uppercase tracking-[0.18em] text-dark opacity-50'}>
                   <Download size={13} /> {isCashPayment ? 'Download Booking Confirmation' : 'Download Bill'}
                 </a>
 
-                <Link to={booking.room_url || '/rooms'} className="flex h-11 items-center justify-center rounded-[5px] bg-[#c99d53] text-[10px] font-bold uppercase tracking-[0.2em] text-white transition hover:bg-[#19352b]">
+                <Link to={booking.room_url || '/rooms'} className="flex h-11 items-center justify-center rounded-[5px] bg-gold text-[10px] font-bold uppercase tracking-[0.2em] text-white transition hover:bg-deep-green">
                   Manage Booking
                 </Link>
               </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Palette, RotateCcw, Save, Eye, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react'
+import { Palette, RotateCcw, Save, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
 import { defaultThemeColors, themeColorFields, isThemeColor, contrastRatio, readableText, shade } from '@/services/themeColors'
@@ -46,13 +46,12 @@ export default function WebsiteAppearance() {
       const response = await apiFetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ colors }) })
       const result = await readJsonResponse(response)
       setSaved(result.data.colors); setDraft(result.data.colors)
-      setMessage('Colours saved. Public website integration will be added in Step 2.')
+      setMessage('Colours saved. Refresh the public website to see your changes.')
     } catch (err) { setError(err.message || 'Could not save appearance settings.') }
     finally { setSaving(false) }
   }
   return <div className="appearance-panel">
-    <div className="appearance-heading"><span className="appearance-heading-icon"><Palette size={23} /></span><div><h2>Website Appearance</h2><p>Choose the website palette and review it before saving.</p></div><span className="appearance-step">Step 1 of 2</span></div>
-    <div className="appearance-stage-note"><Eye size={17} /><p>These controls save your palette. Public pages will start using it after Step 2 is installed.</p></div>
+    <div className="appearance-heading"><span className="appearance-heading-icon"><Palette size={23} /></span><div><h2>Website Appearance</h2><p>Choose the website palette and review it before saving.</p></div></div>
     {error && <div role="alert" className="appearance-error">{error}{!loaded && !loading && <Button variant="outline" onClick={() => setAttempt(value => value + 1)}><RefreshCw size={15} />Retry</Button>}</div>}
     {message && <p role="status" className="appearance-success">{message}</p>}
     {loading ? <p role="status" className="appearance-loading">Loading appearance settings…</p> : loaded && <form onSubmit={save}>

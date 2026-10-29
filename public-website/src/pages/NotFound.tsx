@@ -7,7 +7,7 @@ export default function NotFound() {
         <p className="text-[10px] tracking-[0.35em] uppercase text-gold font-medium mb-4">404 Error</p>
         <h1 className="font-serif text-5xl md:text-6xl font-light text-dark mb-5">Page Not Found</h1>
         <div className="w-14 h-px bg-gold mx-auto mb-6" />
-        <p className="text-sm text-gray-500 leading-relaxed mb-8">
+        <p className="text-sm text-muted leading-relaxed mb-8">
           The page you requested does not exist or may have moved. Return home or browse our available rooms.
         </p>
         <div className="flex flex-wrap justify-center gap-4">

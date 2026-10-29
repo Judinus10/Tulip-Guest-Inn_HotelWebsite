@@ -4,7 +4,8 @@ require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/contact_helpers.php';
 apply_cors_headers();
 if (!in_array($_SERVER['REQUEST_METHOD'], ['GET', 'POST'], true)) json_response(false, 'Method not allowed.', 405);
-require_admin_auth();
+// The palette is public; changing it still requires admin authentication and CSRF.
+if ($_SERVER['REQUEST_METHOD'] === 'POST') require_admin_auth();
 function theme_default_colors(): array {
     return ['primary'=>'#C7A86B','secondary'=>'#19352B','background'=>'#FAF8F4','surface'=>'#FFFFFF','text'=>'#1A1A1A','muted'=>'#6B7280','footer'=>'#1A1A1A','border'=>'#ECE7DF'];
 }

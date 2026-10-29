@@ -42,7 +42,7 @@ export default function SectionTitle({
       {subtitle && (
         <p
           className={`text-sm leading-relaxed max-w-xl ${isCenter ? 'mx-auto' : ''} ${
-            light ? 'text-gray-300' : 'text-gray-500'
+            light ? 'text-gray-300' : 'text-muted'
           }`}
         >
           {subtitle}

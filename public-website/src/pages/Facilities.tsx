@@ -62,7 +62,7 @@ export default function Facilities() {
       </section>
 
       {/* Alternating Sections */}
-      <section className="bg-white">
+      <section className="bg-surface">
         {alternatingFacilities.map((item, i) => {
           const isEven = i % 2 === 0;
           return (
@@ -84,7 +84,7 @@ export default function Facilities() {
                 />
               </div>
               {/* Content */}
-              <div className={`flex items-center px-10 lg:px-16 py-14 ${isEven ? 'lg:order-2' : 'lg:order-1'} ${i === 1 ? 'bg-background' : 'bg-white'}`}>
+              <div className={`flex items-center px-10 lg:px-16 py-14 ${isEven ? 'lg:order-2' : 'lg:order-1'} ${i === 1 ? 'bg-background' : 'bg-surface'}`}>
                 <AnimatedSection direction={isEven ? 'right' : 'left'} className="max-w-lg">
                   <p className="text-[10px] tracking-[0.3em] uppercase text-gold font-medium mb-4">
                     Facilities
@@ -93,7 +93,7 @@ export default function Facilities() {
                     {item.title}
                   </h2>
                   <div className="w-10 h-[1px] bg-gold mb-5" />
-                  <p className="text-sm text-gray-500 leading-relaxed mb-8">{item.description}</p>
+                  <p className="text-sm text-muted leading-relaxed mb-8">{item.description}</p>
                   <Link to="/booking" className="btn-dark">
                     Book Your Stay
                   </Link>

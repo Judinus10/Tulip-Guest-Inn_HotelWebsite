@@ -71,13 +71,13 @@ export default function About() {
                 A Tale of<br />Two Homes
               </h2>
               <div className="w-10 h-[1px] bg-gold mb-6" />
-              <p className="text-sm text-gray-500 leading-relaxed mb-5">
+              <p className="text-sm text-muted leading-relaxed mb-5">
                 Tulip Guest Inn was born from a blend of cultures and a deep love for Northern Sri Lanka. As a family with roots right here in Point Pedro and a second home in the Netherlands, we named the inn 'Tulip' to symbolize the bridge between our two worlds. We founded it with a simple idea: to create a place where guests experience the very best of the north, never as a standard tourist, but as a welcome friend.
               </p>
-              <p className="text-sm text-gray-500 leading-relaxed mb-5">
+              <p className="text-sm text-muted leading-relaxed mb-5">
                 When we found our century-old heritage building, it was full of character but had seen better days. We chose to restore it with care rather than replace it, preserving the authentic architecture and history while quietly adding the comforts of a modern stay.
               </p>
-              <p className="text-sm text-gray-500 leading-relaxed">
+              <p className="text-sm text-muted leading-relaxed">
                 Tranquility is at the heart of what we offer. Our spacious front garden is a true oasis, where guests unwind under the cooling shade of tall coconut trees, enjoying the gentle ocean breeze and the calm of the surroundings. Today, Tulip Guest Inn is a place where history and comfort meet, and where every guest leaves feeling truly at home. We would love to welcome you into our story.
               </p>
             </AnimatedSection>
@@ -99,10 +99,10 @@ export default function About() {
       </section>
 
       {/* Mission & Vision */}
-      <section className="section-padding bg-white">
+      <section className="section-padding bg-surface">
         <div className="container-custom">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <AnimatedSection direction="left" className="bg-deep-green p-10 lg:p-14">
+            <AnimatedSection direction="left" className="bg-deep-green theme-secondary p-10 lg:p-14">
               <p className="text-[9px] tracking-[0.3em] uppercase text-gold font-medium mb-4">Our Mission</p>
               <h3 className="font-serif text-3xl font-light text-white mb-5">
                 Authentic Heritage &amp; Genuine Comfort
@@ -118,7 +118,7 @@ export default function About() {
                 A Home You Remember
               </h3>
               <div className="w-10 h-[1px] bg-gold mb-5" />
-              <p className="text-gray-500 text-sm leading-relaxed">
+              <p className="text-muted text-sm leading-relaxed">
                 We envision Tulip Guest Inn as the most beloved heritage stay in the Jaffna Peninsula. A place that honors its roots, celebrates the local community and shows guests the real north: its history, its warmth and its quiet beauty. Not a hotel you pass through, but a home you remember.
               </p>
             </AnimatedSection>
@@ -139,14 +139,14 @@ export default function About() {
               <AnimatedSection
                 key={value.title}
                 delay={i * 0.1}
-                className="bg-white border border-border p-8 text-center hover:border-gold hover:shadow-luxury transition-all duration-400"
+                className="bg-surface border border-border p-8 text-center hover:border-gold hover:shadow-luxury transition-all duration-400"
               >
                 <div className="w-14 h-14 border border-gold/30 flex items-center justify-center mx-auto mb-5">
                   <value.icon size={22} className="text-gold" />
                 </div>
                 <h4 className="font-serif text-xl font-light text-dark mb-3">{value.title}</h4>
                 <div className="w-8 h-[1px] bg-gold mx-auto mb-4" />
-                <p className="text-sm text-gray-500 leading-relaxed">{value.description}</p>
+                <p className="text-sm text-muted leading-relaxed">{value.description}</p>
               </AnimatedSection>
             ))}
           </div>
@@ -154,7 +154,7 @@ export default function About() {
       </section>
 
       {/* Why Choose Us */}
-      <section className="section-padding bg-white">
+      <section className="section-padding bg-surface">
         <div className="container-custom">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             <AnimatedSection direction="left">
@@ -178,7 +178,7 @@ export default function About() {
                       <div className="w-1.5 h-1.5 rounded-full bg-gold mt-2 shrink-0" />
                       <div>
                         <h4 className="font-medium text-sm text-dark mb-1">{item.label}</h4>
-                        <p className="text-sm text-gray-500 leading-relaxed">{item.desc}</p>
+                        <p className="text-sm text-muted leading-relaxed">{item.desc}</p>
                       </div>
                     </div>
                   ))}

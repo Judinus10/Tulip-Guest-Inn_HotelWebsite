@@ -103,8 +103,8 @@ export default function Rooms() {
 
   return <main>
     <PageHero title="Rooms in Point Pedro" subtitle="Clean, comfortable accommodation for individuals, couples and families in Northern Province, Sri Lanka." image={bannerRooms} breadcrumb="Accommodation" />
-    <section className="bg-white border-b border-border"><div className="container-custom"><div className="flex flex-wrap">
-      {categories.map((cat) => <button key={cat.value} onClick={() => setActive(cat.value)} className={`px-7 py-5 text-[10px] tracking-[0.2em] uppercase font-medium border-b-2 ${active === cat.value ? 'border-gold text-gold' : 'border-transparent text-gray-400'}`}>{cat.label}</button>)}
+    <section className="bg-surface border-b border-border"><div className="container-custom"><div className="flex flex-wrap">
+      {categories.map((cat) => <button key={cat.value} onClick={() => setActive(cat.value)} className={`px-7 py-5 text-[10px] tracking-[0.2em] uppercase font-medium border-b-2 ${active === cat.value ? 'border-gold text-gold' : 'border-transparent text-muted'}`}>{cat.label}</button>)}
     </div></div></section>
 
     <section className="bg-background pt-10"><div className="container-custom">
@@ -115,12 +115,12 @@ export default function Rooms() {
       </div>
       {form.checkIn && form.checkOut && form.checkOut <= form.checkIn && <p className="mt-2 text-sm text-red-600">Check-out must be after check-in.</p>}
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-      <div className="mt-5 flex flex-col items-start justify-between gap-4 border border-gold/30 bg-white px-6 py-5 shadow-sm sm:flex-row sm:items-center">
+      <div className="mt-5 flex flex-col items-start justify-between gap-4 border border-gold/30 bg-surface px-6 py-5 shadow-sm sm:flex-row sm:items-center">
         <div className="flex items-start gap-3">
           <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center bg-gold/10 text-gold"><BedDouble size={18} /></span>
           <div>
             <p className="font-serif text-lg text-dark">Need more than one room?</p>
-            <p className="mt-1 text-xs text-gray-500">Tulip Guest Inn supports one booking for multiple rooms and guests.</p>
+            <p className="mt-1 text-xs text-muted">Tulip Guest Inn supports one booking for multiple rooms and guests.</p>
           </div>
         </div>
         <Link to={multipleRoomBookingPath} className="btn-primary whitespace-nowrap">Book Multiple Rooms</Link>
@@ -131,12 +131,12 @@ export default function Rooms() {
       {hasSearched && !datesPending && !loading && needsMultipleRooms && <div className="mb-10 border border-gold/40 bg-gold/5 p-7 text-center">
         <p className="text-[10px] uppercase tracking-[0.22em] text-gold">Multiple rooms recommended</p>
         <h2 className="mt-2 font-serif text-2xl text-dark">{guests} guests require at least {suggestedRooms.length} available rooms</h2>
-        <p className="mt-2 text-sm text-gray-500">Suggested combined capacity: {suggestedCapacity} guests. You can change the assigned rooms and guest allocation on the next page.</p>
+        <p className="mt-2 text-sm text-muted">Suggested combined capacity: {suggestedCapacity} guests. You can change the assigned rooms and guest allocation on the next page.</p>
         {urlFilters.checkIn && urlFilters.checkOut && <Link to={`/multi-room-booking?${multiQuery}`} className="btn-primary mt-5">Choose {suggestedRooms.length} Rooms</Link>}
       </div>}
 
-      {hasSearched && !loading && singleRoomMatches.length > 0 && <div className="mb-8 border border-border bg-white p-5 text-center text-sm text-gray-500">These rooms can accommodate all {guests} guests in one room. You may book one directly.</div>}
-      {datesPending ? <p className="py-20 text-center text-gray-400">Select valid check-in and check-out dates to see available rooms.</p> : loading ? <p className="py-20 text-center text-gray-400">Checking availability...</p> : categoryRooms.length === 0 ? <p className="py-20 text-center text-gray-400">No rooms are available for the selected dates.</p> : resultRooms.length === 0 ? <div className="py-20 text-center"><p className="text-gray-500">No room is available for a capacity of {guests} guests.</p><p className="mt-2 text-sm text-gray-400">Please use the multiple-room booking option above.</p></div> : <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{resultRooms.map((room,i)=><RoomCard key={room.id} room={room} index={i}/>)}</div>}
+      {hasSearched && !loading && singleRoomMatches.length > 0 && <div className="mb-8 border border-border bg-surface p-5 text-center text-sm text-muted">These rooms can accommodate all {guests} guests in one room. You may book one directly.</div>}
+      {datesPending ? <p className="py-20 text-center text-muted">Select valid check-in and check-out dates to see available rooms.</p> : loading ? <p className="py-20 text-center text-muted">Checking availability...</p> : categoryRooms.length === 0 ? <p className="py-20 text-center text-muted">No rooms are available for the selected dates.</p> : resultRooms.length === 0 ? <div className="py-20 text-center"><p className="text-muted">No room is available for a capacity of {guests} guests.</p><p className="mt-2 text-sm text-muted">Please use the multiple-room booking option above.</p></div> : <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">{resultRooms.map((room,i)=><RoomCard key={room.id} room={room} index={i}/>)}</div>}
     </div></section>
     <CTASection title="Ready for a Restful Stay?" subtitle="Our team is on hand to help you find the perfect rooms for your visit." btnLabel="Book Your Room" btnPath="/booking" />
   </main>;
