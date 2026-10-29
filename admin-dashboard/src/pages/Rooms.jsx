@@ -57,7 +57,17 @@ const roomCategories = [
   { value: 'family', label: 'Family' },
   { value: 'suite', label: 'Suite' },
 ]
-const bedTypes = ['Single Bed', 'Double Bed', 'Twin Beds', 'King Bed', 'Queen Bed', 'King + Twin Beds']
+const bedTypes = [
+  'Single Bed',
+  'Double Bed',
+  'Twin Beds',
+  'King Bed',
+  'Queen Bed',
+  'King + Twin Beds',
+  'King + double bed',
+  'double bed + single bed',
+  'double beds',
+]
 const roomStatuses = ['Available', 'Unavailable', 'Maintenance']
 
 const statusVariant = {
