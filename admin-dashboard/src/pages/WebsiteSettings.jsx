@@ -1,3 +1,4 @@
+import WebsiteAppearance from '@/pages/WebsiteAppearance'
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle,
@@ -16,6 +17,7 @@ import {
   Images,
   FileText,
   HelpCircle,
+  Palette,
   Trash2,
 } from 'lucide-react'
 import { PageHeader, SectionCard } from '@/components/ui/page-header'
@@ -238,7 +240,7 @@ export default function WebsiteSettings() {
 
       <PageHeader
         title="Website Settings"
-        description="Manage public contact information, homepage media, legal pages and FAQs."
+        description="Manage public contact information, homepage media, appearance, legal pages and FAQs."
       />
 
       <div className="mb-6 rounded-2xl border border-border bg-white p-2 shadow-sm shadow-slate-200/60">
@@ -246,6 +248,7 @@ export default function WebsiteSettings() {
           {[
             { id: 'contact', label: 'Contact & Social', icon: Globe2 },
             { id: 'hero', label: 'Hero Media', icon: Images },
+            { id: 'appearance', label: 'Appearance', icon: Palette },
             { id: 'terms', label: 'Terms & Conditions', icon: FileText },
             { id: 'privacy', label: 'Privacy Policy', icon: FileText },
             { id: 'refund', label: 'Refund Policy', icon: FileText },
@@ -262,6 +265,7 @@ export default function WebsiteSettings() {
         </div>
       </div>
       {activeTab === 'hero' && <HeroContent embedded />}
+      {activeTab === 'appearance' && <WebsiteAppearance />}
       {activeTab === 'terms' && <LegalContent page="terms" />}
       {activeTab === 'privacy' && <LegalContent page="privacy" />}
       {activeTab === 'refund' && <LegalContent page="refund" />}
