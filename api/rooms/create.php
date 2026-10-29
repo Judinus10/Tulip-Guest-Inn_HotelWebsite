@@ -50,6 +50,7 @@ try {
         ':sort_order' => max(0, (int) ($data['sort_order'] ?? 0)),
     ]);
     $roomId = (int) $pdo->lastInsertId();
+    save_room_occupancy($pdo, $roomId, $data);
     replace_room_amenities($pdo, $roomId, $amenityIds);
     save_room_ical_url($pdo, $roomId, (string) ($data['booking_ical_url'] ?? ''), true);
     $uploadedImageIds = save_room_images($pdo, $roomId, $_FILES['images'] ?? [], $createdFiles);

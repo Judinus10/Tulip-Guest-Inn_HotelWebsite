@@ -1,3 +1,5 @@
+import RoomOccupancyFields from '@/components/ui/RoomOccupancyFields'
+import { validateRoomOccupancy } from '@/services/roomOccupancy'
 import RoomPhotoOrder from '@/components/ui/RoomPhotoOrder'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -30,7 +32,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dropdown } from '@/components/ui/dropdown'
 import { Input, Label, Textarea } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { createAmenity, createRoom, deleteAmenity, deleteRoomById, listAmenities, listRooms, updateAmenity, updateRoom } from '@/services/roomsApi'
+import { createAmenity, createRoom, deleteAmenity, deleteRoomById, listAmenities, listRoomsWithOccupancy, updateAmenity, updateRoom } from '@/services/roomsApi'
 import { optimizeRoomImages } from '@/utils/imageProcessing'
 
 const emptyForm = {
@@ -41,6 +43,10 @@ const emptyForm = {
   room_category: 'standard',
   price_per_night: '',
   capacity: '',
+  max_adults: '',
+  max_children: 0,
+  max_total_occupants: '',
+  max_child_age: 11,
   bed_type: 'Double Bed',
   room_size: '',
   currency: 'LKR',
@@ -500,8 +506,13 @@ function RoomVideoPreview({ file, savedUrl, onRemove, disabled }) {
   )
 }
 
-function RoomFormModal({ mode, room, amenities, onClose, onSubmit }) {
-  const [form, setForm] = useState(() => room || emptyForm)
+function RoomFormModal({ mode, room, amenities, occupancySettings, onClose, onSubmit }) {
+  const [form, setForm] = useState(() => ({ ...emptyForm, ...room,
+    max_adults: room?.max_adults ?? room?.capacity ?? '',
+    max_total_occupants: room?.max_total_occupants ?? room?.capacity ?? '',
+  }))
+  const [countChildren, setCountChildren] = useState(occupancySettings.count_children_toward_capacity)
+  const [initialCountChildren] = useState(occupancySettings.count_children_toward_capacity)
   const [errors, setErrors] = useState({})
   const [selectedFiles, setSelectedFiles] = useState([])
   const [photoOrder, setPhotoOrder] = useState([])
@@ -605,7 +616,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit }) {
 
     if (isProcessingImages || isSubmitting) return
 
-    const nextErrors = {}
+    const nextErrors = validateRoomOccupancy(form)
     if (String(form.booking_ical_url || '').trim() !== String(room?.booking_ical_url || '').trim() && form.booking_ical_url?.trim() && !/^https:\/\/(ical|admin)\.booking\.com\//i.test(form.booking_ical_url.trim())) nextErrors.booking_ical_url = 'Enter a Booking.com iCal URL.'
     if (!String(form.room_number || '').trim()) nextErrors.room_number = 'Room number is required.'
     if (!form.room_name.trim()) nextErrors.room_name = 'Room name is required.'
@@ -613,8 +624,6 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit }) {
     if (!form.room_category.trim()) nextErrors.room_category = 'Room category is required.'
     if (!String(form.price_per_night).trim()) nextErrors.price_per_night = 'Price is required.'
     if (Number(form.price_per_night) <= 0) nextErrors.price_per_night = 'Price must be greater than 0.'
-    if (!String(form.capacity).trim()) nextErrors.capacity = 'Capacity is required.'
-    if (Number(form.capacity) <= 0) nextErrors.capacity = 'Capacity must be greater than 0.'
     if (!String(form.room_size).trim()) nextErrors.room_size = 'Room size is required.'
     if (Number(form.room_size) <= 0) nextErrors.room_size = 'Room size must be greater than 0.'
     if (!form.description.trim()) nextErrors.description = 'Description is required.'
@@ -630,6 +639,9 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit }) {
         ...form,
         price_per_night: Number(form.price_per_night),
         capacity: Number(form.capacity),
+        count_children_toward_capacity: countChildren,
+        expected_count_children_toward_capacity: initialCountChildren,
+        shared_occupancy_changed: countChildren !== initialCountChildren,
         room_size: Number(form.room_size),
         images: selectedFiles,
         remove_image_ids: removedImageIds,
@@ -709,12 +721,6 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit }) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="capacity">Capacity</Label>
-              <Input id="capacity" type="number" min="1" value={form.capacity} onChange={(e) => updateField('capacity', e.target.value)} placeholder="Ex: 2" />
-              {errors.capacity && <p className="text-xs font-medium text-red-600">{errors.capacity}</p>}
-            </div>
-
-            <div className="space-y-2">
               <Label htmlFor="bed_type">Bed type</Label>
               <select
                 id="bed_type"
@@ -745,7 +751,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit }) {
               {errors.status && <p className="text-xs font-medium text-red-600">{errors.status}</p>}
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 md:col-span-2">
               <Label htmlFor="room_images">Room images</Label>
               <div className="flex items-center gap-3 rounded-lg border border-dashed border-border bg-slate-50 px-3 py-2">
                 <ImagePlus className="h-5 w-5 text-primary-600" />
@@ -762,6 +768,9 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit }) {
               {isProcessingImages && <p className="text-xs font-medium text-primary-600">Optimizing selected images…</p>}
               {isEdit && <p className="text-xs text-text-secondary">Upload new images only if you want to add more photos.</p>}
             </div>
+
+            <RoomOccupancyFields form={form} errors={errors} onChange={updateField}
+              countChildren={countChildren} onToggle={setCountChildren} disabled={isSubmitting} />
 
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="booking_ical_url">Booking.com iCal import URL (optional)</Label>
@@ -991,6 +1000,7 @@ function DeleteDialog({ room, onCancel, onConfirm }) {
 
 export default function Rooms() {
   const [rooms, setRooms] = useState([])
+  const [occupancySettings, setOccupancySettings] = useState(null)
   const [amenities, setAmenities] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -1015,10 +1025,12 @@ export default function Rooms() {
     setLoadError('')
 
     try {
-      const [roomData, amenityData] = await Promise.all([listRooms(), listAmenities()])
-      setRooms(roomData)
+      const [roomData, amenityData] = await Promise.all([listRoomsWithOccupancy(), listAmenities()])
+      setRooms(roomData.rooms)
+      setOccupancySettings(roomData.occupancySettings)
       setAmenities(amenityData)
     } catch (error) {
+      setOccupancySettings(null)
       setLoadError(error.message || 'Unable to load rooms.')
     } finally {
       setLoading(false)
@@ -1070,12 +1082,14 @@ export default function Rooms() {
   }, [enrichedRooms, search, statusFilter, typeFilter])
 
   function openAddModal() {
+    if (!occupancySettings || loading) return
     setOpenActionsId(null)
     setSelectedRoom(null)
     setFormMode('add')
   }
 
   function openEditModal(room) {
+    if (!occupancySettings || loading) return
     setOpenActionsId(null)
     setSelectedRoom({
       ...room,
@@ -1108,6 +1122,11 @@ export default function Rooms() {
     payload.append('description', form.description)
     payload.append('max_guests', form.capacity)
     payload.append('capacity', form.capacity)
+    for (const key of ['max_adults', 'max_children', 'max_total_occupants', 'max_child_age']) payload.append(key, String(form[key]))
+    if (form.shared_occupancy_changed) {
+      payload.append('count_children_toward_capacity', form.count_children_toward_capacity ? '1' : '0')
+      payload.append('expected_count_children_toward_capacity', form.expected_count_children_toward_capacity ? '1' : '0')
+    }
     payload.append('room_category', form.room_category || 'standard')
     payload.append('category', form.room_category || 'standard')
     payload.append('bed_type', form.bed_type || 'Double Bed')
@@ -1168,7 +1187,7 @@ export default function Rooms() {
             <Settings2 className="h-4 w-4" />
             Manage Amenities
           </Button>
-          <Button onClick={openAddModal}>
+          <Button onClick={openAddModal} disabled={!occupancySettings || loading}>
             <Plus className="h-4 w-4" />
             Add Room
           </Button>
@@ -1273,7 +1292,7 @@ export default function Rooms() {
             <p className="mt-1 max-w-md text-sm text-text-secondary">
               Your filters did not match any rooms. Clear the filters or add a new room.
             </p>
-            <Button className="mt-5" onClick={openAddModal}>
+            <Button className="mt-5" onClick={openAddModal} disabled={!occupancySettings || loading}>
               <Plus className="h-4 w-4" />
               Add Room
             </Button>
@@ -1287,6 +1306,7 @@ export default function Rooms() {
           mode={formMode}
           room={selectedRoom}
           amenities={amenities}
+          occupancySettings={occupancySettings}
           onClose={closeFormModal}
           onSubmit={handleSubmitRoom}
         />

@@ -12,6 +12,15 @@ export async function listRooms() {
   return normalize(payload)
 }
 
+export async function listRoomsWithOccupancy() {
+  const response = await apiFetch(buildApiUrl('/rooms/list.php'))
+  const payload = await readJsonResponse(response)
+  if (typeof payload.occupancy_settings?.count_children_toward_capacity !== 'boolean') {
+    throw new Error('Room occupancy settings could not be loaded. Refresh after updating the room API files.')
+  }
+  return { rooms: normalize(payload), occupancySettings: payload.occupancy_settings }
+}
+
 export async function createRoom(formData) {
   const response = await apiFetch(buildApiUrl('/rooms/create.php'), {
     method: 'POST',

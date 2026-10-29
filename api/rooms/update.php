@@ -25,7 +25,7 @@ try {
     if ($roomName === '') json_response(false, 'Room name is required.', 422);
     $preparedVideo = prepare_room_video($id, $_FILES['video'] ?? []);
     $pdo->beginTransaction();
-    $calendarStmt = $pdo->prepare('SELECT booking_ical_url, video_path FROM rooms WHERE id = ? FOR UPDATE');
+    $calendarStmt = $pdo->prepare('SELECT * FROM rooms WHERE id = ? FOR UPDATE');
     $calendarStmt->execute([$id]);
     $currentCalendar = $calendarStmt->fetch(PDO::FETCH_ASSOC);
     if (!$currentCalendar) throw new OutOfBoundsException('Room not found.');
@@ -75,6 +75,7 @@ try {
         ':status' => in_array($data['status'] ?? 'Available', ['Available', 'Unavailable', 'Maintenance'], true) ? ($data['status'] ?? 'Available') : 'Available',
         ':sort_order' => max(0, (int) ($data['sort_order'] ?? 0)),
     ]);
+    save_room_occupancy($pdo, $id, $data, $currentCalendar);
     replace_room_amenities($pdo, $id, $amenityIds);
     if (array_key_exists('booking_ical_url', $data)) save_room_ical_url($pdo, $id, (string)$data['booking_ical_url'], true);
     room_remove_images($pdo, $id, room_removed_image_ids($data), $obsoleteFiles);

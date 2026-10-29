@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../amenities/_amenity_helpers.php';
+require_once __DIR__ . '/occupancy-helper.php';
 
 function rooms_upload_url(string $relativePath): string
 {
@@ -38,6 +39,7 @@ function ensure_rooms_schema(PDO $pdo): void
         }
     }
     $pdo->exec("UPDATE rooms SET room_number = CONCAT('R', LPAD(id, GREATEST(2, CHAR_LENGTH(id)), '0')) WHERE room_number IS NULL");
+    ensure_room_occupancy_schema($pdo);
 }
 
 function room_number_input(PDO $pdo, array $data, int $roomId = 0): string
@@ -272,6 +274,10 @@ function normalize_room(array $room, array $images = [], array $amenityRecords =
         'guests' => $guests,
         'max_guests' => $guests,
         'capacity' => $guests,
+        'max_adults' => (int) ($room['max_adults'] ?? $guests),
+        'max_children' => (int) ($room['max_children'] ?? 0),
+        'max_total_occupants' => (int) ($room['max_total_occupants'] ?? $guests),
+        'max_child_age' => (int) ($room['max_child_age'] ?? 11),
         'beds' => $bedType,
         'bed_type' => $bedType,
         'size' => $roomSize,
