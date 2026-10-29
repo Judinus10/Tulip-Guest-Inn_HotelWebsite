@@ -21,11 +21,8 @@ import OfferCard from "../components/ui/OfferCard";
 import StatCounter from "../components/ui/StatCounter";
 import CTASection from "../components/ui/CTASection";
 import AttractionCard from "../components/ui/AttractionCard";
-import { rooms } from "../data/rooms";
 import { facilities } from "../data/facilities";
-import { galleryImages } from "../data/gallery";
-import { statistics } from "../data/statistics";
-import { attractions } from "../data/attractions";
+import type { GalleryImage } from "../data/gallery";
 import {
   getPublicAttractions,
   getPublicGalleryImages,
@@ -64,7 +61,7 @@ const galleryCategoryOrder = [
   "facilities",
 ] as const;
 
-type HomeGalleryImage = (typeof galleryImages)[number];
+type HomeGalleryImage = GalleryImage;
 
 function normalizeGalleryCategory(
   folderSlug?: string,
@@ -113,23 +110,73 @@ function pickRandomGalleryPreview(
   return [...selected, ...shuffledRemaining].slice(0, limit);
 }
 
-export default function Home() {
-  const [heroIndex, setHeroIndex] = useState(0);
-  const [publishedHero, setPublishedHero] = useState<{source?:'default'|'custom';mode:'images'|'video';images:string[];video:string;poster:string}|null>(null);
+type LoadStatus = 'loading' | 'ready' | 'error';
+type HeroContent = { source?: 'default' | 'custom'; mode: 'images' | 'video'; images: string[]; video: string; poster: string };
+
+function loadHeroContent() {
+  return requestJson<HeroContent>('/settings/hero-content.php');
+}
+
+async function loadGalleryPreview(): Promise<HomeGalleryImage[]> {
+  const images = await getPublicGalleryImages();
+  return images
+    .filter((image) => typeof image.image_path === 'string' && image.image_path.trim() !== '')
+    .map((image, index) => ({
+      id: String(image.id ?? `api-gallery-${index}`),
+      src: image.image_path,
+      alt: image.title || image.folder_name || 'Tulip Guest Inn Gallery',
+      category: normalizeGalleryCategory(image.folder_slug, image.folder_name),
+      width: (index % 5 === 0 ? 'wide' : 'normal') as 'wide' | 'normal',
+    }));
+}
+
+function useHomeResource<T>(load: () => Promise<T>) {
+  const [resource, setResource] = useState<{ data?: T; status: LoadStatus }>({ status: 'loading' });
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let active = true;
-    requestJson<{source?:'default'|'custom';mode:'images'|'video';images:string[];video:string;poster:string}>('/settings/hero-content.php')
-      .then(data => { if(active) setPublishedHero(data); }).catch(() => {});
-    return () => { active=false; };
-  }, []);
-  const videoHero = publishedHero?.source !== 'default' && publishedHero?.mode === 'video' && Boolean(publishedHero.video);
+    load().then((data) => {
+      if (active) setResource({ data, status: 'ready' });
+    }).catch(() => {
+      if (active) setResource({ status: 'error' });
+    });
+    return () => { active = false; };
+  }, [load, attempt]);
+  const retry = () => {
+    setResource({ status: 'loading' });
+    setAttempt((value) => value + 1);
+  };
+  return { ...resource, retry };
+}
 
+function HomeSectionState({ status, empty, label, emptyMessage, onRetry, dark = false }: {
+  status: LoadStatus; empty: boolean; label: string; emptyMessage: string; onRetry: () => void; dark?: boolean;
+}) {
+  if (status === 'ready' && !empty) return null;
+  return (
+    <div role="status" className={`rounded border p-6 text-center text-sm ${dark ? 'border-white/20 text-gray-300' : 'border-border text-gray-500'}`}>
+      <p>{status === 'loading' ? `Loading ${label}…` : status === 'error' ? `We couldn't load ${label}. Please try again.` : emptyMessage}</p>
+      {status === 'error' && <button type="button" onClick={onRetry} className="mt-4 font-semibold text-gold underline underline-offset-4">Try again<span className="sr-only"> loading {label}</span></button>}
+    </div>
+  );
+}
+
+export default function Home() {
+  const [heroIndex, setHeroIndex] = useState(0);
+  const heroResource = useHomeResource(loadHeroContent);
+  const publishedHero = heroResource.data;
+  const videoHero = publishedHero?.source !== 'default' && publishedHero?.mode === 'video' && Boolean(publishedHero.video);
   const [lightbox, setLightbox] = useState<string | null>(null);
-  const [homeRooms, setHomeRooms] = useState(rooms);
-  const [homeGalleryImages, setHomeGalleryImages] = useState(galleryImages);
-  const [homeAttractions, setHomeAttractions] = useState(attractions);
-  const [homeOffers, setHomeOffers] = useState<Awaited<ReturnType<typeof getPublicOffers>>>([]);
-  const [homeStatistics, setHomeStatistics] = useState(statistics);
+  const roomsResource = useHomeResource(getPublicRooms);
+  const galleryResource = useHomeResource(loadGalleryPreview);
+  const attractionsResource = useHomeResource(getPublicAttractions);
+  const offersResource = useHomeResource(getPublicOffers);
+  const statisticsResource = useHomeResource(getPublicHomeStatistics);
+  const homeRooms = roomsResource.data ?? [];
+  const homeGalleryImages = useMemo(() => galleryResource.data ?? [], [galleryResource.data]);
+  const homeAttractions = attractionsResource.data ?? [];
+  const homeOffers = offersResource.data ?? [];
+  const homeStatistics = statisticsResource.data ?? [];
 
   const previewImages = useMemo(
     () => pickRandomGalleryPreview(homeGalleryImages, 10),
@@ -145,88 +192,24 @@ export default function Home() {
     return groups;
   }, [previewImages]);
   const featuredRooms = homeRooms.filter((r) => r.featured).slice(0, 3);
-  const activeHeroImages = publishedHero?.source !== "default" && publishedHero?.mode === "images" && publishedHero.images?.length ? publishedHero.images : heroImages;
+  const activeHeroImages = publishedHero?.source === 'default'
+    ? heroImages
+    : publishedHero?.mode === 'images' ? (publishedHero.images ?? []).filter(Boolean) : [];
 
   useEffect(() => {
-    if (videoHero) return;
+    if (videoHero || activeHeroImages.length < 2) return;
     const interval = setInterval(() => {
       setHeroIndex((prev) => (prev + 1) % activeHeroImages.length);
     }, 7000);
     return () => clearInterval(interval);
   }, [activeHeroImages.length, videoHero]);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadHomeData() {
-      const [roomsResult, galleryResult, attractionsResult, offersResult, statisticsResult] =
-        await Promise.allSettled([
-          getPublicRooms(),
-          getPublicGalleryImages(),
-          getPublicAttractions(),
-          getPublicOffers(),
-          getPublicHomeStatistics(),
-        ]);
-
-      if (!isMounted) return;
-
-      if (roomsResult.status === "fulfilled" && roomsResult.value.length > 0) {
-        setHomeRooms(roomsResult.value);
-      }
-
-      if (
-        galleryResult.status === "fulfilled" &&
-        galleryResult.value.length > 0
-      ) {
-        const normalizedGalleryImages = galleryResult.value
-          .filter(
-            (img) =>
-              typeof img.image_path === "string" &&
-              img.image_path.trim() !== "",
-          )
-          .map((img, index) => ({
-            id: String(img.id ?? `api-gallery-${index}`),
-            src: img.image_path,
-            alt: img.title || img.folder_name || "Tulip Guest Inn Gallery",
-            category: normalizeGalleryCategory(
-              img.folder_slug,
-              img.folder_name,
-            ),
-            width: (index % 5 === 0 ? "wide" : "normal") as "wide" | "normal",
-          }));
-
-        if (normalizedGalleryImages.length > 0) {
-          setHomeGalleryImages(normalizedGalleryImages);
-        }
-      }
-
-      if (
-        attractionsResult.status === "fulfilled" &&
-        attractionsResult.value.length > 0
-      ) {
-        setHomeAttractions(attractionsResult.value);
-      }
-
-      setHomeOffers(offersResult.status === "fulfilled" ? offersResult.value : []);
-
-      if (statisticsResult.status === "fulfilled" && statisticsResult.value.length > 0) {
-        setHomeStatistics(statisticsResult.value);
-      }
-    }
-
-    loadHomeData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
   return (
     <main>
       {/* ── HERO ─────────────────────────────────────────── */}
-      <section className="relative h-screen min-h-[600px] flex items-center justify-center overflow-hidden">
+      <section className="relative h-screen min-h-[600px] flex items-center justify-center overflow-hidden bg-deep-green">
         {videoHero ? (
-          <video src={publishedHero!.video} poster={publishedHero!.poster || heroImages[0]}
+          <video src={publishedHero!.video} poster={publishedHero!.poster || undefined}
             autoPlay muted loop playsInline preload="metadata"
             className="absolute inset-0 h-full w-full object-cover"
             aria-label="Tulip Guest Inn property video" />
@@ -235,19 +218,22 @@ export default function Home() {
             key={`${src}-${i}`}
             className="absolute inset-0"
             initial={{ opacity: 0 }}
-            animate={{ opacity: i === heroIndex ? 1 : 0 }}
+            animate={{ opacity: i === heroIndex % activeHeroImages.length ? 1 : 0 }}
             transition={{ duration: 1.5, ease: "easeInOut" }}
           >
             <motion.img
               src={src}
               alt="Tulip Guest Inn"
               className="w-full h-full object-cover"
-              animate={{ scale: i === heroIndex ? 1.07 : 1 }}
+              animate={{ scale: i === heroIndex % activeHeroImages.length ? 1.07 : 1 }}
               transition={{ duration: 8, ease: "easeOut" }}
             />
           </motion.div>
         ))}
         <div className="absolute inset-0 bg-linear-to-b from-black/50 via-black/30 to-black/60" />
+        {heroResource.status !== 'ready' && <div className="absolute inset-x-4 bottom-24 z-20 mx-auto max-w-md rounded bg-black/50 p-3 text-center text-xs text-white" role="status">
+          {heroResource.status === 'loading' ? 'Loading banner…' : <><p>Banner media is temporarily unavailable.</p><button type="button" onClick={heroResource.retry} className="mt-2 underline underline-offset-4">Try again</button></>}
+        </div>}
 
         <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
           <motion.p
@@ -326,7 +312,7 @@ export default function Home() {
               key={i}
               onClick={() => setHeroIndex(i)}
               className={`transition-all duration-400 ${
-                i === heroIndex
+                i === heroIndex % activeHeroImages.length
                   ? "w-8 h-1.5 bg-gold"
                   : "w-1.5 h-1.5 rounded-full bg-white/40 hover:bg-white/70"
               }`}
@@ -443,6 +429,7 @@ export default function Home() {
             title="Discover Our Rooms"
             subtitle="Each room is a private sanctuary — thoughtfully designed for comfort, elegance and peaceful rest."
           />
+          <HomeSectionState status={roomsResource.status} empty={featuredRooms.length === 0} label="rooms" emptyMessage="No featured rooms are currently listed. Please contact us for room enquiries." onRetry={roomsResource.retry} />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {featuredRooms.map((room, i) => (
               <RoomCard key={room.id} room={room} index={i} />
@@ -514,6 +501,7 @@ export default function Home() {
       <section className="section-padding bg-background">
         <div className="container-custom">
           <SectionTitle eyebrow="Photo Gallery" title="A Glimpse of Tulip" />
+          <HomeSectionState status={galleryResource.status} empty={previewImages.length === 0} label="gallery photos" emptyMessage="No gallery photos have been published yet." onRetry={galleryResource.retry} />
           <div className="space-y-3">
             {previewGroups.map((group, groupIndex) => {
               const big = group[0];
@@ -556,6 +544,7 @@ export default function Home() {
             title="Nearby Attractions"
             subtitle="Point Pedro and the Jaffna Peninsula are rich in natural beauty, history and culture."
           />
+          <HomeSectionState status={attractionsResource.status} empty={homeAttractions.length === 0} label="nearby attractions" emptyMessage="No nearby attractions are currently listed." onRetry={attractionsResource.retry} />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {homeAttractions.slice(0, 3).map((attraction, i) => (
               <AttractionCard
@@ -574,13 +563,14 @@ export default function Home() {
       </section>
 
       {/* ── SPECIAL OFFERS ────────────────────────────────── */}
-      {homeOffers.length > 0 && <section className="section-padding bg-background">
+      {(offersResource.status !== 'ready' || homeOffers.length > 0) && <section className="section-padding bg-background">
         <div className="container-custom">
           <SectionTitle
             eyebrow="Special Offers"
             title="Exclusive Packages"
             subtitle="Take advantage of our curated offers designed to make your stay even more special."
           />
+          <HomeSectionState status={offersResource.status} empty={homeOffers.length === 0} label="special offers" emptyMessage="No special offers are currently available." onRetry={offersResource.retry} />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {homeOffers.map((offer, i) => (
               <OfferCard key={offer.id} offer={offer} index={i} />
@@ -590,15 +580,16 @@ export default function Home() {
       </section>}
 
       {/* ── STATISTICS ────────────────────────────────────── */}
-      <section className="bg-dark py-20">
+      {(statisticsResource.status !== 'ready' || homeStatistics.length > 0) && <section className="bg-dark py-20">
         <div className="container-custom">
+          <HomeSectionState status={statisticsResource.status} empty={homeStatistics.length === 0} label="hotel statistics" emptyMessage="" onRetry={statisticsResource.retry} dark />
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-12">
             {homeStatistics.map((stat) => (
               <StatCounter key={stat.id} stat={stat} />
             ))}
           </div>
         </div>
-      </section>
+      </section>}
 
       {/* ── CTA ───────────────────────────────────────────── */}
       <CTASection
