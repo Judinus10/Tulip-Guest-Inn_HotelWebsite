@@ -40,7 +40,7 @@ export default function LegalContent({page='terms'}){
   <SectionCard>
    <div className="flex items-start gap-3"><div className="rounded-xl bg-blue-50 p-3 text-blue-600"><FileText className="h-5 w-5"/></div>
     <div><h2 className="text-lg font-semibold">{titles[page]}</h2>
-     <p className="mt-1 text-sm text-text-secondary">Format this page with headings, bold, italic and lists. Publish changes directly to the public website.</p></div>
+     <p className="mt-1 text-sm text-text-secondary">Format this page with fonts, text sizes, headings, links and lists. Publish changes directly to the public website.</p></div>
    </div>
   </SectionCard>
   {error&&<p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}

@@ -1,3 +1,4 @@
+import LegalDocument from '../components/ui/LegalDocument';
 import { useLegalContent } from '../hooks/useLegalContent';
 import { Link } from 'react-router-dom';
 import PageHero from '../components/ui/PageHero';
@@ -60,7 +61,7 @@ export default function PrivacyPolicy() {
           <p className="text-sm text-gray-500 mb-10">Last updated: {updated ? new Date(updated.replace(' ', 'T')).toLocaleDateString() : '20 August 2026'}</p>
 
           <div className="bg-white border border-border p-7 md:p-10 space-y-9">
-            {content?.html ? <div className="legal-document text-sm leading-7 text-gray-600 [&_u]:underline [&_strong]:font-semibold [&_h2]:mb-4 [&_h2]:mt-9 [&_h2]:font-serif [&_h2]:text-2xl [&_h2]:font-light [&_h2]:text-dark [&_p]:my-3 [&_p:empty]:min-h-[1.75rem] [&_div]:my-3 [&_div:empty]:min-h-[1.75rem] [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6" dangerouslySetInnerHTML={{ __html: content.html }} /> : content ? <>
+            {content?.html ? <LegalDocument html={content.html} /> : content ? <>
               <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{content.intro}</p>
               {(content.sections ?? []).map((section,index)=><section key={index}><h2 className="font-serif text-2xl font-light text-dark mb-3">{section.title}</h2><p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{section.body}</p></section>)}
             </> : <>
