@@ -30,7 +30,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dropdown } from '@/components/ui/dropdown'
 import { Input, Label, Textarea } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { createAmenity, createRoom, deleteAmenity, deleteRoomById, deleteRoomImage, listAmenities, listRooms, updateAmenity, updateRoom } from '@/services/roomsApi'
+import { createAmenity, createRoom, deleteAmenity, deleteRoomById, listAmenities, listRooms, updateAmenity, updateRoom } from '@/services/roomsApi'
 import { optimizeRoomImages } from '@/utils/imageProcessing'
 
 const emptyForm = {
@@ -500,7 +500,7 @@ function RoomVideoPreview({ file, savedUrl, onRemove, disabled }) {
   )
 }
 
-function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExistingImage }) {
+function RoomFormModal({ mode, room, amenities, onClose, onSubmit }) {
   const [form, setForm] = useState(() => room || emptyForm)
   const [errors, setErrors] = useState({})
   const [selectedFiles, setSelectedFiles] = useState([])
@@ -524,7 +524,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
   const [selectedVideo, setSelectedVideo] = useState(null)
   const videoInputRef = useRef(null)
   const [removeVideo, setRemoveVideo] = useState(false)
-  const [deletingImageId, setDeletingImageId] = useState(null)
+  const [removedImageIds, setRemovedImageIds] = useState([])
   const [isProcessingImages, setIsProcessingImages] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
@@ -579,40 +579,25 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
     }
   }
 
-  async function removeExistingImage(image) {
-    const imageId = image?.raw && typeof image.raw === 'object' ? image.raw.id || image.raw.image_id : null
-
+  function removeExistingImage(image) {
+    const imageId = Number(image?.id || image?.raw?.id || image?.raw?.image_id || 0)
     if (!imageId) {
-      setErrors((current) => ({ ...current, images: 'This image cannot be deleted because it has no database image id.' }))
+      setErrors((current) => ({ ...current, images: 'This photo has no valid image ID. Reopen the room.' }))
       return
     }
-
-    const confirmed = window.confirm('Delete this room image permanently?')
-    if (!confirmed) return
-
-    setDeletingImageId(imageId)
+    if (!window.confirm('Remove this photo when you save changes? Cancel will keep it.')) return
+    setRemovedImageIds((current) => [...new Set([...current, imageId])])
     setErrors((current) => ({ ...current, images: '' }))
-
-    try {
-      await onDeleteExistingImage(imageId)
-      setForm((current) => {
-        const imageRecords = Array.isArray(current.image_records) ? current.image_records.filter((record) => Number(record.id || record.image_id) !== Number(imageId)) : []
-        const removedSrc = image.src
-        const images = Array.isArray(current.images) ? current.images.filter((src) => resolveImageSrc(src) !== removedSrc) : []
-        const mainImageSrc = resolveImageSrc(current.image)
-
-        return {
-          ...current,
-          image_records: imageRecords,
-          images,
-          image: mainImageSrc === removedSrc ? imageRecords[0] || images[0] || null : current.image,
-        }
-      })
-    } catch (error) {
-      setErrors((current) => ({ ...current, images: error.message || 'Unable to delete image.' }))
-    } finally {
-      setDeletingImageId(null)
-    }
+    setForm((current) => {
+      const imageRecords = (current.image_records || []).filter((record) => Number(record.id || record.image_id) !== imageId)
+      const images = (current.images || []).filter((src) => resolveImageSrc(src) !== image.src)
+      return {
+        ...current,
+        image_records: imageRecords,
+        images,
+        image: resolveImageSrc(current.image) === image.src ? imageRecords[0] || images[0] || null : current.image,
+      }
+    })
   }
 
   async function handleSubmit(event) {
@@ -647,6 +632,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
         capacity: Number(form.capacity),
         room_size: Number(form.room_size),
         images: selectedFiles,
+        remove_image_ids: removedImageIds,
         image_order: photoItems.map(item => item.upload_index !== undefined ? { upload_index: item.upload_index } : { id: item.id }),
         video: selectedVideo,
         remove_video: removeVideo,
@@ -661,7 +647,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" onClick={() => { if (!isSubmitting) onClose() }}>
       <div className="max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl shadow-slate-950/20" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
@@ -670,7 +656,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
               {isEdit ? 'Update room details and amenities.' : 'Create a new room in the inventory.'}
             </p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800">
+          <button onClick={() => { if (!isSubmitting) onClose() }} className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -861,7 +847,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
                 <div>
                   <p className="text-sm font-semibold text-text-primary">Room media preview</p>
                   <p className="text-xs text-text-secondary">
-                    Drag the handles or use the arrows to arrange photos. The first photo is the cover. Save Changes to publish the order. Deleting a saved photo is immediate after confirmation.
+                    Drag the handles or use the arrows to arrange photos. The first photo is the cover. Save Changes to publish the order and photo removals. Cancel keeps your saved photos.
                   </p>
                 </div>
                 {selectedFiles.length > 0 && (
@@ -870,7 +856,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
               </div>
 
               <RoomPhotoOrder items={photoItems} onChange={items => setPhotoOrder(items.map(item => item.key))}
-                disabled={isSubmitting || isProcessingImages || deletingImageId !== null}
+                disabled={isSubmitting || isProcessingImages}
                 onRemove={item => item.upload_index !== undefined ? removeSelectedFile(null, item.upload_index) : removeExistingImage(item)} />
               {errors.images && <p className="mt-3 text-xs font-medium text-red-600">{errors.images}</p>}
               {(selectedVideo || (room?.video_url && !removeVideo)) && (
@@ -892,7 +878,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
           )}
 
           <div className="mt-6 flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isProcessingImages || isSubmitting}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={() => { if (!isSubmitting) onClose() }} disabled={isProcessingImages || isSubmitting}>Cancel</Button>
             <Button type="submit" disabled={isProcessingImages || isSubmitting}>
               {isProcessingImages
                 ? 'Optimizing Images…'
@@ -1135,6 +1121,7 @@ export default function Rooms() {
     payload.append('status', form.status)
     payload.append('sort_order', form.sort_order || 0)
     payload.append('image_order', JSON.stringify(form.image_order || []))
+    payload.append('remove_image_ids', JSON.stringify(form.remove_image_ids || []))
 
     ;(form.images || []).forEach((file) => payload.append('images[]', file))
     if (form.video) payload.append('video', form.video)
@@ -1154,12 +1141,6 @@ export default function Rooms() {
       showToast('Room save failed', error.message || 'Unable to save room.', 'error')
       throw error // Keep edit modal open and preserve entered values.
     }
-  }
-
-  async function handleDeleteRoomImage(imageId) {
-    await deleteRoomImage(imageId)
-    await loadRooms()
-    showToast('Image deleted', 'The selected room image was removed.')
   }
 
   async function confirmDeleteRoom() {
@@ -1308,7 +1289,6 @@ export default function Rooms() {
           amenities={amenities}
           onClose={closeFormModal}
           onSubmit={handleSubmitRoom}
-          onDeleteExistingImage={handleDeleteRoomImage}
         />
       )}
 

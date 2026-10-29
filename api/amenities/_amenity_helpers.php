@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 function ensure_amenity_tables(PDO $pdo): void
 {
+    // Room saves initialize schema before BEGIN; never issue DDL inside that transaction.
+    if ($pdo->inTransaction()) return;
     $pdo->exec("CREATE TABLE IF NOT EXISTS property_amenities (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT,
         name VARCHAR(120) NOT NULL,

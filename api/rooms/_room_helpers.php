@@ -68,13 +68,13 @@ function ensure_room_ical_column(PDO $pdo): void
     }
 }
 
-function save_room_ical_url(PDO $pdo, int $roomId, string $url): void
+function save_room_ical_url(PDO $pdo, int $roomId, string $url, bool $permissionChecked = false): void
 {
     $current = $pdo->prepare('SELECT booking_ical_url FROM rooms WHERE id = ?');
     $current->execute([$roomId]);
     $row = $current->fetch(PDO::FETCH_ASSOC);
     if ($row && trim((string) ($row['booking_ical_url'] ?? '')) === trim($url)) return;
-    require_calendar_permission($pdo, $roomId, $url);
+    if (!$permissionChecked) require_calendar_permission($pdo, $roomId, $url);
     $url = trim($url);
     if ($url !== '') {
         $parts = parse_url($url);
@@ -101,6 +101,8 @@ function normalize_room_category(mixed $value): string
 
 function ensure_room_images_table(PDO $pdo): void
 {
+    // Room saves initialize schema before their transaction. DDL here would commit it.
+    if ($pdo->inTransaction()) return;
     $pdo->exec("CREATE TABLE IF NOT EXISTS room_images (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT,
         room_id INT UNSIGNED NOT NULL,
@@ -138,8 +140,9 @@ function prepare_room_video(int $roomId, array $file): ?string
     return optimize_uploaded_video($file, $directory . '/room-video-' . $roomId . '-' . bin2hex(random_bytes(12)));
 }
 
-function save_room_video(PDO $pdo, int $roomId, array $file, ?string $preparedVideo = null): void
+function save_room_video(PDO $pdo, int $roomId, array $file, ?string $preparedVideo = null, ?array &$obsoleteFiles = null): void
 {
+    if ($pdo->inTransaction() && $obsoleteFiles === null) throw new LogicException('Transactional video saves require deferred file cleanup.');
     $destination = $preparedVideo ?? prepare_room_video($roomId, $file);
     if ($destination === null) return;
     $filename = basename($destination);
@@ -149,7 +152,11 @@ function save_room_video(PDO $pdo, int $roomId, array $file, ?string $preparedVi
     try {
         $pdo->prepare('UPDATE rooms SET video_path = :path WHERE id = :id')->execute([':path' => 'uploads/rooms/' . $filename, ':id' => $roomId]);
     } catch (Throwable $e) { @unlink($destination); throw $e; }
-    delete_room_video_file($old);
+    if ($obsoleteFiles !== null) {
+        if (is_string($old) && $old !== '') $obsoleteFiles[] = $old;
+    } else {
+        delete_room_video_file($old);
+    }
 }
 
 function delete_room_video_file(mixed $path): void
@@ -318,7 +325,7 @@ function get_room_payload(PDO $pdo, bool $publicOnly = false): array
     );
 }
 
-function save_room_images(PDO $pdo, int $roomId, array $files): array
+function save_room_images(PDO $pdo, int $roomId, array $files, ?array &$createdFiles = null): array
 {
     ensure_room_images_table($pdo);
     if (!isset($files['name']) || $files['name'] === []) return [];
@@ -343,9 +350,9 @@ function save_room_images(PDO $pdo, int $roomId, array $files): array
 
     $savedIds = [];
     foreach ($names as $index => $originalName) {
-        if (($errors[$index] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) continue;
+        if (($errors[$index] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) throw new InvalidArgumentException('An image upload failed. Check the upload size and try again.');
         $tmpName = $tmpNames[$index] ?? '';
-        if (!is_uploaded_file($tmpName)) continue;
+        if (!is_uploaded_file($tmpName)) throw new InvalidArgumentException('Invalid image upload. Please select the photos again.');
 
         $result = secure_image_upload([
             'error' => $errors[$index] ?? UPLOAD_ERR_NO_FILE,
@@ -353,6 +360,7 @@ function save_room_images(PDO $pdo, int $roomId, array $files): array
             'size' => is_array($files['size'] ?? null) ? ($files['size'][$index] ?? 0) : ($files['size'] ?? 0),
         ], $uploadDir, 'room_' . $roomId);
         $filename = $result['filename'];
+        if ($createdFiles !== null) $createdFiles[] = $uploadDir . '/' . $filename;
 
         $relativePath = 'uploads/rooms/' . $filename;
         $sortOrder++;
@@ -425,6 +433,9 @@ function room_image_order_input(PDO $pdo, int $roomId, array $data, array $files
     $stmt = $pdo->prepare('SELECT id FROM room_images WHERE room_id = ?');
     $stmt->execute([$roomId]);
     $current = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    $removed = room_removed_image_ids($data);
+    if (array_diff($removed, $current)) throw new InvalidArgumentException('A removed photo no longer belongs to this room. Reopen the room.');
+    $current = array_values(array_diff($current, $removed));
     sort($existing, SORT_NUMERIC); sort($current, SORT_NUMERIC); sort($uploads, SORT_NUMERIC);
     $count = isset($files['name']) ? (is_array($files['name']) ? count($files['name']) : 1) : 0;
     $expectedUploads = $count ? range(0, $count - 1) : [];
@@ -441,7 +452,8 @@ function apply_room_image_order(PDO $pdo, int $roomId, ?array $order, array $upl
         if ($id < 1) throw new InvalidArgumentException('A photo upload did not complete. Reopen the room before saving its order.');
         $ids[] = $id;
     }
-    $pdo->beginTransaction();
+    $ownsTransaction = !$pdo->inTransaction();
+    if ($ownsTransaction) $pdo->beginTransaction();
     try {
         $stmt = $pdo->prepare('SELECT id FROM room_images WHERE room_id = ? FOR UPDATE');
         $stmt->execute([$roomId]);
@@ -450,6 +462,83 @@ function apply_room_image_order(PDO $pdo, int $roomId, ?array $order, array $upl
         if ($sorted !== $current) throw new InvalidArgumentException('Room photos changed while saving. Reopen the room and try again.');
         $update = $pdo->prepare('UPDATE room_images SET sort_order = ?, is_main = ? WHERE id = ? AND room_id = ?');
         foreach ($ids as $index => $id) $update->execute([$index + 1, $index === 0 ? 1 : 0, $id, $roomId]);
-        $pdo->commit();
-    } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+        if ($ownsTransaction) $pdo->commit();
+    } catch (Throwable $e) { if ($ownsTransaction && $pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+}
+
+
+class RoomSavePermissionException extends RuntimeException {}
+
+function room_removed_image_ids(array $data): array
+{
+    $ids = $data['remove_image_ids'] ?? [];
+    if (is_string($ids)) $ids = json_decode($ids, true);
+    if (!is_array($ids) || !array_is_list($ids)) throw new InvalidArgumentException('Invalid removed photo list.');
+    foreach ($ids as $id) {
+        if (!is_int($id) || $id < 1) throw new InvalidArgumentException('Invalid removed photo identifier.');
+    }
+    if (count(array_unique($ids)) !== count($ids)) throw new InvalidArgumentException('Duplicate removed photo identifier.');
+    if ($ids && !array_key_exists('image_order', $data)) throw new InvalidArgumentException('Provide the complete photo order when removing photos.');
+    return $ids;
+}
+
+/** Delete database records now; keep their files until the room transaction commits. */
+function room_remove_images(PDO $pdo, int $roomId, array $ids, array &$obsoleteFiles): void
+{
+    if (!$ids) return;
+    $marks = implode(',', array_fill(0, count($ids), '?'));
+    $stmt = $pdo->prepare("SELECT id, image_path FROM room_images WHERE room_id = ? AND id IN ($marks) FOR UPDATE");
+    $stmt->execute(array_merge([$roomId], $ids));
+    $images = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if (count($images) !== count($ids)) throw new InvalidArgumentException('Room photos changed. Reopen the room and try again.');
+    foreach ($images as $image) $obsoleteFiles[] = (string) $image['image_path'];
+    $pdo->prepare("DELETE FROM room_images WHERE room_id = ? AND id IN ($marks)")->execute(array_merge([$roomId], $ids));
+}
+
+function room_delete_upload_file(string $absolutePath): void
+{
+    $root = realpath(__DIR__ . '/../uploads/rooms');
+    $file = realpath($absolutePath);
+    if ($root !== false && $file !== false && dirname($file) === $root && is_file($file)) {
+        if (!@unlink($file)) error_log('Could not clean up unused room upload: ' . basename($file));
+    }
+}
+
+/** A failed connection during COMMIT has an unknown outcome: retain files in that case. */
+function room_rollback_save(?PDO $pdo, array $createdFiles, ?string $preparedVideo, bool $commitAttempted): void
+{
+    $rolledBack = false;
+    try {
+        if ($pdo && $pdo->inTransaction()) { $pdo->rollBack(); $rolledBack = true; }
+    } catch (Throwable $e) { error_log('Room rollback could not be confirmed: ' . $e->getMessage()); }
+    if (!$commitAttempted || $rolledBack) {
+        foreach ($createdFiles as $path) room_delete_upload_file($path);
+        if ($preparedVideo !== null) room_delete_upload_file($preparedVideo);
+    }
+}
+
+/** Best-effort garbage collection must never turn a committed save into an error response. */
+function room_cleanup_obsolete_files(PDO $pdo, array $paths): void
+{
+    foreach (array_unique($paths) as $path) {
+        if (!is_string($path) || !str_starts_with($path, 'uploads/rooms/') || basename($path) !== substr($path, strlen('uploads/rooms/'))) continue;
+        try {
+            $images = $pdo->prepare('SELECT COUNT(*) FROM room_images WHERE image_path = ?');
+            $images->execute([$path]);
+            $videos = $pdo->prepare('SELECT COUNT(*) FROM rooms WHERE video_path = ?');
+            $videos->execute([$path]);
+            if (!(int) $images->fetchColumn() && !(int) $videos->fetchColumn()) room_delete_upload_file(__DIR__ . '/../' . $path);
+        } catch (Throwable $e) { error_log('Deferred room file cleanup failed: ' . $e->getMessage()); }
+    }
+}
+
+function room_saved_payload(PDO $pdo, int $id): array
+{
+    $images = fetch_room_images($pdo, [$id]);
+    $stmt = $pdo->prepare('SELECT * FROM rooms WHERE id = :id LIMIT 1');
+    $stmt->execute([':id' => $id]);
+    $room = $stmt->fetch();
+    if (!$room) throw new RuntimeException('Room was not found while saving.');
+    $assignments = fetch_room_amenity_assignments($pdo, [$id]);
+    return normalize_room($room, $images[$id] ?? [], $assignments[$id] ?? [], list_amenities($pdo), true);
 }

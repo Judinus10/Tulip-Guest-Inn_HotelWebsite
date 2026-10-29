@@ -3,9 +3,13 @@ declare(strict_types=1);
 require_once __DIR__ . '/_room_helpers.php';
 require_once __DIR__ . '/../calendar/url-guard.php';
 apply_cors_headers();
-require_admin_auth();
+$admin = require_admin_auth();
 require_post_request();
 $preparedVideo = null;
+$createdFiles = [];
+$obsoleteFiles = [];
+$commitAttempted = false;
+$pdo = null;
 try {
     $pdo = get_db_connection();
     ensure_rooms_schema($pdo);
@@ -13,20 +17,25 @@ try {
     ensure_room_ical_column($pdo);
     ensure_room_images_table($pdo);
     ensure_amenity_tables($pdo);
+    lock_booking_inventory($pdo);
     $data = room_input_data();
     $id = (int) ($data['id'] ?? $_GET['id'] ?? 0);
     if ($id <= 0) json_response(false, 'Room id is required.', 422);
-    $calendarStmt = $pdo->prepare('SELECT booking_ical_url FROM rooms WHERE id = ?');
+    $roomName = clean_string($data['room_name'] ?? '', 150);
+    if ($roomName === '') json_response(false, 'Room name is required.', 422);
+    $preparedVideo = prepare_room_video($id, $_FILES['video'] ?? []);
+    $pdo->beginTransaction();
+    $calendarStmt = $pdo->prepare('SELECT booking_ical_url, video_path FROM rooms WHERE id = ? FOR UPDATE');
     $calendarStmt->execute([$id]);
     $currentCalendar = $calendarStmt->fetch(PDO::FETCH_ASSOC);
-    if (!$currentCalendar) json_response(false, 'Room not found.', 404);
+    if (!$currentCalendar) throw new OutOfBoundsException('Room not found.');
     // Old clients may resend an unchanged legacy/test feed. Do not revalidate it
     // or write it while saving unrelated room fields.
     if (array_key_exists('booking_ical_url', $data)) {
         if (trim((string) $data['booking_ical_url']) === trim((string) ($currentCalendar['booking_ical_url'] ?? ''))) {
             unset($data['booking_ical_url']);
         } else {
-            require_calendar_permission($pdo, $id, (string) $data['booking_ical_url']);
+            if (($admin['role'] ?? '') !== 'super_admin') throw new RoomSavePermissionException('Owner access required to change calendar feeds.');
         }
     }
     $imageOrder = room_image_order_input($pdo, $id, $data, $_FILES['images'] ?? []);
@@ -36,21 +45,18 @@ try {
         $parts = parse_url($calendarUrl);
         $host = strtolower((string) ($parts['host'] ?? ''));
         if (!$parts || strtolower((string) ($parts['scheme'] ?? '')) !== 'https' || !in_array($host, ['ical.booking.com', 'admin.booking.com'], true)) {
-            json_response(false, 'Enter a valid Booking.com iCal export URL.', 422);
+            throw new InvalidArgumentException('Enter a valid Booking.com iCal export URL.');
         }
         if (tulip_ics_duplicate_room($pdo, $calendarUrl, $id) !== null) {
-            json_response(false, 'This Booking.com calendar URL is already assigned to another room.', 422);
+            throw new InvalidArgumentException('This Booking.com calendar URL is already assigned to another room.');
         }
     }
     $roomNumber = room_number_input($pdo, $data, $id);
-    $roomName = clean_string($data['room_name'] ?? '', 150);
-    if ($roomName === '') json_response(false, 'Room name is required.', 422);
     $legacyAmenities = parse_amenities_input($data['amenities'] ?? $data['amenities_summary'] ?? '');
     $amenityIds = array_key_exists('amenity_ids', $data)
         ? parse_amenity_ids($data['amenity_ids'])
         : amenity_ids_for_names($pdo, $legacyAmenities);
     $amenities = amenity_names_for_ids($pdo, $amenityIds);
-    $preparedVideo = prepare_room_video($id, $_FILES['video'] ?? []);
     $stmt = $pdo->prepare("UPDATE rooms SET room_number = :room_number, room_name = :room_name, slug = :slug, room_category = :room_category, description = :description, max_guests = :max_guests, bed_type = :bed_type, room_size = :room_size, base_price = :base_price, currency = :currency, amenities = :amenities, show_unavailable_amenities = :show_unavailable_amenities, status = :status, sort_order = :sort_order WHERE id = :id");
     $stmt->execute([
         ':id' => $id,
@@ -66,39 +72,44 @@ try {
         ':currency' => clean_string($data['currency'] ?? 'LKR', 10),
         ':amenities' => json_encode($amenities, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
         ':show_unavailable_amenities' => !empty($data['show_unavailable_amenities']) ? 1 : 0,
-        ':status' => in_array($data['status'] ?? 'Available', ['Available', 'Unavailable', 'Maintenance'], true) ? $data['status'] : 'Available',
+        ':status' => in_array($data['status'] ?? 'Available', ['Available', 'Unavailable', 'Maintenance'], true) ? ($data['status'] ?? 'Available') : 'Available',
         ':sort_order' => max(0, (int) ($data['sort_order'] ?? 0)),
     ]);
     replace_room_amenities($pdo, $id, $amenityIds);
-    if (array_key_exists('booking_ical_url', $data)) save_room_ical_url($pdo, $id, (string)$data['booking_ical_url']);
-    $uploadedImageIds = save_room_images($pdo, $id, $_FILES['images'] ?? []);
+    if (array_key_exists('booking_ical_url', $data)) save_room_ical_url($pdo, $id, (string)$data['booking_ical_url'], true);
+    room_remove_images($pdo, $id, room_removed_image_ids($data), $obsoleteFiles);
+    $uploadedImageIds = save_room_images($pdo, $id, $_FILES['images'] ?? [], $createdFiles);
     apply_room_image_order($pdo, $id, $imageOrder, $uploadedImageIds);
     if (!empty($data['remove_video'])) {
         $old = $pdo->prepare('SELECT video_path FROM rooms WHERE id = :id');
         $old->execute([':id' => $id]);
         $oldPath = $old->fetchColumn();
         $pdo->prepare('UPDATE rooms SET video_path = NULL WHERE id = :id')->execute([':id' => $id]);
-        delete_room_video_file($oldPath);
+        if (is_string($oldPath) && $oldPath !== '') $obsoleteFiles[] = $oldPath;
     }
-    save_room_video($pdo, $id, $_FILES['video'] ?? [], $preparedVideo);
+    save_room_video($pdo, $id, $_FILES['video'] ?? [], $preparedVideo, $obsoleteFiles);
+    $normalized = room_saved_payload($pdo, $id);
+    $commitAttempted = true;
+    $pdo->commit();
     $preparedVideo = null;
-    $images = fetch_room_images($pdo, [$id]);
-    $stmt = $pdo->prepare('SELECT * FROM rooms WHERE id = :id LIMIT 1');
-    $stmt->execute([':id' => $id]);
-    $room = $stmt->fetch();
-    $assignments = fetch_room_amenity_assignments($pdo, [$id]);
-    $normalized = normalize_room($room, $images[$id] ?? [], $assignments[$id] ?? [], list_amenities($pdo), true);
+    room_cleanup_obsolete_files($pdo, $obsoleteFiles);
     json_response(true, 'Room updated.', 200, ['data' => $normalized, 'room' => $normalized]);
+} catch (RoomSavePermissionException $e) {
+    room_rollback_save($pdo, $createdFiles, $preparedVideo, $commitAttempted);
+    json_response(false, $e->getMessage(), 403);
+} catch (OutOfBoundsException $e) {
+    room_rollback_save($pdo, $createdFiles, $preparedVideo, $commitAttempted);
+    json_response(false, $e->getMessage(), 404);
 } catch (InvalidArgumentException $e) {
-    if ($preparedVideo !== null && is_file($preparedVideo)) @unlink($preparedVideo);
+    room_rollback_save($pdo, $createdFiles, $preparedVideo, $commitAttempted);
     json_response(false, $e->getMessage(), 422);
 } catch (RoomVideoProcessingException $e) {
-    if ($preparedVideo !== null && is_file($preparedVideo)) @unlink($preparedVideo);
+    room_rollback_save($pdo, $createdFiles, $preparedVideo, $commitAttempted);
     error_log('Room video upload failed: ' . $e->getMessage());
     json_response(false, $e->userMessage(), 422);
 } catch (Throwable $e) {
-    if ($preparedVideo !== null && is_file($preparedVideo)) @unlink($preparedVideo);
+    room_rollback_save($pdo, $createdFiles, $preparedVideo, $commitAttempted);
     if ($e instanceof PDOException && (int) ($e->errorInfo[1] ?? 0) === 1062) json_response(false, 'Room number or slug already exists. Use a unique value.', 422);
     error_log('Room update failed: ' . $e->getMessage());
-    json_response(false, 'We could not save the room. Please try again or contact support.', 500);
+    json_response(false, $commitAttempted ? 'We could not confirm the save. Refresh the room list before trying again.' : 'The room could not be saved. No room changes were saved. Please try again.', 500);
 }
