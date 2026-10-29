@@ -199,12 +199,13 @@ function invoice_settings(PDO $pdo): array
     $defaults = [
         'business_name' => 'Tulip Guest Inn',
         'address' => 'Point Pedro, Northern Sri Lanka',
-        'phone' => '+94 77 123 4567',
+        'phone' => '',
+        'reception_contact_number' => '',
         'email' => 'info@tulipguestinn.com',
         'website' => 'www.tulipguestinn.com',
     ];
     try {
-        $stmt = $pdo->query("SELECT setting_key, setting_value FROM website_settings WHERE setting_key IN ('business_name','address','phone','email','website','website_url')");
+        $stmt = $pdo->query("SELECT setting_key, setting_value FROM website_settings WHERE setting_key IN ('business_name','address','phone','reception_contact_number','email','website','website_url')");
         foreach (($stmt ? $stmt->fetchAll() : []) as $row) {
             $key = (string) $row['setting_key'];
             $value = trim((string) $row['setting_value']);
@@ -295,6 +296,7 @@ function build_invoice_data_for_booking(PDO $pdo, int $bookingId, array $payment
         'business_name' => $settings['business_name'],
         'business_address' => $settings['address'],
         'business_phone' => $settings['phone'],
+        'business_reception_phone' => $settings['reception_contact_number'],
         'business_email' => $settings['email'],
         'business_website' => $settings['website'],
     ];
@@ -355,7 +357,15 @@ function create_invoice_pdf_binary(array $invoice): string
     $documentBadge = $isPaid ? 'PAID' : 'PENDING';
     $methodLabel = $isCash ? 'Cash on Arrival' : $paymentMethod;
     $businessAddress = (string) ($invoice['business_address'] ?? 'Point Pedro, Northern Sri Lanka');
-    $businessPhone = (string) ($invoice['business_phone'] ?? '+94 77 123 4567');
+    $businessPhones = [];
+    foreach (['business_phone', 'business_reception_phone'] as $phoneKey) {
+        $number = trim((string) ($invoice[$phoneKey] ?? ''));
+        $normalized = preg_replace('/[^+0-9]/', '', $number);
+        if ($number !== '' && preg_match('/[0-9]/', $normalized) && !isset($businessPhones[$normalized])) {
+            $businessPhones[$normalized] = $number;
+        }
+    }
+    $businessPhones = array_values($businessPhones);
     $businessEmail = (string) ($invoice['business_email'] ?? 'info@tulipguestinn.com');
     $businessWebsite = (string) ($invoice['business_website'] ?? 'www.tulipguestinn.com');
 
@@ -382,7 +392,10 @@ function create_invoice_pdf_binary(array $invoice): string
     pdf_add_text($content, 362, 766, 'Thank you for choosing Tulip Guest Inn.', 9.5, 'F1', $white);
     pdf_add_text($content, 362, 750, 'We look forward to welcoming you!', 9.5, 'F1', $white);
     // Keep contact details with the hotel identity in the lower header strip.
-    pdf_add_text($content, 42, 726, $businessPhone, 7.5, 'F1', $white);
+    foreach ($businessPhones as $index => $number) {
+        $phoneY = count($businessPhones) > 1 ? 731 - ($index * 11) : 726;
+        pdf_add_text($content, 42, $phoneY, $number, 7.5, 'F1', $white);
+    }
     pdf_add_text($content, 160, 726, $businessEmail, 7.3, 'F1', $white);
     pdf_add_wrapped_text($content, 302, 731, $businessAddress, 7.1, 145, 9, 'F1', $white, 2);
     pdf_add_right_text($content, 553, 726, $businessWebsite, 7.1, 'F1', $white);
