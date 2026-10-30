@@ -241,8 +241,8 @@ export default function WebsiteSettings() {
       <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: '', type: 'success' })} />
 
       <PageHeader
-        title={activeTab === 'booking-emails' ? 'Booking Emails' : 'Website Settings'}
-        description={activeTab === 'booking-emails' ? 'Customize guest emails and preview changes before saving.' : 'Manage website content, appearance, policies, FAQs and booking email wording.'}
+        title={activeTab === 'booking-emails' ? 'Email Templates' : 'Website Settings'}
+        description={activeTab === 'booking-emails' ? 'Customize email wording and preview changes before saving.' : 'Manage website content, appearance, policies, FAQs and booking email wording.'}
       />
 
       <div className="mb-6 rounded-2xl border border-border bg-white p-2 shadow-sm shadow-slate-200/60">
@@ -251,7 +251,7 @@ export default function WebsiteSettings() {
             { id: 'contact', label: 'Contact & Social', icon: Globe2 },
             { id: 'hero', label: 'Hero Media', icon: Images },
             { id: 'appearance', label: 'Appearance', icon: Palette },
-            { id: 'booking-emails', label: 'Booking Emails', icon: Mail },
+            { id: 'booking-emails', label: 'Email Templates', icon: Mail },
             { id: 'terms', label: 'Terms & Conditions', icon: FileText },
             { id: 'privacy', label: 'Privacy Policy', icon: FileText },
             { id: 'refund', label: 'Refund Policy', icon: FileText },

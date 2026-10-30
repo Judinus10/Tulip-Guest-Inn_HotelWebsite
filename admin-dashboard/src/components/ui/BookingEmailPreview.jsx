@@ -29,6 +29,7 @@ export default function BookingEmailPreview({ type, content, brandingRevision = 
     }, 400)
     return () => { active = false; clearTimeout(timer); controller.abort() }
   }, [fingerprint, refresh, brandingRevision]) // A change to any draft field schedules a fresh, cancellable preview.
+  const isContact = type.startsWith('contact_')
   const stale = preview && preview.fingerprint !== fingerprint
   useEffect(() => {
     const node = stage.current
@@ -50,9 +51,9 @@ export default function BookingEmailPreview({ type, content, brandingRevision = 
           {[['desktop', 'Desktop', Monitor], ['mobile', 'Mobile', Smartphone]].map(([key, label, Icon]) => <button key={key} type="button" aria-pressed={device === key} onClick={() => setDevice(key)}><Icon className="h-3.5 w-3.5" />{label}</button>)}
         </div>
         <label className="sr-only" htmlFor="email-sample-scenario">Sample booking</label>
-        <select id="email-sample-scenario" value={scenario} onChange={e => setScenario(e.target.value)} className="booking-email-sample-select" title="Select sample booking">
+        {isContact ? <span className="booking-email-sample-select">Sample enquiry</span> : <select id="email-sample-scenario" value={scenario} onChange={e => setScenario(e.target.value)} className="booking-email-sample-select" title="Select sample booking">
           <option value="single">Sample booking</option><option value="group">Multiple rooms</option>
-        </select>
+        </select>}
       </div>
     </div>
     <div className="booking-email-preview-meta">
@@ -65,12 +66,12 @@ export default function BookingEmailPreview({ type, content, brandingRevision = 
       <div className="booking-email-preview-stage">
         <div ref={stage}>
           <div className="booking-email-preview-frame" style={{ width: frameWidth * scale, height: 820 * scale }}>
-            <iframe title={`Sample ${type === 'received' ? 'booking received' : 'booking confirmed'} email preview`} sandbox="" referrerPolicy="no-referrer" srcDoc={preview.html}
+            <iframe title={`Sample ${isContact ? 'contact enquiry' : type === 'received' ? 'booking received' : 'booking confirmed'} email preview`} sandbox="" referrerPolicy="no-referrer" srcDoc={preview.html}
               style={{ display: 'block', border: 0, width: frameWidth, height: 820, transform: `scale(${scale})`, transformOrigin: 'top left' }} />
           </div>
         </div>
       </div>
-      <p className="booking-email-preview-note">Sample booking data. Links are inactive. Previewing does not save or send an email.</p>
+      <p className="booking-email-preview-note">{isContact ? 'Sample enquiry data.' : 'Sample booking data.'} Links are inactive. Previewing does not save or send an email.</p>
     </> : <div className="flex min-h-[420px] items-center justify-center rounded-lg border border-dashed border-border bg-slate-50 p-6 text-center text-sm text-text-secondary">{busy ? 'Preparing your email preview...' : 'Complete the required fields to see the email preview.'}</div>}
     <BookingEmailTest type={type} content={content} scenario={scenario} />
   </section>

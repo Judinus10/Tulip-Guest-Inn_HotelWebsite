@@ -1,10 +1,13 @@
 <?php
 declare(strict_types=1);
 
-function booking_email_editor_placeholders(): array
+function booking_email_editor_placeholders(?string $type = null): array
 {
-    return ['guest_name' => 'Guest name', 'booking_reference' => 'Booking reference',
+    $contact = ['sender_name'=>'Sender name','enquiry_reference'=>'Enquiry reference','enquiry_subject'=>'Enquiry subject','hotel_name'=>'Hotel name'];
+    if ($type !== null && str_starts_with($type, 'contact_')) return $contact;
+    $booking = ['guest_name' => 'Guest name', 'booking_reference' => 'Booking reference',
         'check_in' => 'Check-in date', 'check_out' => 'Check-out date', 'hotel_name' => 'Hotel name'];
+    return $type === null ? array_merge($booking, $contact) : $booking;
 }
 
 function booking_email_editor_defaults(): array
@@ -17,6 +20,8 @@ function booking_email_editor_defaults(): array
             'subject' => 'We received your booking - {booking_reference}',
             'introduction_html' => '<p>Thank you for choosing {hotel_name}. We have received your booking request and will confirm availability shortly.</p>',
         ]),
+        'contact_customer' => ['subject'=>'We received your enquiry - {enquiry_reference}','greeting'=>'Hello {sender_name},','introduction_html'=>'<p>Thank you for contacting {hotel_name}. We have received your message and will get back to you.</p>','closing_html'=>'<p>You can reply to this email if you need to add anything to your enquiry.</p>','footer_note'=>'Thank you for getting in touch.'],
+        'contact_admin' => ['subject'=>'New enquiry - {enquiry_reference}: {enquiry_subject}','greeting'=>'Hello team,','introduction_html'=>'<p>A new website enquiry has been received. Review the details below and reply to the customer.</p>','closing_html'=>'<p>Use Reply in your email app to contact the sender.</p>','footer_note'=>'Website enquiry notification.'],
         'confirmed' => array_merge($common, [
             'subject' => 'Your booking is confirmed - {booking_reference}',
             'introduction_html' => '<p>Thank you for choosing {hotel_name}. Your booking is confirmed. We look forward to welcoming you.</p>',
@@ -27,7 +32,7 @@ function booking_email_editor_defaults(): array
 function booking_email_editor_type(mixed $type): string
 {
     if (!is_string($type) || !array_key_exists($type, booking_email_editor_defaults())) {
-        throw new InvalidArgumentException('Choose Booking Received or Booking Confirmed.');
+        throw new InvalidArgumentException('Choose a supported email template.');
     }
     return $type;
 }
@@ -79,7 +84,7 @@ function booking_email_editor_sanitize(string $html): string
     return trim($result);
 }
 
-function booking_email_editor_validate(mixed $content): array
+function booking_email_editor_validate(mixed $content, ?string $type = null): array
 {
     $limits = ['subject' => 200, 'greeting' => 200, 'introduction_html' => 6000, 'closing_html' => 4000, 'footer_note' => 500];
     if (!is_array($content) || array_diff(array_keys($content), array_keys($limits)) || array_diff(array_keys($limits), array_keys($content))) {
@@ -104,7 +109,7 @@ function booking_email_editor_validate(mixed $content): array
         }
         preg_match_all('/\{([^{}]*)\}/u', $text, $matches);
         foreach ($matches[1] as $token) {
-            if (!isset(booking_email_editor_placeholders()[$token])) throw new InvalidArgumentException('Unsupported placeholder: {' . $token . '}. Use Insert booking detail.');
+            if (!isset(booking_email_editor_placeholders($type)[$token])) throw new InvalidArgumentException('Unsupported placeholder: {' . $token . '}. Use Insert booking detail.');
         }
         if ($rich) {
             $tokenDoc = new DOMDocument('1.0', 'UTF-8');
@@ -145,10 +150,10 @@ function booking_email_editor_read(PDO $pdo): array
     foreach ($rows as $row) {
         $key = $row['template_key'];
         if (!isset($defaults[$key])) continue;
-        $templates[$key] = ['content' => booking_email_editor_validate(json_decode($row['content_json'], true, 32, JSON_THROW_ON_ERROR)),
+        $templates[$key] = ['content' => booking_email_editor_validate(json_decode($row['content_json'], true, 32, JSON_THROW_ON_ERROR), $key),
             'version' => (int) $row['version'], 'updated_at' => $row['updated_at']];
     }
-    return ['templates' => $templates, 'defaults' => $defaults, 'placeholders' => booking_email_editor_placeholders()];
+    return ['templates' => $templates, 'defaults' => $defaults, 'placeholders' => booking_email_editor_placeholders(), 'placeholders_by_type' => array_combine(array_keys($defaults), array_map('booking_email_editor_placeholders', array_keys($defaults)))];
 }
 
 function booking_email_editor_save(PDO $pdo, array $input): array
@@ -156,7 +161,7 @@ function booking_email_editor_save(PDO $pdo, array $input): array
     $type = booking_email_editor_type($input['type'] ?? null);
     $version = $input['version'] ?? null;
     if (!is_int($version) || $version < 0 || $version > 2147483646) throw new InvalidArgumentException('Reload this email template before saving.');
-    $content = booking_email_editor_validate($input['content'] ?? null);
+    $content = booking_email_editor_validate($input['content'] ?? null, $type);
     $json = json_encode($content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     if ($version === 0) {
         try {

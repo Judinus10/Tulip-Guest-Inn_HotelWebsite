@@ -26,7 +26,7 @@ function tulip_saved_booking_template(PDO $pdo, string $type): array
         $json = false;
     }
     return $json === false ? booking_email_editor_defaults()[$type]
-        : booking_email_editor_validate(json_decode((string) $json, true, 32, JSON_THROW_ON_ERROR));
+        : booking_email_editor_validate(json_decode((string) $json, true, 32, JSON_THROW_ON_ERROR), $type);
 }
 
 function tulip_booking_email_for_queue(PDO $pdo, ?string $relatedType, ?int $bookingId, string $recipient, string $emailType): ?array

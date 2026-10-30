@@ -5,7 +5,7 @@
 .booking-email-card-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
 .booking-email-card-heading h2,.booking-email-card-heading h3{font-size:17px;font-weight:750;line-height:1.4;margin:0}
 .booking-email-draft-badge{font-size:11px;font-weight:600;color:#966318;background:#fff7e6;padding:4px 9px;border-radius:20px}
-.booking-email-type-tabs{display:inline-flex;max-width:100%;gap:2px;border:1px solid #dbe3ee;border-radius:7px;background:#f6f8fc;padding:2px}
+.booking-email-type-tabs{display:inline-flex;flex-wrap:wrap;max-width:100%;gap:2px;border:1px solid #dbe3ee;border-radius:7px;background:#f6f8fc;padding:2px}
 .booking-email-type-tabs button{padding:8px 15px;border-radius:5px;font-size:12px;white-space:normal}
 .booking-email-type-description{font-size:11px;line-height:1.6;color:#64748b;margin:6px 0 13px}
 .booking-email-fields{display:grid;gap:13px}

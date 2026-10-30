@@ -10,7 +10,9 @@ import BookingEmailTextEditor from '@/components/ui/BookingEmailTextEditor'
 import { fetchBookingEmailSettings, saveBookingEmailSettings } from '@/services/bookingEmailSettings'
 
 const types = { received: { title: 'Booking Received', description: 'Sent when a booking request is submitted. This does not confirm the reservation.' },
-  confirmed: { title: 'Booking Confirmed', description: 'Sent when the property confirms the reservation.' } }
+  confirmed: { title: 'Booking Confirmed', description: 'Sent when the property confirms the reservation.' },
+  contact_customer: { title: 'Customer acknowledgement', description: 'Sent to the customer after a contact enquiry is received.' },
+  contact_admin: { title: 'Admin enquiry notification', description: 'Sent to the hotel with enquiry details. Reply goes to the customer.' } }
 const fieldLabels = { subject: 'Subject', greeting: 'Greeting', introduction_html: 'Introduction', closing_html: 'Closing message', footer_note: 'Footer note' }
 const limits = { subject: 200, greeting: 200, introduction_html: 6000, closing_html: 4000, footer_note: 500 }
 const bytes = text => new TextEncoder().encode(text).length
@@ -34,6 +36,8 @@ export default function WebsiteBookingEmails() {
   const closing = useRef(null)
   const requestId = useRef(0)
   const draft = drafts[type]
+  const isContact = type.startsWith('contact_')
+  const placeholders = settings?.placeholders_by_type?.[type] || settings?.placeholders || {}
   const dirty = settings && draft && !same(draft, settings.templates[type].content)
   const anyDirty = settings && Object.keys(types).some(key => !same(drafts[key], settings.templates[key].content))
   useEffect(() => {
@@ -84,6 +88,11 @@ export default function WebsiteBookingEmails() {
   if (loading) return <SectionCard><p role="status" className="flex items-center gap-2 text-sm text-text-secondary"><Loader2 className="h-4 w-4 animate-spin" />Loading booking emails...</p></SectionCard>
   if (loadError) return <SectionCard><p role="alert" className="text-sm text-red-700">{loadError}</p><Button className="mt-4" variant="outline" onClick={() => window.location.reload()}>Reload settings</Button></SectionCard>
   return <div className="booking-email-page">
+    <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Email category">
+      {[['received', 'Guest bookings'], ['contact_customer', 'Contact enquiries']].map(([key, title]) => <button key={key} type="button" disabled={busy} aria-pressed={key.startsWith('contact_') === isContact}
+        onClick={() => { setType(key); setTarget('introduction_html'); positions.current = {}; setError(''); setMessage('') }}
+        className={`rounded-lg border px-4 py-2 text-sm font-semibold ${key.startsWith('contact_') === isContact ? 'border-blue-600 bg-blue-600 text-white' : 'border-border bg-white text-text-secondary'}`}>{title}</button>)}
+    </div>
     <EmailBrandingSettings onSaved={() => setBrandingRevision(n => n + 1)} />
     <div className="booking-email-workspace">
       <section className="booking-email-card booking-email-editor" aria-label="Email content editor">
@@ -91,7 +100,7 @@ export default function WebsiteBookingEmails() {
           {dirty && <span className="booking-email-draft-badge">Unsaved changes</span>}
         </div>
         <div role="tablist" aria-label="Email type" className="booking-email-type-tabs">
-          {Object.entries(types).map(([key, item]) => <button key={key} type="button" role="tab" aria-selected={type === key} disabled={busy}
+          {Object.entries(types).filter(([key]) => key.startsWith('contact_') === isContact).map(([key, item]) => <button key={key} type="button" role="tab" aria-selected={type === key} disabled={busy}
             onClick={() => { setType(key); setTarget('introduction_html'); positions.current = {}; setError(''); setMessage(''); setLinkReload(false) }}
             className={`flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition disabled:opacity-50 ${type === key ? 'bg-blue-600 text-white shadow-sm' : 'text-text-secondary hover:bg-white'}`}>{item.title}{settings && !same(drafts[key], settings.templates[key].content) ? ' •' : ''}</button>)}
         </div>
@@ -108,17 +117,17 @@ export default function WebsiteBookingEmails() {
           </div>)}
         </div>
         <div className="booking-email-insert">
-          <Label htmlFor="email-placeholder">Insert booking detail</Label>
+          <Label htmlFor="email-placeholder">Insert {isContact ? 'enquiry' : 'booking'} detail</Label>
           <div className="booking-email-insert-row">
             <div className="relative"><select id="email-placeholder" value="" disabled={busy} onChange={e => insert(e.target.value)} aria-describedby="email-placeholder-target">
-              <option value="">Insert booking detail</option>{Object.entries(settings.placeholders).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+              <option value="">Insert {isContact ? 'enquiry' : 'booking'} detail</option>{Object.entries(placeholders).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
             </select><ChevronDown className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-text-secondary" /></div>
-            <div className="booking-email-token-chips">{Object.entries(settings.placeholders).filter(([key]) => key !== 'hotel_name').map(([key, label]) =>
+            <div className="booking-email-token-chips">{Object.entries(placeholders).filter(([key]) => key !== 'hotel_name').map(([key, label]) =>
               <button type="button" key={key} disabled={busy} title={`Insert ${label.toLowerCase()}`} onMouseDown={e => e.preventDefault()} onClick={() => insert(key)}>{'{' + key + '}'}</button>)}</div>
           </div>
           <p id="email-placeholder-target" className="booking-email-insert-target">Insert into: <strong>{fieldLabels[target]}</strong></p>
         </div>
-        <div className="booking-email-info"><Info className="h-4 w-4 shrink-0" /><span>Room assignments, guest counts and payment details are filled in automatically.</span></div>
+        <div className="booking-email-info"><Info className="h-4 w-4 shrink-0" /><span>{isContact ? 'Sender details and the original enquiry message are filled in automatically.' : 'Room assignments, guest counts and payment details are filled in automatically.'}</span></div>
         <div className="booking-email-actions">
           <button type="button" disabled={busy || !dirty} onClick={() => { setDrafts(current => ({ ...current, [type]: { ...settings.templates[type].content } })); setError(''); setMessage('Changes discarded.') }} className="text-sm font-semibold text-text-secondary hover:text-blue-700 disabled:opacity-40">Discard changes</button>
           <div className="flex flex-wrap gap-3"><Button variant="outline" disabled={busy} onClick={() => { setDrafts(current => ({ ...current, [type]: { ...settings.defaults[type] } })); setError(''); setMessage('Default wording restored in the editor. Save to apply it.') }}><RotateCcw className="h-4 w-4" />Reset to default</Button>

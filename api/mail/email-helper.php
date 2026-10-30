@@ -10,6 +10,7 @@ require_once __DIR__ . '/../bookings/booking-audit-helper.php';
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../bookings/guest-display-helper.php';
 require_once __DIR__ . '/booking-template-delivery.php';
+require_once __DIR__ . '/templates/contact-customizable-template.php';
 require_once __DIR__ . '/../security/public-token-helper.php';
 
 $contactHelpers = __DIR__ . '/../settings/contact_helpers.php';
@@ -362,7 +363,7 @@ function send_tracked_email(
     }
 
     /*
-     * Booking emails must be stored in email_queue first.
+     * Booking and contact emails must be stored in email_queue first.
      * Previously, every booking workflow called send_tracked_email(), which
      * sent through SMTP immediately and therefore never created a queue row.
      *
@@ -370,11 +371,11 @@ function send_tracked_email(
      * record. This applies to booking received, confirmed, payment pending,
      * payment success, cancellation, expiry and status-change emails.
      */
-    if (strtolower(trim($relatedType)) === 'booking') {
+    if (in_array(strtolower(trim($relatedType)), ['booking', 'enquiry'], true)) {
         try {
             return enqueue_email(
                 $pdo,
-                'booking',
+                $relatedType,
                 $relatedId,
                 $to,
                 $subject,
@@ -387,7 +388,7 @@ function send_tracked_email(
             );
         } catch (Throwable $e) {
             error_log(
-                'Booking email queue insert failed for booking #'
+                'Email queue insert failed for record #'
                 . (string) ($relatedId ?? 0)
                 . ' [' . $emailType . ']: '
                 . $e->getMessage()
@@ -2191,7 +2192,9 @@ function enqueue_email(
 
     try {
         $customTemplate = tulip_booking_email_for_queue($pdo, $relatedType, $relatedId, $to, $emailType);
+        if ($customTemplate === null) $customTemplate = tulip_contact_email_for_queue($pdo, $relatedType, $relatedId, $emailType);
         if ($customTemplate !== null) {
+            if (array_key_exists('reply_to', $customTemplate)) $replyTo = filter_var($customTemplate['reply_to'], FILTER_VALIDATE_EMAIL) ? $customTemplate['reply_to'] : null;
             $subject = $customTemplate['subject'];
             $htmlBody = $customTemplate['html'];
         }
