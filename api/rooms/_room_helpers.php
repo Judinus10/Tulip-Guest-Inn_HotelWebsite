@@ -254,7 +254,7 @@ function normalize_room(array $room, array $images = [], array $amenityRecords =
     $category = normalize_room_category($room['room_category'] ?? '');
     $price = (float) ($room['base_price'] ?? 0);
     $currency = (string) ($room['currency'] ?? 'LKR');
-    $guests = (int) ($room['max_guests'] ?? 2);
+    $guests = (int) ($room['max_total_occupants'] ?? $room['max_guests'] ?? 2);
     $bedType = trim((string) ($room['bed_type'] ?? '')) !== '' ? (string) $room['bed_type'] : 'Double Bed';
     $roomSize = (float) ($room['room_size'] ?? 24);
     if ($roomSize <= 0) $roomSize = $guests > 3 ? 45 : 24;
@@ -274,7 +274,7 @@ function normalize_room(array $room, array $images = [], array $amenityRecords =
         'guests' => $guests,
         'max_guests' => $guests,
         'capacity' => $guests,
-        'max_adults' => (int) ($room['max_adults'] ?? $guests),
+        'max_adults' => (int) ($room['max_adults'] ?? $room['max_guests'] ?? $guests),
         'max_children' => (int) ($room['max_children'] ?? 0),
         'max_total_occupants' => (int) ($room['max_total_occupants'] ?? $guests),
         'max_child_age' => (int) ($room['max_child_age'] ?? 11),

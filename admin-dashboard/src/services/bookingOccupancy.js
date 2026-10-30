@@ -4,7 +4,7 @@ export function partyError(p, allowZeroAdults = false) {
         return 'At least one adult is required.';
     if (!Number.isInteger(p.children) || p.children < 0 || p.adults + p.children > 20)
         return 'Choose up to 20 people in total.';
-    if (p.children_ages.length !== p.children || p.children_ages.some(a => !((typeof a === 'number' && Number.isInteger(a)) || (typeof a === 'string' && /^(0|[1-9][0-9]*)$/.test(a))) || !Number.isInteger(Number(a)) || Number(a) < 0 || Number(a) > 17))
+    if (p.children_ages.length > 0 && (p.children_ages.length !== p.children || p.children_ages.some(a => !((typeof a === 'number' && Number.isInteger(a)) || (typeof a === 'string' && /^(0|[1-9][0-9]*)$/.test(a))) || !Number.isInteger(Number(a)) || Number(a) < 0 || Number(a) > 17)))
         return 'Select an age at check-in for every child.';
     return '';
 }
@@ -30,23 +30,23 @@ export function partyRequest(p) { return { adults: p.adults, children: p.childre
 export function occupancy(room, p) {
     const capacity = Number(room.max_guests ?? room.guests ?? room.capacity ?? 0);
     const childAge = Number(room.max_child_age ?? 11);
-    const childPlaces = p.children_ages.filter(age => Number(age) <= childAge).length;
+    const childPlaces = p.children_ages.length ? p.children_ages.filter(age => Number(age) <= childAge).length : p.children;
     const adultPlaces = p.adults + p.children - childPlaces;
     const maxAdults = Number(room.max_adults ?? capacity), maxChildren = Number(room.max_children ?? 0), total = Number(room.max_total_occupants ?? capacity);
-    const counted = room.count_children_toward_capacity === false ? adultPlaces : partyTotal(p);
-    return { fits: !partyError(p, true) && adultPlaces <= maxAdults && childPlaces <= maxChildren && partyTotal(p) <= total && counted <= capacity, adultPlaces, childPlaces, maxAdults, maxChildren, total, childAge };
+    const extraPlacesFit = room.count_children_toward_capacity !== false || childPlaces <= maxChildren;
+    return { fits: !partyError(p, true) && adultPlaces <= maxAdults && extraPlacesFit && partyTotal(p) <= total, adultPlaces, childPlaces, maxAdults, maxChildren, total, childAge };
 }
 export function roomOccupancyLabel(room) {
     const cap = Number(room.max_guests ?? room.guests ?? room.capacity ?? 0);
-    return `Up to ${room.max_adults ?? cap} adult places · ${room.max_children ?? 0} child places (ages 0–${room.max_child_age ?? 11}) · ${room.max_total_occupants ?? cap} people total`;
+    return `${room.max_total_occupants ?? cap} guests total · max ${room.max_adults ?? cap} adults · ${room.count_children_toward_capacity === false ? `up to ${room.max_children ?? 0} extra child places` : 'children use normal guest places'} (ages 0–${room.max_child_age ?? 11})`;
 }
 /** Exact search with memoization and symmetry pruning; never substitutes child places for adult places. */
 export function allocateParty(rooms, p, exactRooms) {
     if (partyError(p) || !rooms.length)
         return [];
-    const people = [...Array.from({ length: p.adults }, () => null), ...p.children_ages.map(Number)];
+    const people = [...Array.from({ length: p.adults }, () => null), ...(p.children_ages.length ? p.children_ages.map(Number) : Array.from({length:p.children},()=>-1))];
     const empty = () => ({ adults: 0, children: 0, children_ages: [] });
-    const alone = (person) => person === null ? { adults: 1, children: 0, children_ages: [] } : { adults: 0, children: 1, children_ages: [person] };
+    const alone = (person) => person === null ? { adults: 1, children: 0, children_ages: [] } : { adults: 0, children: 1, children_ages: person < 0 ? [] : [person] };
     const eligible = (person) => rooms.filter(r => occupancy(r, alone(person)).fits).length;
     people.sort((a, b) => eligible(a) - eligible(b) || Number(b ?? 18) - Number(a ?? 18));
     if (people.some(person => !eligible(person)))
@@ -63,7 +63,7 @@ export function allocateParty(rooms, p, exactRooms) {
                 return false;
             if (index === people.length)
                 return used === wanted;
-            const key = `${index}|${assigned.map(a => `${a.adults}:${a.children_ages.join(',')}`).join('|')}`;
+            const key = `${index}|${assigned.map(a => `${a.adults}:${a.children}:${a.children_ages.join(',')}`).join('|')}`;
             if (failed.has(key))
                 return false;
             const symmetric = new Set();
@@ -76,7 +76,7 @@ export function allocateParty(rooms, p, exactRooms) {
                     continue;
                 symmetric.add(signature);
                 const person = people[index];
-                const next = person === null ? { ...prior, adults: prior.adults + 1 } : { ...prior, children: prior.children + 1, children_ages: [...prior.children_ages, person] };
+                const next = person === null ? { ...prior, adults: prior.adults + 1 } : { ...prior, children: prior.children + 1, children_ages: person < 0 ? [] : [...prior.children_ages, person] };
                 if (!occupancy(room, next).fits)
                     continue;
                 assigned[i] = next;

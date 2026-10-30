@@ -1,6 +1,6 @@
 import { useGuestAgePolicy } from '../services/guestAgePolicy';
 import GuestPartyFields from '../components/ui/GuestPartyFields';
-import { readParty, writeParty, partyError, partyTotal, partyRequest, occupancy, allocateParty, roomMaxOccupancy, roomGuestLabel, type GuestParty } from '../services/guestOccupancy';
+import { readParty, writeParty, partyError, partyTotal, partyRequest, occupancy, roomAllocationSearch, roomMaxOccupancy, roomGuestLabel, type GuestParty } from '../services/guestOccupancy';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Calendar, Home, Users } from 'lucide-react';
@@ -27,15 +27,14 @@ function todayBookingDate(): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-function assignRooms(available: Room[], roomCount: number, party: GuestParty): AssignedRoom[] {
-  return allocateParty(available, party, roomCount).map(({ room, party: assigned }) => ({ ...room, party: assigned, allocatedGuests: partyTotal(assigned) }));
-}
 
 export default function MultiRoomBooking() {
   const { maxChildAge } = useGuestAgePolicy();
   const toast = useToast();
   const [params, setParams] = useSearchParams();
   const filters = useMemo(()=>({checkIn:params.get('checkin')||'',checkOut:params.get('checkout')||'',...readParty(params),guests:partyTotal(readParty(params)),rooms:Math.max(2,Number(params.get('rooms')||2))}),[params]);
+  const [allocationIssue,setAllocationIssue]=useState('');
+  const [suggestion,setSuggestion]=useState<{rooms:number;slug:string}|null>(null);
   const [available,setAvailable]=useState<Room[]>([]); const [assigned,setAssigned]=useState<AssignedRoom[]>([]);
   const searchKey = `${filters.checkIn}|${filters.checkOut}|${filters.adults}|${filters.children}|${filters.rooms}|${maxChildAge}`;
   const [checkedSearchKey,setCheckedSearchKey]=useState('');
@@ -48,13 +47,13 @@ export default function MultiRoomBooking() {
 
   const selectPaymentMethod=(method:'Cash'|'PayHere')=>{if(method==='Cash'&&!arrivalEnabled){toast.warning('Pay on Arrival is unavailable.');return;}if(method==='PayHere'&&!onlinePaymentEnabled){setForm(current=>({...current,payment_method:'Cash'}));toast.warning('Online payment is not available at the moment. Please use Pay on Arrival.');return;}setForm(current=>({...current,payment_method:method}));};
 
-  useEffect(()=>{let active=true; setError('');
+  useEffect(()=>{let active=true; setError('');setAllocationIssue('');setSuggestion(null);
     if (!filters.checkIn || !filters.checkOut || filters.checkOut <= filters.checkIn || partyError(filters, false, maxChildAge)) {
       setAvailable([]); setAssigned([]); setLoading(false);
       return()=>{active=false};
     }
     setLoading(true); setAvailable([]); setAssigned([]); setError(''); fetchPublicRooms({check_in_date:filters.checkIn,check_out_date:filters.checkOut})
-    .then(rows=>{if(active){setAvailable(rows);setAssigned(assignRooms(rows,filters.rooms,filters));setCheckedSearchKey(searchKey);}})
+    .then(rows=>{if(active){setAvailable(rows);const result=roomAllocationSearch(rows,filters,filters.rooms);setAssigned(result.assignments.map(({room,party})=>({...room,party,allocatedGuests:partyTotal(party)})));setAllocationIssue(result.reason);setSuggestion(result.alternative.length?{rooms:result.alternative.length,slug:result.alternative[0].room.slug}:null);setCheckedSearchKey(searchKey);}})
     .catch(e=>{if(active){setAvailable([]);setAssigned([]);setError(e instanceof Error?e.message:'Unable to load rooms.');setCheckedSearchKey(searchKey);}}).finally(()=>active&&setLoading(false)); return()=>{active=false};},[filters,maxChildAge]);
   const hasValidDates = Boolean(filters.checkIn && filters.checkOut && filters.checkOut > filters.checkIn);
   const allocated=assigned.reduce((s,r)=>s+r.allocatedGuests,0); const totalCapacity=assigned.reduce((s,r)=>s+roomMaxOccupancy(r),0);
@@ -63,6 +62,9 @@ export default function MultiRoomBooking() {
     && assigned.every(room=>partyTotal(room.party)>0 && !partyError(room.party,true,maxChildAge) && occupancy(room,room.party).fits)
     && assigned.reduce((sum,room)=>sum+room.party.adults,0) === filters.adults
     && assigned.reduce((sum,room)=>sum+room.party.children,0) === filters.children;
+  const suggestionParams = writeParty(new URLSearchParams({checkin:filters.checkIn,checkout:filters.checkOut,rooms:String(suggestion?.rooms ?? 1)}),filters);
+  if (suggestion?.rooms === 1) suggestionParams.set('room',suggestion.slug);
+  const suggestionPath = `${suggestion?.rooms === 1 ? '/booking' : '/multi-room-booking'}?${suggestionParams.toString()}`;
   const nights=Math.max(1,Math.ceil((new Date(filters.checkOut).getTime()-new Date(filters.checkIn).getTime())/86400000));
   const total=assigned.reduce((s,r)=>s+r.price*nights,0);
 
@@ -111,12 +113,12 @@ export default function MultiRoomBooking() {
         <label className="flex flex-col px-5 py-4">
           <span className="mb-2 flex items-center gap-1.5 text-[9px] tracking-[0.2em] uppercase text-gold"><Home size={12}/>Rooms</span>
           <select value={filters.rooms} onChange={e=>updateFilter('rooms',e.target.value)} className="bg-transparent text-sm outline-hidden">
-            {Array.from({length:19},(_,i)=>i+2).map(n=><option key={n} value={n}>{n} Rooms</option>)}
+            {Array.from({length:19},(_,i)=>i+2).map(n=><option key={n} value={n} disabled={n>filters.guests || (!loading && checkedSearchKey===searchKey && n>available.length)}>{n} Rooms</option>)}
           </select>
         </label>
       </div>
       <p className="mb-8 text-[11px] text-muted">Availability and room assignments update automatically.</p>{error&&<p role="alert" className="mb-4 text-sm text-red-600">{error}</p>}
-      {!hasValidDates?<div className="border border-gold/30 bg-surface py-16 text-center"><h2 className="font-serif text-2xl text-dark">Select your stay dates</h2><p className="mt-2 text-sm text-muted">Room availability and allocation will appear after both dates are selected.</p></div>:partyError(filters, false, maxChildAge)?<p role="status" className="py-10 text-center text-muted">Complete the adult and child counts above to find rooms.</p>:loading||checkedSearchKey!==searchKey?<p className="py-20 text-center">Assigning rooms...</p>:assigned.length===0?<div className="text-center py-20"><p>There are not enough available rooms or combined capacity.</p><Link className="btn-primary mt-5" to={`/rooms?${params.toString()}`}>Change Search</Link></div>:
+      {!hasValidDates?<div className="border border-gold/30 bg-surface py-16 text-center"><h2 className="font-serif text-2xl text-dark">Select your stay dates</h2><p className="mt-2 text-sm text-muted">Room availability and allocation will appear after both dates are selected.</p></div>:partyError(filters, false, maxChildAge)?<p role="status" className="py-10 text-center text-muted">Complete the adult and child counts above to find rooms.</p>:loading||checkedSearchKey!==searchKey?<p className="py-20 text-center">Assigning rooms...</p>:assigned.length===0?<div role="alert" className="border border-amber-300 bg-surface p-6 text-center sm:p-10"><h2 className="font-serif text-2xl">Your selected room count cannot be allocated</h2><p className="mt-3 text-sm text-muted">{allocationIssue || 'No suitable rooms are available for this search.'}</p>{suggestion && <p className="mt-3 text-sm text-dark">Your group can fit in {suggestion.rooms} {suggestion.rooms===1?'available room':'available rooms'}. Review this option before continuing.</p>}<div className="mt-5 flex flex-wrap justify-center gap-3">{suggestion && <Link className="btn-primary" to={suggestionPath}>Review {suggestion.rooms} {suggestion.rooms===1?'room':'rooms'}</Link>}<Link className="btn-outline" to={`/rooms?${params.toString()}`}>Change Search</Link></div></div>:
       <form onSubmit={submit} className="space-y-10"><div><div className="flex justify-between mb-5"><div><h2 className="font-serif text-3xl">Choose Your Rooms</h2><p className="text-sm text-muted">Select rooms and assign your guests.</p></div><p className={allocationReady?'text-green-700':'text-red-600'}>Allocated {allocated}/{filters.guests} · Up to {totalCapacity} guests</p></div>
       <div className="grid md:grid-cols-2 gap-5">{assigned.map((room,index)=>{const used=new Set(assigned.filter((_,i)=>i!==index).map(r=>r.id));return <div key={index} className="bg-surface border border-border p-6"><label className="text-[9px] uppercase tracking-widest text-muted">Room {index+1}<select value={room.id} onChange={e=>changeRoom(index,e.target.value)} className="mt-2 w-full border border-border p-3 text-sm">{available.filter(r=>r.id===room.id||!used.has(r.id)).map(r=><option key={r.id} value={r.id}>{r.name} — {roomGuestLabel(r)} — {r.currency} {r.price}</option>)}</select></label><h3 className="font-serif text-2xl mt-5">{room.name}</h3><p className="mt-2 text-xs text-muted">{roomGuestLabel(room)}</p><div className="mt-4 border-t border-border pt-4"><GuestPartyFields value={room.party} onChange={party=>updateRoomParty(index,party)} allowZeroAdults disabled={submitting}/>{!occupancy(room,room.party).fits&&<p className="mt-2 text-xs text-red-600">This allocation exceeds the adult, child or combined guest limit shown for this room.</p>}</div></div>})}</div></div>
       {!allocationReady && <p role="alert" className="border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">Allocate all {filters.adults} adults and {filters.children} children within each room’s limits to continue. Guest details and payment stay disabled until the allocation is valid.</p>}

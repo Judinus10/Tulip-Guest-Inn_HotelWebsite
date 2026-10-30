@@ -6,14 +6,14 @@ export default function RoomOccupancyFields({ form, errors, onChange, countChild
   return <section className="md:col-span-2 overflow-hidden rounded-2xl border border-border bg-white" aria-labelledby="room-occupancy-title">
     <div className="flex items-start gap-3 border-b border-border bg-slate-50/80 px-5 py-4">
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-600"><Users size={20} /></span>
-      <div><h3 id="room-occupancy-title" className="text-sm font-bold text-text-primary">Room occupancy</h3><p className="mt-1 text-xs leading-relaxed text-text-secondary">Dependent limits adjust automatically. Guest capacity stays as you set it; total occupancy is always a hard limit.</p></div>
+      <div><h3 id="room-occupancy-title" className="text-sm font-bold text-text-primary">Room occupancy</h3><p className="mt-1 text-xs leading-relaxed text-text-secondary">Set one total guest limit and the adult limit. The extra-child allowance is used only when the shared switch is off.</p></div>
     </div>
     <div className="grid gap-5 p-5 sm:grid-cols-2">
       {occupancyFields.filter(({ key }) => key !== 'max_child_age').map(({ key, label, min, max, hint }) => <div key={key} className="space-y-2">
         <Label htmlFor={`occupancy-${key}`}>{label}</Label>
-        <Input id={`occupancy-${key}`} type="number" inputMode="numeric" min={min} max={key === 'max_adults' || (key === 'max_children' && countChildren) || (key === 'max_total_occupants' && countChildren) ? (Number(form.capacity) || max) : max} step="1" value={form[key] ?? ''} disabled={disabled}
+        <Input id={`occupancy-${key}`} type="number" inputMode="numeric" min={min} max={key === 'max_adults' || key === 'max_children' ? (Number(form.max_total_occupants) || max) : max} step="1" value={form[key] ?? ''} disabled={disabled || (key === 'max_children' && countChildren)}
           onChange={event => onChange(key, event.target.value)} onBlur={onCommit} aria-invalid={Boolean(errors[key])} aria-describedby={`occupancy-${key}-hint${errors[key] ? ` occupancy-${key}-error` : ''}`} />
-        <p id={`occupancy-${key}-hint`} className="text-xs leading-relaxed text-text-secondary">{hint}</p>
+        <p id={`occupancy-${key}-hint`} className="text-xs leading-relaxed text-text-secondary">{key === 'max_children' && countChildren ? 'Not used while children occupy normal guest places. The saved allowance is retained for when the switch is off.' : hint}</p>
         {errors[key] && <p id={`occupancy-${key}-error`} className="text-xs font-medium text-red-600">{errors[key]}</p>}
       </div>)}
     </div>
@@ -29,8 +29,8 @@ export default function RoomOccupancyFields({ form, errors, onChange, countChild
       </div>
       <div className="flex items-start justify-between gap-5">
         <div className="min-w-0">
-          <p id="count-children-label" className="text-sm font-semibold text-text-primary">Count children toward guest capacity</p>
-          <p id="count-children-help" className="mt-1 text-xs leading-relaxed text-text-secondary">{countChildren ? 'Adults and children both count toward guest capacity.' : 'Only adults count toward guest capacity. The child limit and total occupancy limit still apply.'}</p>
+          <p id="count-children-label" className="text-sm font-semibold text-text-primary">Children use normal guest places</p>
+          <p id="count-children-help" className="mt-1 text-xs leading-relaxed text-text-secondary">{countChildren ? 'Each child uses one normal guest place. Extra child places are not checked. The adult and total guest limits still apply.' : 'Children use the extra-child allowance. The adult and total guest limits still apply; children are always included in the total.'}</p>
         </div>
         <button type="button" role="switch" aria-checked={countChildren} aria-labelledby="count-children-label" aria-describedby="count-children-help" disabled={disabled}
           onClick={() => onToggle(!countChildren)} className={`mt-1 inline-flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${countChildren ? 'bg-blue-600' : 'bg-slate-300'}`}>

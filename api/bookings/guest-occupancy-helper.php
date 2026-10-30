@@ -51,9 +51,11 @@ function booking_room_occupancy(array $room,array $party,bool $countChildren): a
     $maxAdults=(int)($room['max_adults']??$capacity);
     $maxChildren=(int)($room['max_children']??0);
     $maxTotal=(int)($room['max_total_occupants']??$capacity);
-    $fits=$adultPlaces<=$maxAdults && $qualifying<=$maxChildren && $party['guests']<=$maxTotal
-        && ($countChildren?$party['guests']:$adultPlaces)<=$capacity;
-    return ['fits'=>$fits,'guest_capacity'=>$capacity,'adult_places'=>$adultPlaces,'child_places'=>$qualifying,
+    // Children use normal guest places in counting mode. Extra-child places
+    // restrict only the other mode; the hard total always includes everyone.
+    $fits=$adultPlaces<=$maxAdults && $party['guests']<=$maxTotal
+        && ($countChildren || $qualifying<=$maxChildren);
+    return ['fits'=>$fits,'guest_capacity'=>$maxTotal,'adult_places'=>$adultPlaces,'child_places'=>$qualifying,
         'max_adults'=>$maxAdults,'max_children'=>$maxChildren,'max_total_occupants'=>$maxTotal,
         'max_child_age'=>$cutoff,'count_children_toward_capacity'=>$countChildren];
 }

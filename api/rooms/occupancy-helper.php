@@ -76,16 +76,16 @@ function room_occupancy_integer(mixed $value, int $minimum, int $maximum, string
 
 function room_occupancy_input(array $data, array $existing = []): array
 {
-    $capacity = room_occupancy_integer($data['max_guests'] ?? $data['capacity'] ?? $existing['max_guests'] ?? 2, 1, 20, 'Guest capacity');
+    // One hard total; max_guests/capacity are legacy aliases, not a second limit.
+    $total = room_occupancy_integer($data['max_total_occupants'] ?? $data['max_guests'] ?? $data['capacity'] ?? $existing['max_total_occupants'] ?? $existing['max_guests'] ?? 2, 1, 20, 'Maximum total guests');
     $limits = [
-        'max_adults' => room_occupancy_integer($data['max_adults'] ?? $existing['max_adults'] ?? $capacity, 1, 20, 'Maximum adults'),
-        'max_children' => room_occupancy_integer($data['max_children'] ?? $existing['max_children'] ?? 0, 0, 20, 'Maximum children'),
-        'max_total_occupants' => room_occupancy_integer($data['max_total_occupants'] ?? $existing['max_total_occupants'] ?? $capacity, 1, 20, 'Maximum total occupants'),
+        'max_adults' => room_occupancy_integer($data['max_adults'] ?? $existing['max_adults'] ?? $total, 1, 20, 'Maximum adults'),
+        'max_children' => room_occupancy_integer($data['max_children'] ?? $existing['max_children'] ?? 0, 0, 20, 'Extra child places'),
+        'max_total_occupants' => $total,
         'max_child_age' => room_occupancy_integer($data['max_child_age'] ?? $existing['max_child_age'] ?? 11, 0, 17, 'Maximum child age'),
     ];
-    if ($limits['max_adults'] > $capacity) throw new InvalidArgumentException('Maximum adults cannot exceed guest capacity.');
-    if ($limits['max_total_occupants'] < max($limits['max_adults'], $limits['max_children'])) throw new InvalidArgumentException('Total occupancy cannot be lower than an individual adult or child limit.');
-    if ($limits['max_total_occupants'] > $limits['max_adults'] + $limits['max_children']) throw new InvalidArgumentException('Total occupancy cannot exceed the combined adult and child limits.');
+    if ($limits['max_adults'] > $total) throw new InvalidArgumentException('Maximum adults cannot exceed maximum total guests.');
+    if ($limits['max_children'] > $total) throw new InvalidArgumentException('Extra child places cannot exceed maximum total guests.');
     return $limits;
 }
 
@@ -118,8 +118,8 @@ function save_room_occupancy(PDO $pdo, int $roomId, array $data, array $existing
     // The room column mirrors the shared age so existing availability readers also
     // use the common policy. Room-specific adult, child and total limits stay separate.
     $limits = room_occupancy_input(array_replace($data, ['max_child_age' => $nextAge]), $existing);
-    $pdo->prepare('UPDATE rooms SET max_adults = ?, max_children = ?, max_total_occupants = ?, max_child_age = ? WHERE id = ?')
-        ->execute([...array_values($limits), $roomId]);
+    $pdo->prepare('UPDATE rooms SET max_guests = ?, max_adults = ?, max_children = ?, max_total_occupants = ?, max_child_age = ? WHERE id = ?')
+        ->execute([$limits['max_total_occupants'], ...array_values($limits), $roomId]);
     $write = $pdo->prepare('INSERT INTO website_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)');
     if ($nextAge !== $age) {
         $write->execute(['max_child_age', (string) $nextAge]);

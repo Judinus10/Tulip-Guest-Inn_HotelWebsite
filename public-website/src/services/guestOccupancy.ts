@@ -21,18 +21,20 @@ export function occupancy(room: OccupancyRoom, p: GuestParty) {
   const childPlaces = p.children;
   const adultPlaces = p.adults;
   const maxAdults = Number(room.max_adults ?? capacity), maxChildren = Number(room.max_children ?? 0), total = Number(room.max_total_occupants ?? capacity);
-  const counted = room.count_children_toward_capacity === false ? adultPlaces : partyTotal(p);
-  return { fits: validAge && !partyError(p, true, childAge ?? null) && adultPlaces <= maxAdults && childPlaces <= maxChildren && partyTotal(p) <= total && counted <= capacity, adultPlaces, childPlaces, maxAdults, maxChildren, total, childAge };
+  const extraPlacesFit = room.count_children_toward_capacity !== false || childPlaces <= maxChildren;
+  return { fits: validAge && !partyError(p, true, childAge ?? null) && adultPlaces <= maxAdults && extraPlacesFit && partyTotal(p) <= total, adultPlaces, childPlaces, maxAdults, maxChildren, total, childAge };
 }
 export function roomOccupancyLabel(room: OccupancyRoom): string {
   const cap = Number(room.max_guests ?? room.guests ?? room.capacity ?? 0);
-  return `Up to ${room.max_adults ?? cap} adult places · ${room.max_children ?? 0} child places (ages 0–${room.max_child_age ?? 'unavailable'}) · ${room.max_total_occupants ?? cap} people total`;
+  return `${room.max_total_occupants ?? cap} guests total · max ${room.max_adults ?? cap} adults · ${room.count_children_toward_capacity === false ? `up to ${room.max_children ?? 0} extra child places` : 'children use normal guest places'} (ages 0–${room.max_child_age ?? 'unavailable'})`;
 }
 /** Public occupancy summary; the adult/child policy is explained on room details. */
 export function roomMaxOccupancy(room: OccupancyRoom): number {
   const capacity = Number(room.max_guests ?? room.guests ?? room.capacity ?? 0);
   const total = Number(room.max_total_occupants ?? capacity);
-  return room.count_children_toward_capacity === false ? total : Math.min(capacity, total);
+  return room.count_children_toward_capacity === false
+    ? Math.min(total, Number(room.max_adults ?? capacity) + Number(room.max_children ?? 0))
+    : total;
 }
 export type PartyAllocation<R> = { room: R; party: GuestParty };
 /** Exact search with memoization and symmetry pruning; never substitutes child places for adult places. */
@@ -77,7 +79,7 @@ export function roomGuestLabel(room: OccupancyRoom): string {
   const total = roomMaxOccupancy(room);
   const capacity = Number(room.max_guests ?? room.guests ?? room.capacity ?? 0);
   const adults = Math.min(Number(room.max_adults ?? capacity), total);
-  const children = Math.min(Number(room.max_children ?? 0), total);
+  const children = room.count_children_toward_capacity === false ? Math.min(Number(room.max_children ?? 0), total) : total;
   return `${total} ${total === 1 ? 'Guest' : 'Guests'} (max ${adults} ${adults === 1 ? 'adult' : 'adults'}, ${children} ${children === 1 ? 'child' : 'children'})`;
 }
 
@@ -87,4 +89,19 @@ export function bookingRoomOptions<R extends OccupancyRoom & { slug: string }>(r
   const selected = matches.find(room => room.slug === preferredSlug) ?? matches[0];
   const multiRoomCount = matches.length ? 0 : allocateParty(rooms, party).length;
   return { matches, selected, multiRoomCount: multiRoomCount >= 2 ? multiRoomCount : 0 };
+}
+
+/** Explain an exact-room search failure and offer an actual alternative. */
+export function roomAllocationSearch<R extends OccupancyRoom>(rooms: R[], party: GuestParty, requestedRooms: number) {
+  const assignments = allocateParty(rooms, party, requestedRooms);
+  if (assignments.length) return { assignments, alternative: [] as PartyAllocation<R>[], reason: '' };
+  const alternative = allocateParty(rooms, party);
+  let reason: string;
+  if (requestedRooms > partyTotal(party)) reason = `You selected ${requestedRooms} rooms for ${partyTotal(party)} guests. Each selected room must have at least one guest.`;
+  else if (requestedRooms > rooms.length) reason = `Only ${rooms.length} ${rooms.length === 1 ? 'room is' : 'rooms are'} available for these dates; ${requestedRooms} were requested.`;
+  else if (rooms.reduce((sum,room)=>sum+roomMaxOccupancy(room),0) < partyTotal(party)) reason = 'The available rooms do not have enough combined guest capacity.';
+  else if (rooms.reduce((sum,room)=>sum+Math.min(Number(room.max_adults ?? room.max_guests ?? room.guests ?? room.capacity ?? 0),roomMaxOccupancy(room)),0) < party.adults) reason = 'The available rooms do not have enough adult places for your group.';
+  else if (rooms.reduce((sum,room)=>sum+(room.count_children_toward_capacity === false ? Math.min(Number(room.max_children ?? 0),roomMaxOccupancy(room)) : roomMaxOccupancy(room)),0) < party.children) reason = 'The available rooms do not have enough extra child places under the current child policy.';
+  else reason = `This adult and child combination cannot be allocated across exactly ${requestedRooms} available rooms within their limits.`;
+  return { assignments, alternative, reason };
 }

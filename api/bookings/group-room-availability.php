@@ -60,7 +60,7 @@ try {
             'room_id' => (int) $room['id'],
             'room_name' => (string) $room['room_name'],
             'room_number' => (string) $room['room_number'],
-            'capacity' => (int) $room['max_guests'],
+            'capacity' => (int) ($room['max_total_occupants'] ?? $room['max_guests']),
             'max_adults' => (int) ($room['max_adults'] ?? $room['max_guests']),
             'max_children' => (int) $room['max_children'],
             'max_total_occupants' => (int) ($room['max_total_occupants'] ?? $room['max_guests']),
