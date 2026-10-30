@@ -1,7 +1,8 @@
 import './WebsiteBookingEmails.css'
+import { notifyError, notifyInfo, notifySuccess } from '@/utils/notifications'
 import BookingEmailPreview from '@/components/ui/BookingEmailPreview'
 import { useEffect, useRef, useState } from 'react'
-import { AlertCircle, CheckCircle2, ChevronDown, Info, Loader2, RotateCcw, Save } from 'lucide-react'
+import { ChevronDown, Info, Loader2, RotateCcw, Save } from 'lucide-react'
 import { SectionCard } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Input, Label, Textarea } from '@/components/ui/input'
@@ -40,10 +41,7 @@ export default function WebsiteBookingEmails() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [loadError, setLoadError] = useState('')
-  const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
   const [target, setTarget] = useState('introduction_html')
-  const [linkReload, setLinkReload] = useState(false)
   const inputs = useRef({})
   const positions = useRef({})
   const intro = useRef(null)
@@ -72,11 +70,11 @@ export default function WebsiteBookingEmails() {
       if (!data.branding) throw new Error('Could not load email logo size. Update the email settings API and reload.')
       setBrandingSaved(data.branding); setLogoWidth(data.branding.width)
       setSettings(data); setDrafts(Object.fromEntries(Object.entries(data.templates).map(([key, template]) => [key, { ...template.content }])))
-    }).catch(e => { if (active) setLoadError(e.message || 'Could not load booking email settings.') })
+    }).catch(e => { if (active) { setLoadError('Email settings are unavailable.'); notifyError(e, { duration: 6000 }) } })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false; requestId.current++ }
   }, [])
-  const change = (field, value) => { setDrafts(current => ({ ...current, [type]: { ...current[type], [field]: value } })); setMessage(''); setError('') }
+  const change = (field, value) => { setDrafts(current => ({ ...current, [type]: { ...current[type], [field]: value } })); }
   const remember = (field, node) => { setTarget(field); positions.current[field] = [node.selectionStart ?? node.value.length, node.selectionEnd ?? node.value.length] }
   const insert = token => {
     if (!token || busy) return
@@ -91,8 +89,8 @@ export default function WebsiteBookingEmails() {
     }
   }
   async function save() {
-    setError(''); setMessage(''); setLinkReload(false)
-    for (const [field, value] of Object.entries(draft)) if (bytes(value) > limits[field]) { setError(`${fieldLabels[field]} is too long. Shorten the text before saving.`); return }
+    
+    for (const [field, value] of Object.entries(draft)) if (bytes(value) > limits[field]) { notifyError({ message: `${fieldLabels[field]} is too long. Shorten the text before saving.` }, { duration: 6000 }); return }
     const currentType = type
     const currentRequest = ++requestId.current
     setBusy(true)
@@ -102,9 +100,9 @@ export default function WebsiteBookingEmails() {
       setSettings(current => ({ ...current, templates: { ...current.templates, [currentType]: saved } }))
       setDrafts(current => ({ ...current, [currentType]: { ...saved.content } }))
       if (saved.branding) { setBrandingSaved(saved.branding); setLogoWidth(saved.branding.width); setBrandingRevision(n => n + 1) }
-      setMessage(`${types[currentType].title} changes saved.`)
+      notifySuccess(`${types[currentType].title} changes saved.`, { duration: 4000 })
     } catch (e) {
-      if (requestId.current === currentRequest) { setError(e.message || 'Could not save email content.'); setLinkReload(e.status === 409) }
+      if (requestId.current === currentRequest) { notifyError(e.status === 409 ? { status: 409, message: `${e.message || 'These settings changed in another session.'} Copy your draft before reloading.` } : e, { duration: 6000 }) }
     } finally { if (requestId.current === currentRequest) setBusy(false) }
   }
   if (loading) return <SectionCard><p role="status" className="flex items-center gap-2 text-sm text-text-secondary"><Loader2 className="h-4 w-4 animate-spin" />Loading booking emails...</p></SectionCard>
@@ -112,7 +110,7 @@ export default function WebsiteBookingEmails() {
   return <div className="booking-email-page">
     <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Email category">
       {[['received', 'Booking emails'], ['contact_customer', 'Contact emails'], ['admin_daily_summary', 'Daily admin summary']].map(([key, title]) => <button key={key} type="button" disabled={busy} aria-pressed={categoryOf(key) === category}
-        onClick={() => { setType(key); setTarget('introduction_html'); positions.current = {}; setError(''); setMessage('') }}
+        onClick={() => { setType(key); setTarget('introduction_html'); positions.current = {}; }}
         className={`rounded-lg border px-4 py-2 text-sm font-semibold ${categoryOf(key) === category ? 'border-blue-600 bg-blue-600 text-white' : 'border-border bg-white text-text-secondary'}`}>{title}</button>)}
     </div>
     <div className="booking-email-workspace">
@@ -123,13 +121,13 @@ export default function WebsiteBookingEmails() {
         {category === 'booking' ? <div className="booking-email-selector-row">
           <div className="booking-email-recipient-buttons" role="group" aria-label="Booking email recipient">
           {[['received','Guest emails',false],['admin_new_booking','Admin booking notifications',true]].map(([key,label,admin]) => <button key={key} type="button" disabled={busy} aria-pressed={isAdminBooking === admin}
-            onClick={() => { setType(key); setTarget('introduction_html'); positions.current = {}; setError(''); setMessage(''); setLinkReload(false) }}
+            onClick={() => { setType(key); setTarget('introduction_html'); positions.current = {} }}
             className={`rounded-lg border px-3 py-2 text-xs font-semibold ${isAdminBooking === admin ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-border text-text-secondary'}`}>{label}</button>)}
           </div>
           <div className="booking-email-template-select">
             <label htmlFor="email-template-select" className="sr-only">Booking email template</label>
             <select id="email-template-select" value={type} disabled={busy}
-              onChange={e => { setType(e.target.value); setTarget('introduction_html'); positions.current = {}; setError(''); setMessage(''); setLinkReload(false) }}>
+              onChange={e => { setType(e.target.value); setTarget('introduction_html'); positions.current = {} }}>
               {Object.entries(types).filter(([key]) => categoryOf(key) === 'booking' && key.startsWith('admin_') === isAdminBooking).map(([key, item]) =>
                 <option key={key} value={key}>{item.title}{settings && !same(drafts[key], settings.templates[key].content) ? ' •' : ''}</option>)}
             </select>
@@ -138,18 +136,16 @@ export default function WebsiteBookingEmails() {
         </div> : <>
         <div role="tablist" aria-label="Email type" className="booking-email-type-tabs booking-email-type-tabs--extended">
           {Object.entries(types).filter(([key]) => categoryOf(key) === category && (category !== 'booking' || key.startsWith('admin_') === isAdminBooking)).map(([key, item]) => <button key={key} type="button" role="tab" aria-selected={type === key} disabled={busy}
-            onClick={() => { setType(key); setTarget('introduction_html'); positions.current = {}; setError(''); setMessage(''); setLinkReload(false) }}
+            onClick={() => { setType(key); setTarget('introduction_html'); positions.current = {} }}
             className={`flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition disabled:opacity-50 ${type === key ? 'bg-blue-600 text-white shadow-sm' : 'text-text-secondary hover:bg-white'}`}>{item.title}{settings && !same(drafts[key], settings.templates[key].content) ? ' •' : ''}</button>)}
         </div>
         </>}
         <p className="booking-email-type-description">{types[type].description}</p>
-        {error && <div role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"><span className="flex items-start gap-2"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{error}</span>{linkReload && <p className="mt-2">Copy your draft before reloading this page.</p>}</div>}
-        {message && <p role="status" className="mb-5 flex items-center gap-2 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800"><CheckCircle2 className="h-4 w-4" />{message}</p>}
         <div className="mb-4 rounded-lg border border-border bg-slate-50 px-3 py-3">
           <div className="mb-2 flex items-center justify-between gap-3"><label htmlFor="email-logo-width" className="text-xs font-semibold text-text-primary">Logo size</label><span className="text-xs text-text-secondary">{logoWidth} px</span></div>
           <div className="flex items-center gap-3"><input id="email-logo-width" type="range" min="40" max="240" step="1" value={logoWidth} disabled={busy}
-            onChange={e => { setLogoWidth(Number(e.target.value)); setError(''); setMessage('') }} className="min-w-0 flex-1 accent-blue-600" />
-            <button type="button" disabled={busy} onClick={() => { setLogoWidth(brandingSaved.default_width); setError(''); setMessage('') }}
+            onChange={e => { setLogoWidth(Number(e.target.value)); }} className="min-w-0 flex-1 accent-blue-600" />
+            <button type="button" disabled={busy} onClick={() => { setLogoWidth(brandingSaved.default_width); }}
               className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border bg-white px-2.5 py-1.5 text-xs font-semibold text-text-secondary disabled:opacity-50" title="Reset logo size"><RotateCcw className="h-3.5 w-3.5" />Reset</button>
           </div>
         </div>
@@ -175,8 +171,8 @@ export default function WebsiteBookingEmails() {
         </div>
         <div className="booking-email-info"><Info className="h-4 w-4 shrink-0" /><span>{isDaily ? 'Arrival and departure lists, room assignments, guest counts and payment statuses are filled automatically. No occupancy or daily revenue estimates are included.' : isContact ? 'Sender details and the original enquiry message are filled in automatically.' : 'Room assignments, guest counts and payment details are filled in automatically.'}</span></div>
         <div className="booking-email-actions">
-          <button type="button" disabled={busy || !dirty} onClick={() => { setDrafts(current => ({ ...current, [type]: { ...settings.templates[type].content } })); setLogoWidth(brandingSaved.width); setError(''); setMessage('Changes discarded.') }} className="text-sm font-semibold text-text-secondary hover:text-blue-700 disabled:opacity-40">Discard changes</button>
-          <div className="flex flex-wrap gap-3"><Button variant="outline" disabled={busy} onClick={() => { setDrafts(current => ({ ...current, [type]: { ...settings.defaults[type] } })); setError(''); setMessage('Default wording restored in the editor. Save to apply it.') }}><RotateCcw className="h-4 w-4" />Reset to default</Button>
+          <button type="button" disabled={busy || !dirty} onClick={() => { setDrafts(current => ({ ...current, [type]: { ...settings.templates[type].content } })); setLogoWidth(brandingSaved.width); notifyInfo('Changes discarded.', { duration: 4000 }) }} className="text-sm font-semibold text-text-secondary hover:text-blue-700 disabled:opacity-40">Discard changes</button>
+          <div className="flex flex-wrap gap-3"><Button variant="outline" disabled={busy} onClick={() => { setDrafts(current => ({ ...current, [type]: { ...settings.defaults[type] } })); notifyInfo('Default wording restored in the editor. Save to apply it.', { duration: 4000 }) }}><RotateCcw className="h-4 w-4" />Reset to default</Button>
             <Button disabled={busy || !dirty} onClick={save}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{busy ? 'Saving...' : 'Save changes'}</Button></div>
         </div>
       </section>

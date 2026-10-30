@@ -1,7 +1,8 @@
+import { notifyError } from '@/utils/notifications'
 import BookingEmailTest from '@/components/ui/BookingEmailTest'
 import { applyEmailBrandingPreview } from '@/services/emailBrandingPreview'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertCircle, Loader2, Monitor, RefreshCw, Smartphone } from 'lucide-react'
+import { Loader2, Monitor, RefreshCw, Smartphone } from 'lucide-react'
 import { previewBookingEmail } from '@/services/bookingEmailSettings'
 
 export default function BookingEmailPreview({ type, content, brandingRevision = 0, branding = null }) {
@@ -14,6 +15,7 @@ export default function BookingEmailPreview({ type, content, brandingRevision = 
   const stage = useRef(null)
   const [stageWidth, setStageWidth] = useState(600)
   const sequence = useRef(0)
+  const lastNotifiedError = useRef('')
   const isDaily = type === 'admin_daily_summary'
   const [summaryScenario, setSummaryScenario] = useState('single')
   const selectedScenario = isDaily ? summaryScenario : scenario
@@ -26,9 +28,13 @@ export default function BookingEmailPreview({ type, content, brandingRevision = 
     const timer = setTimeout(async () => {
       try {
         const result = await previewBookingEmail(type, content, selectedScenario, controller.signal)
-        if (active && request === sequence.current) setPreview({ ...result, fingerprint })
+        if (active && request === sequence.current) { setPreview({ ...result, fingerprint }); lastNotifiedError.current = '' }
       } catch (e) {
-        if (active && e.name !== 'AbortError' && request === sequence.current) setError(e.message || 'Could not update the email preview.')
+        if (active && e.name !== 'AbortError' && request === sequence.current) {
+          setError(e.message || 'Could not update the email preview.')
+          const key = `${type}:${refresh}:${e.status || ''}:${e.message || ''}`
+          if (lastNotifiedError.current !== key) { lastNotifiedError.current = key; notifyError(e, { duration: 6000 }) }
+        }
       } finally { if (active && request === sequence.current) setBusy(false) }
     }, 400)
     return () => { active = false; clearTimeout(timer); controller.abort() }
@@ -69,7 +75,6 @@ export default function BookingEmailPreview({ type, content, brandingRevision = 
       <span role="status" className="inline-flex shrink-0 items-center gap-1">{busy ? <><Loader2 className="h-3 w-3 animate-spin" />Updating...</> : stale ? 'Showing last valid preview' : error ? 'Preview unavailable' : branding?.preparing ? 'Preparing logo…' : branding?.dirty ? 'Unsaved logo preview' : 'Up to date'}</span>
       <button type="button" aria-label="Refresh email preview" title="Refresh hotel details" onClick={() => setRefresh(n => n + 1)}><RefreshCw className="h-3.5 w-3.5" /></button>
     </div>
-    {error && <p role="alert" className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{error}</p>}
     {preview ? <>
       <div className="booking-email-preview-stage">
         <div ref={stage}>
