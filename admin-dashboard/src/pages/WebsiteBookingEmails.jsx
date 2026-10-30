@@ -120,16 +120,28 @@ export default function WebsiteBookingEmails() {
         <div className="booking-email-card-heading"><h2>Email content</h2>
           {dirty && <span className="booking-email-draft-badge">Unsaved changes</span>}
         </div>
-        {category === 'booking' && <div className="mb-3 flex gap-2" role="group" aria-label="Booking email recipient">
+        {category === 'booking' ? <div className="booking-email-selector-row">
+          <div className="booking-email-recipient-buttons" role="group" aria-label="Booking email recipient">
           {[['received','Guest emails',false],['admin_new_booking','Admin booking notifications',true]].map(([key,label,admin]) => <button key={key} type="button" disabled={busy} aria-pressed={isAdminBooking === admin}
             onClick={() => { setType(key); setTarget('introduction_html'); positions.current = {}; setError(''); setMessage(''); setLinkReload(false) }}
             className={`rounded-lg border px-3 py-2 text-xs font-semibold ${isAdminBooking === admin ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-border text-text-secondary'}`}>{label}</button>)}
-        </div>}
+          </div>
+          <div className="booking-email-template-select">
+            <label htmlFor="email-template-select" className="sr-only">Booking email template</label>
+            <select id="email-template-select" value={type} disabled={busy}
+              onChange={e => { setType(e.target.value); setTarget('introduction_html'); positions.current = {}; setError(''); setMessage(''); setLinkReload(false) }}>
+              {Object.entries(types).filter(([key]) => categoryOf(key) === 'booking' && key.startsWith('admin_') === isAdminBooking).map(([key, item]) =>
+                <option key={key} value={key}>{item.title}{settings && !same(drafts[key], settings.templates[key].content) ? ' •' : ''}</option>)}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
+          </div>
+        </div> : <>
         <div role="tablist" aria-label="Email type" className="booking-email-type-tabs booking-email-type-tabs--extended">
           {Object.entries(types).filter(([key]) => categoryOf(key) === category && (category !== 'booking' || key.startsWith('admin_') === isAdminBooking)).map(([key, item]) => <button key={key} type="button" role="tab" aria-selected={type === key} disabled={busy}
             onClick={() => { setType(key); setTarget('introduction_html'); positions.current = {}; setError(''); setMessage(''); setLinkReload(false) }}
             className={`flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition disabled:opacity-50 ${type === key ? 'bg-blue-600 text-white shadow-sm' : 'text-text-secondary hover:bg-white'}`}>{item.title}{settings && !same(drafts[key], settings.templates[key].content) ? ' •' : ''}</button>)}
         </div>
+        </>}
         <p className="booking-email-type-description">{types[type].description}</p>
         {error && <div role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"><span className="flex items-start gap-2"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{error}</span>{linkReload && <p className="mt-2">Copy your draft before reloading this page.</p>}</div>}
         {message && <p role="status" className="mb-5 flex items-center gap-2 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800"><CheckCircle2 className="h-4 w-4" />{message}</p>}

@@ -60,3 +60,10 @@
 /* Additional booking states wrap without squeezing labels on narrow panels. */
 .booking-email-page .booking-email-type-tabs--extended{flex-wrap:wrap}
 .booking-email-page .booking-email-type-tabs--extended>button{flex:1 1 140px}
+
+.booking-email-selector-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.booking-email-recipient-buttons{display:flex;flex-wrap:wrap;gap:8px;min-width:0}
+.booking-email-template-select{position:relative;flex:1 1 180px;min-width:0;max-width:100%}
+.booking-email-template-select select{display:block;appearance:none;width:100%;min-width:0;height:36px;padding:7px 32px 7px 11px;border:1px solid #dbe3ee;border-radius:7px;background:#fff;color:#334155;font-size:12px;font-weight:600;outline:none}
+.booking-email-template-select select:focus{border-color:#2563eb;box-shadow:0 0 0 2px #dbeafe}
+.booking-email-template-select select:disabled{opacity:.5}
