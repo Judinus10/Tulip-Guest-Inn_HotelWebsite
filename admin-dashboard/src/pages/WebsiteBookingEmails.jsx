@@ -1,4 +1,3 @@
-import EmailBrandingSettings from '@/components/ui/EmailBrandingSettings'
 import './WebsiteBookingEmails.css'
 import BookingEmailPreview from '@/components/ui/BookingEmailPreview'
 import { useEffect, useRef, useState } from 'react'
@@ -34,7 +33,8 @@ const same = (a, b) => Object.keys(limits).every(key => a?.[key] === b?.[key])
 export default function WebsiteBookingEmails() {
   const [type, setType] = useState('received')
   const [brandingRevision, setBrandingRevision] = useState(0)
-  const [brandingDraft, setBrandingDraft] = useState(null)
+  const [brandingSaved, setBrandingSaved] = useState(null)
+  const [logoWidth, setLogoWidth] = useState(76)
   const [settings, setSettings] = useState(null)
   const [drafts, setDrafts] = useState({})
   const [loading, setLoading] = useState(true)
@@ -55,8 +55,10 @@ export default function WebsiteBookingEmails() {
   const isAdminBooking = type.startsWith('admin_') && !isDaily
   const category = categoryOf(type)
   const placeholders = settings?.placeholders_by_type?.[type] || settings?.placeholders || {}
-  const dirty = settings && draft && !same(draft, settings.templates[type].content)
-  const anyDirty = settings && Object.keys(types).some(key => !same(drafts[key], settings.templates[key].content))
+  const logoDirty = Boolean(brandingSaved && logoWidth !== brandingSaved.width)
+  const brandingDraft = brandingSaved ? { logo: brandingSaved.logo, width: logoWidth, dirty: logoDirty } : null
+  const dirty = settings && draft && (!same(draft, settings.templates[type].content) || logoDirty)
+  const anyDirty = logoDirty || (settings && Object.keys(types).some(key => !same(drafts[key], settings.templates[key].content)))
   useEffect(() => {
     if (!anyDirty) return undefined
     const warn = event => { event.preventDefault(); event.returnValue = '' }
@@ -67,6 +69,8 @@ export default function WebsiteBookingEmails() {
     let active = true
     fetchBookingEmailSettings().then(data => {
       if (!active) return
+      if (!data.branding) throw new Error('Could not load email logo size. Update the email settings API and reload.')
+      setBrandingSaved(data.branding); setLogoWidth(data.branding.width)
       setSettings(data); setDrafts(Object.fromEntries(Object.entries(data.templates).map(([key, template]) => [key, { ...template.content }])))
     }).catch(e => { if (active) setLoadError(e.message || 'Could not load booking email settings.') })
       .finally(() => { if (active) setLoading(false) })
@@ -93,11 +97,12 @@ export default function WebsiteBookingEmails() {
     const currentRequest = ++requestId.current
     setBusy(true)
     try {
-      const saved = await saveBookingEmailSettings(currentType, draft, settings.templates[currentType].version)
+      const saved = await saveBookingEmailSettings(currentType, draft, settings.templates[currentType].version, logoDirty ? { width: logoWidth, version: brandingSaved.version } : null)
       if (requestId.current !== currentRequest) return
       setSettings(current => ({ ...current, templates: { ...current.templates, [currentType]: saved } }))
       setDrafts(current => ({ ...current, [currentType]: { ...saved.content } }))
-      setMessage(`${types[currentType].title} content saved.`)
+      if (saved.branding) { setBrandingSaved(saved.branding); setLogoWidth(saved.branding.width); setBrandingRevision(n => n + 1) }
+      setMessage(`${types[currentType].title} changes saved.`)
     } catch (e) {
       if (requestId.current === currentRequest) { setError(e.message || 'Could not save email content.'); setLinkReload(e.status === 409) }
     } finally { if (requestId.current === currentRequest) setBusy(false) }
@@ -110,7 +115,6 @@ export default function WebsiteBookingEmails() {
         onClick={() => { setType(key); setTarget('introduction_html'); positions.current = {}; setError(''); setMessage('') }}
         className={`rounded-lg border px-4 py-2 text-sm font-semibold ${categoryOf(key) === category ? 'border-blue-600 bg-blue-600 text-white' : 'border-border bg-white text-text-secondary'}`}>{title}</button>)}
     </div>
-    <EmailBrandingSettings onDraftChange={setBrandingDraft} onSaved={() => setBrandingRevision(n => n + 1)} />
     <div className="booking-email-workspace">
       <section className="booking-email-card booking-email-editor" aria-label="Email content editor">
         <div className="booking-email-card-heading"><h2>Email content</h2>
@@ -129,6 +133,14 @@ export default function WebsiteBookingEmails() {
         <p className="booking-email-type-description">{types[type].description}</p>
         {error && <div role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"><span className="flex items-start gap-2"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{error}</span>{linkReload && <p className="mt-2">Copy your draft before reloading this page.</p>}</div>}
         {message && <p role="status" className="mb-5 flex items-center gap-2 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800"><CheckCircle2 className="h-4 w-4" />{message}</p>}
+        <div className="mb-4 rounded-lg border border-border bg-slate-50 px-3 py-3">
+          <div className="mb-2 flex items-center justify-between gap-3"><label htmlFor="email-logo-width" className="text-xs font-semibold text-text-primary">Logo size</label><span className="text-xs text-text-secondary">{logoWidth} px</span></div>
+          <div className="flex items-center gap-3"><input id="email-logo-width" type="range" min="40" max="240" step="1" value={logoWidth} disabled={busy}
+            onChange={e => { setLogoWidth(Number(e.target.value)); setError(''); setMessage('') }} className="min-w-0 flex-1 accent-blue-600" />
+            <button type="button" disabled={busy} onClick={() => { setLogoWidth(brandingSaved.default_width); setError(''); setMessage('') }}
+              className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border bg-white px-2.5 py-1.5 text-xs font-semibold text-text-secondary disabled:opacity-50" title="Reset logo size"><RotateCcw className="h-3.5 w-3.5" />Reset</button>
+          </div>
+        </div>
         <div className="booking-email-fields" key={type}>
           {Object.entries(fieldLabels).map(([field, label]) => <div key={field} className={`booking-email-field ${field === 'closing_html' ? 'booking-email-field--closing' : ''}`}>
             <div className="mb-2 flex items-center justify-between gap-3"><Label id={`email-${field}-label`} htmlFor={`email-${field}`}>{label}{['subject', 'greeting', 'introduction_html'].includes(field) && <span className="ml-1 text-blue-600">*</span>}</Label>
@@ -151,7 +163,7 @@ export default function WebsiteBookingEmails() {
         </div>
         <div className="booking-email-info"><Info className="h-4 w-4 shrink-0" /><span>{isDaily ? 'Arrival and departure lists, room assignments, guest counts and payment statuses are filled automatically. No occupancy or daily revenue estimates are included.' : isContact ? 'Sender details and the original enquiry message are filled in automatically.' : 'Room assignments, guest counts and payment details are filled in automatically.'}</span></div>
         <div className="booking-email-actions">
-          <button type="button" disabled={busy || !dirty} onClick={() => { setDrafts(current => ({ ...current, [type]: { ...settings.templates[type].content } })); setError(''); setMessage('Changes discarded.') }} className="text-sm font-semibold text-text-secondary hover:text-blue-700 disabled:opacity-40">Discard changes</button>
+          <button type="button" disabled={busy || !dirty} onClick={() => { setDrafts(current => ({ ...current, [type]: { ...settings.templates[type].content } })); setLogoWidth(brandingSaved.width); setError(''); setMessage('Changes discarded.') }} className="text-sm font-semibold text-text-secondary hover:text-blue-700 disabled:opacity-40">Discard changes</button>
           <div className="flex flex-wrap gap-3"><Button variant="outline" disabled={busy} onClick={() => { setDrafts(current => ({ ...current, [type]: { ...settings.defaults[type] } })); setError(''); setMessage('Default wording restored in the editor. Save to apply it.') }}><RotateCcw className="h-4 w-4" />Reset to default</Button>
             <Button disabled={busy || !dirty} onClick={save}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{busy ? 'Saving...' : 'Save changes'}</Button></div>
         </div>

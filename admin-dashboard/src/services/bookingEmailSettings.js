@@ -5,9 +5,9 @@ export async function fetchBookingEmailSettings() {
   const response = await apiFetch(url, { method: 'GET', cache: 'no-store' })
   return (await readJsonResponse(response)).data
 }
-export async function saveBookingEmailSettings(type, content, version) {
+export async function saveBookingEmailSettings(type, content, version, branding = null) {
   const response = await apiFetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type, content, version }) })
+    body: JSON.stringify({ type, content, version, ...(branding ? { logo_width: branding.width, branding_version: branding.version } : {}) }) })
   return (await readJsonResponse(response)).data
 }
 
