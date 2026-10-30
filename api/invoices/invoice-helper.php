@@ -356,7 +356,6 @@ function create_invoice_pdf_binary(array $invoice): string
     $roomNumbers = array_map(static fn(array $room): string => trim((string) ($room['room_number'] ?? '')) ?: 'Not available', $invoice['room_assignments'] ?? []);
     $roomNumberText = 'Assigned room ' . (count($roomNumbers) > 1 ? 'numbers: ' : 'number: ') . ($roomNumbers ? implode(', ', $roomNumbers) : 'Not available');
     $guestSummary = booking_guest_summary($invoice);
-    $hasGuestDetails = (int) ($invoice['children'] ?? 0) > 0 || count($invoice['room_assignments'] ?? []) > 1;
     $nights = max(1, (int) ($invoice['nights'] ?? 1));
     $currency = (string) ($invoice['currency'] ?? 'LKR');
     $amountPaid = (float) ($invoice['amount_paid'] ?? 0);
@@ -477,7 +476,7 @@ function create_invoice_pdf_binary(array $invoice): string
         'Check-in is available from 1:00 PM.',
         'Check-out is by 12:00 PM.',
         $isCash ? 'Payment will be collected at the property.' : ($isPaid ? 'Online payment has been received.' : 'Complete payment through the secure online gateway.'),
-        $hasGuestDetails ? 'Guest ages and room allocations are listed on the following pages.' : 'Please contact us in advance if you need to change your booking.',
+        'Please contact us in advance if you need to change your booking.',
     ];
     $y = 160;
     foreach ($notes as $note) {
@@ -510,18 +509,6 @@ function create_invoice_pdf_binary(array $invoice): string
     $objects[] = "8 0 obj\n<< /Length " . strlen($content) . " >>\nstream\n" . $content . "\nendstream\nendobj\n";
     if ($imageObject !== '') $objects[] = $imageObject;
 
-    // Extra pages keep long room names and child-age lists clear of the payment layout.
-    $guestPages = $hasGuestDetails ? invoice_guest_detail_pages($invoice, $bookingCode) : [];
-    $pageReferences = ['3 0 R'];
-    foreach ($guestPages as $pageContent) {
-        $pageId = count($objects) + 1;
-        $streamId = $pageId + 1;
-        $pageReferences[] = $pageId . ' 0 R';
-        $objects[] = "$pageId 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << $resources >> /Contents $streamId 0 R >>\nendobj\n";
-        $objects[] = "$streamId 0 obj\n<< /Length " . strlen($pageContent) . " >>\nstream\n" . $pageContent . "\nendstream\nendobj\n";
-    }
-    $objects[1] = "2 0 obj\n<< /Type /Pages /Kids [" . implode(' ', $pageReferences) . "] /Count " . count($pageReferences) . " >>\nendobj\n";
-
     $pdf = "%PDF-1.4\n";
     $offsets = [0];
     foreach ($objects as $object) {
@@ -536,59 +523,6 @@ function create_invoice_pdf_binary(array $invoice): string
     }
     $pdf .= "trailer\n<< /Size " . (count($objects) + 1) . " /Root 1 0 R >>\nstartxref\n" . $xrefOffset . "\n%%EOF";
     return $pdf;
-}
-
-/** Paginated guest appendix. Saved ages refer to check-in, including babies aged zero. */
-function invoice_guest_detail_pages(array $invoice, string $bookingCode): array
-{
-    $navy = [0.03, 0.11, 0.19];
-    $gold = [0.72, 0.50, 0.22];
-    $pages = [];
-    $startPage = static function (int $number) use ($bookingCode, $navy, $gold): string {
-        $page = '';
-        pdf_add_rect($page, 0, 740, 595, 102, $navy, $navy);
-        pdf_add_text($page, 38, 797, 'TULIP GUEST INN', 19, 'F4', [1, 1, 1]);
-        pdf_add_text($page, 38, 767, 'GUEST & ROOM DETAILS', 13, 'F2', $gold);
-        pdf_add_right_text($page, 557, 767, $bookingCode, 10, 'F2', [1, 1, 1]);
-        pdf_add_line($page, 38, 62, 557, 62, $gold);
-        pdf_add_text($page, 38, 44, 'Ages are recorded in years at check-in. Under 1 means less than one year old.', 8, 'F1', $navy);
-        pdf_add_right_text($page, 557, 27, 'Page ' . $number, 8, 'F1', $navy);
-        return $page;
-    };
-    $content = $startPage(2);
-    pdf_add_text($content, 38, 710, 'Booking total: ' . booking_guest_summary($invoice), 12, 'F2', $navy);
-    $y = 687;
-    $ages = booking_guest_ages($invoice);
-    if ($ages !== '') $y = pdf_add_wrapped_text($content, 38, $y, 'Child ages at check-in (years): ' . $ages, 10, 510, 15, 'F1', $navy);
-    $y -= 20;
-    $rooms = $invoice['room_assignments'] ?? [];
-    if (!$rooms) $rooms = [$invoice];
-    foreach ($rooms as $index => $room) {
-        // Render into a temporary block first to measure its complete height.
-        $drawRoom = static function (string &$target, float $top) use ($room, $index, $navy, $gold): float {
-            $top = pdf_add_wrapped_text($target, 38, $top, 'Room ' . ($index + 1) . ': ' . (string) ($room['room_name'] ?? 'Room'), 12, 510, 17, 'F2', $navy);
-            $number = trim((string) ($room['room_number'] ?? '')) ?: 'Not available';
-            $top = pdf_add_wrapped_text($target, 38, $top - 4, 'Assigned room number: ' . $number, 10, 510, 15, 'F1', $navy);
-            pdf_add_text($target, 38, $top - 4, booking_guest_summary($room), 10, 'F2', $navy);
-            $top -= 23;
-            $ages = booking_guest_ages($room);
-            if ($ages !== '') $top = pdf_add_wrapped_text($target, 38, $top, 'Child ages at check-in (years): ' . $ages, 10, 510, 15, 'F1', $navy);
-            pdf_add_line($target, 38, $top - 8, 557, $top - 8, $gold, 0.5);
-            return $top - 30;
-        };
-        $block = '';
-        $bottom = $drawRoom($block, $y);
-        if ($bottom < 80) {
-            $pages[] = $content;
-            $content = $startPage(count($pages) + 2);
-            $block = '';
-            $bottom = $drawRoom($block, 710);
-        }
-        $content .= $block;
-        $y = $bottom;
-    }
-    $pages[] = $content;
-    return $pages;
 }
 
 function create_simple_invoice_pdf(string $filePath, array $invoice): void
