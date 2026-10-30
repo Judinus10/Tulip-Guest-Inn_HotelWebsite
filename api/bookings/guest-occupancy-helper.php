@@ -34,7 +34,7 @@ function booking_party_input(array $data, string $legacyKey='guests', bool $allo
     $children=room_occupancy_integer($data['children'] ?? 0,0,19,'Children');
     $ages=$data['children_ages'] ?? [];
     if (is_string($ages)) $ages=json_decode($ages,true);
-    if (!is_array($ages)||!array_is_list($ages)||count($ages)!==$children)throw new InvalidArgumentException('Enter one age at check-in for every child.');
+    if (!is_array($ages)||!array_is_list($ages)||($ages!==[] && count($ages)!==$children))throw new InvalidArgumentException('If child ages are supplied, include one valid age for every child.');
     foreach ($ages as &$age) $age=room_occupancy_integer($age,0,17,'Child age at check-in'); unset($age);
     $guests=$adults+$children;
     if ($guests<1||$guests>20)throw new InvalidArgumentException('A reservation must contain 1 to 20 people.');
@@ -45,7 +45,7 @@ function booking_party_input(array $data, string $legacyKey='guests', bool $allo
 function booking_room_occupancy(array $room,array $party,bool $countChildren): array
 {
     $cutoff=(int)($room['max_child_age']??11);
-    $qualifying=count(array_filter($party['children_ages'],static fn(int $age):bool=>$age<=$cutoff));
+    $qualifying=empty($party['children_ages']) ? $party['children'] : count(array_filter($party['children_ages'],static fn(int $age):bool=>$age<=$cutoff));
     $adultPlaces=$party['adults']+$party['children']-$qualifying;
     $capacity=(int)($room['max_guests']??$room['guests']??0);
     $maxAdults=(int)($room['max_adults']??$capacity);
@@ -68,7 +68,7 @@ function booking_require_room_occupancy(PDO $pdo,array $room,array $party,bool $
         $room['max_child_age'] = $age;
     }
     $snapshot=booking_room_occupancy($room,$party,room_count_children_setting($pdo));
-    if (!$snapshot['fits'])throw new InvalidArgumentException('The selected adults and child ages do not fit '.($room['room_name']??'this room').'. Choose another room or additional rooms.');
+    if (!$snapshot['fits'])throw new InvalidArgumentException('The selected adult and child counts do not fit '.($room['room_name']??'this room').'. Choose another room or additional rooms.');
     return $snapshot;
 }
 
@@ -87,15 +87,14 @@ function booking_stored_party(array $row): array
 
 function booking_party_allocations(array $requested,array $total): array
 {
-    $parties=[];$adults=0;$ages=[];
+    $parties=[];$adults=0;$children=0;
     foreach($requested as $entry){
         if(!is_array($entry))throw new InvalidArgumentException('Invalid room allocation.');
         $id=room_occupancy_integer($entry['room_id']??0,1,PHP_INT_MAX,'Room ID');
         if(isset($parties[$id]))throw new InvalidArgumentException('Choose each room only once.');
         $party=booking_party_input($entry,'guests',true);$parties[$id]=$party;
-        $adults+=$party['adults'];$ages=array_merge($ages,$party['children_ages']);
+        $adults+=$party['adults'];$children+=$party['children'];
     }
-    $expected=$total['children_ages'];sort($ages);sort($expected);
-    if(!$parties||$adults!==$total['adults']||$ages!==$expected)throw new InvalidArgumentException('Allocate every adult and child exactly once across the rooms.');
+    if(!$parties||$adults!==$total['adults']||$children!==$total['children'])throw new InvalidArgumentException('Allocate every adult and child exactly once across the rooms.');
     return $parties;
 }

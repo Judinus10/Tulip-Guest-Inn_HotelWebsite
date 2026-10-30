@@ -116,7 +116,7 @@ export async function submitBookingRequest(payload: BookingFormPayload): Promise
 export type MultiRoomBookingPayload = {
   adults: number;
   children: number;
-  children_ages: number[];
+  children_ages?: number[];
   full_name: string;
   email: string;
   phone: string;
