@@ -153,6 +153,7 @@ function tulip_render_booking_email(string $type, array $content, array $booking
     if (!empty($brand['website'])) $contactHtml .= '<div style="margin-top:7px;"><a style="color:#56635b;text-decoration:none;" href="' . $e($brand['website']) . '">' . $e(parse_url($brand['website'], PHP_URL_HOST) ?: $brand['website']) . '</a></div>';
     $logoWidth = max(40, min(240, (int) ($brand['logo_width'] ?? 76)));
     $logo = !empty($brand['logo_src']) ? '<img src="' . $e($brand['logo_src']) . '" width="' . $logoWidth . '" alt="' . $e($brand['name']) . '" style="display:block;width:' . $logoWidth . 'px;max-width:100%;height:auto;margin:0 auto 12px;border:0;">' : '';
+    if ($preview) $logo = '<div data-email-brand-logo="true">' . $logo . '</div>';
     $isTest = !empty($booking['is_test_email']);
     $testBanner = $isTest ? '<tr><td style="padding:12px 20px;background:#fff5df;color:#865d1c;text-align:center;font-size:12px;font-weight:bold;">TEST EMAIL - Sample booking data. No reservation was created.</td></tr>' : '';
     $bookedBy = '';

@@ -2,10 +2,46 @@
 declare(strict_types=1);
 require_once __DIR__ . '/templates/booking-customizable-template.php';
 
+/** Keep later status changes distinct, while retries of the same change share one queue key. */
+function tulip_booking_status_email_key(string $kind, array $booking, array $payment, array $changes): string
+{
+    if (!in_array($kind, ['booking_status_updated','payment_status_updated','combined_status_updated','admin_payment_received','admin_payment_failed'], true)) {
+        throw new InvalidArgumentException('Unsupported status email event.');
+    }
+    $event = [(int) ($booking['id'] ?? 0), (string) ($booking['updated_at'] ?? ''),
+        (int) ($payment['id'] ?? 0), (string) ($payment['order_id'] ?? ''),
+        (string) ($payment['updated_at'] ?? ''), array_map(static fn($value): string => strtolower(trim((string) $value)), $changes)];
+    return $kind . '_' . substr(hash('sha256', json_encode($event, JSON_THROW_ON_ERROR)), 0, 24);
+}
+
+function tulip_booking_email_event_base(string $type): string
+{
+    return preg_match('/^(booking_status_updated|payment_status_updated|combined_status_updated|admin_payment_received|admin_payment_failed)_[a-f0-9]{24}$/D', $type, $match)
+        ? $match[1] : $type;
+}
+
+/** Admin manual payment updates use the same editable templates and routing as gateway events. */
+function tulip_queue_admin_payment_update(PDO $pdo, array $booking, array $payment, string $oldStatus, string $newStatus): void
+{
+    if (strcasecmp(trim($oldStatus), trim($newStatus)) === 0 || (int) ($booking['id'] ?? 0) < 1) return;
+    $kind = match (strtolower(trim($newStatus))) { 'paid'=>'admin_payment_received', 'failed'=>'admin_payment_failed', default=>null };
+    if ($kind === null) return;
+    $type = tulip_booking_status_email_key($kind, $booking, $payment, [$oldStatus, $newStatus]);
+    try {
+        $notification = tulip_booking_email_for_queue($pdo, 'booking', (int) $booking['id'], booking_admin_email(), $type);
+        if ($notification === null) return;
+        $queued = enqueue_email($pdo, 'booking', (int) $booking['id'], booking_admin_email(),
+            $notification['subject'], $notification['html'], $type, $booking['email'] ?? null, 3, booking_from_email(), booking_from_name());
+        if (!$queued) error_log('Admin payment status email could not be queued for booking #' . $booking['id']);
+    } catch (Throwable $e) {
+        error_log('Admin payment status email failed for booking #' . $booking['id'] . ': ' . $e->getMessage());
+    }
+}
+
 /** Map supported guest and hotel booking notifications to their editable templates. */
 function tulip_booking_template_event(string $emailType): ?string
 {
-    return match ($emailType) {
+    return match (tulip_booking_email_event_base($emailType)) {
         'admin_new_booking', 'admin_manual_booking' => 'admin_new_booking',
         'booking_payment_pending_admin' => 'admin_payment_pending',
         'booking_expired_admin' => 'admin_booking_expired',
@@ -42,6 +78,7 @@ function tulip_saved_booking_template(PDO $pdo, string $type): array
 
 function tulip_booking_email_for_queue(PDO $pdo, ?string $relatedType, ?int $bookingId, string $recipient, string $emailType): ?array
 {
+    $emailType = tulip_booking_email_event_base($emailType);
     $event = tulip_booking_template_event($emailType);
     if ($relatedType !== 'booking' || !$bookingId || !$event) return null;
     $stmt = $pdo->prepare('SELECT * FROM bookings WHERE id = ? LIMIT 1');

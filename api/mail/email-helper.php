@@ -1847,6 +1847,7 @@ function queue_payment_failed_email(PDO $pdo, array $booking): int
 
 function send_booking_status_changed_email(PDO $pdo, array $booking, string $oldStatus, string $newStatus): void
 {
+    if (strcasecmp(trim($oldStatus), trim($newStatus)) === 0) return;
     $booking = booking_with_guest_details($pdo, $booking);
     $label = status_label_for_email($newStatus);
     $tone = strtolower($label) === 'confirmed' ? 'green' : (strtolower($label) === 'cancelled' ? 'red' : 'blue');
@@ -1856,7 +1857,7 @@ function send_booking_status_changed_email(PDO $pdo, array $booking, string $old
         'New Booking Status' => $label,
     ]);
 
-    $sent = send_tracked_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''), 'Booking status updated - Tulip Guest Inn #' . $bookingId, $body, 'booking_status_updated');
+    $sent = send_tracked_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''), 'Booking status updated - Tulip Guest Inn #' . $bookingId, $body, tulip_booking_status_email_key('booking_status_updated', $booking, [], [$oldStatus, $newStatus]));
     if ($bookingId > 0) {
         update_booking_email_status($pdo, $bookingId, $sent ? 'Queued' : 'Queue Failed');
     }
@@ -1864,6 +1865,7 @@ function send_booking_status_changed_email(PDO $pdo, array $booking, string $old
 
 function send_payment_status_changed_email(PDO $pdo, array $booking, array $payment, string $oldStatus, string $newStatus): void
 {
+    if (strcasecmp(trim($oldStatus), trim($newStatus)) === 0) return;
     $booking = booking_with_guest_details($pdo, $booking);
     $label = status_label_for_email($newStatus);
     $tone = strtolower($label) === 'paid' ? 'green' : (strtolower($label) === 'failed' ? 'red' : 'gold');
@@ -1875,7 +1877,8 @@ function send_payment_status_changed_email(PDO $pdo, array $booking, array $paym
         'Amount' => $amount,
     ]);
 
-    $sent = send_tracked_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''), 'Payment status updated - Tulip Guest Inn #' . $bookingId, $body, 'payment_status_updated');
+    $sent = send_tracked_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''), 'Payment status updated - Tulip Guest Inn #' . $bookingId, $body, tulip_booking_status_email_key('payment_status_updated', $booking, $payment, [$oldStatus, $newStatus]));
+    tulip_queue_admin_payment_update($pdo, $booking, $payment, $oldStatus, $newStatus);
     if ($bookingId > 0) {
         update_booking_email_status($pdo, $bookingId, $sent ? 'Queued' : 'Queue Failed');
     }
@@ -1883,6 +1886,8 @@ function send_payment_status_changed_email(PDO $pdo, array $booking, array $paym
 
 function send_combined_status_changed_email(PDO $pdo, array $booking, array $payment, string $oldBookingStatus, string $newBookingStatus, string $oldPaymentStatus, string $newPaymentStatus): void
 {
+    if (strcasecmp(trim($oldBookingStatus), trim($newBookingStatus)) === 0
+        && strcasecmp(trim($oldPaymentStatus), trim($newPaymentStatus)) === 0) return;
     $booking = booking_with_guest_details($pdo, $booking);
     $bookingLabel = status_label_for_email($newBookingStatus);
     $paymentLabel = status_label_for_email($newPaymentStatus);
@@ -1895,7 +1900,8 @@ function send_combined_status_changed_email(PDO $pdo, array $booking, array $pay
         'Amount' => $amount,
     ]);
 
-    $sent = send_tracked_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''), 'Booking and payment updated - Tulip Guest Inn #' . $bookingId, $body, 'combined_status_updated');
+    $sent = send_tracked_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''), 'Booking and payment updated - Tulip Guest Inn #' . $bookingId, $body, tulip_booking_status_email_key('combined_status_updated', $booking, $payment, [$oldBookingStatus, $newBookingStatus, $oldPaymentStatus, $newPaymentStatus]));
+    tulip_queue_admin_payment_update($pdo, $booking, $payment, $oldPaymentStatus, $newPaymentStatus);
     if ($bookingId > 0) {
         update_booking_email_status($pdo, $bookingId, $sent ? 'Queued' : 'Queue Failed');
     }

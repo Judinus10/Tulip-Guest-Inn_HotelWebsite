@@ -84,6 +84,7 @@ function tulip_render_daily_summary_email(array $content, array $summary, array 
     $subject = trim(preg_replace('/[\x00-\x1F\x7F]+/u', ' ', tulip_booking_email_plain_text($content['subject'], $tokens)) ?? '');
     $width = max(40, min(240, (int) ($brand['logo_width'] ?? 76)));
     $logo = !empty($brand['logo_src']) ? '<img src="'.$e($brand['logo_src']).'" width="'.$width.'" alt="'.$e($brand['name']).'" style="display:block;width:'.$width.'px;max-width:100%;height:auto;margin:0 auto 12px;border:0;">' : '';
+    if ($preview) $logo = '<div data-email-brand-logo="true">' . $logo . '</div>';
     $action = '';
     if ($preview || !empty($summary['is_test_email'])) {
         $action = '<div style="padding:13px;text-align:center;background:#19352B;color:#fff;border-radius:5px;font-weight:bold;">Open booking calendar (sample)</div>';

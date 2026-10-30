@@ -34,6 +34,7 @@ const same = (a, b) => Object.keys(limits).every(key => a?.[key] === b?.[key])
 export default function WebsiteBookingEmails() {
   const [type, setType] = useState('received')
   const [brandingRevision, setBrandingRevision] = useState(0)
+  const [brandingDraft, setBrandingDraft] = useState(null)
   const [settings, setSettings] = useState(null)
   const [drafts, setDrafts] = useState({})
   const [loading, setLoading] = useState(true)
@@ -109,7 +110,7 @@ export default function WebsiteBookingEmails() {
         onClick={() => { setType(key); setTarget('introduction_html'); positions.current = {}; setError(''); setMessage('') }}
         className={`rounded-lg border px-4 py-2 text-sm font-semibold ${categoryOf(key) === category ? 'border-blue-600 bg-blue-600 text-white' : 'border-border bg-white text-text-secondary'}`}>{title}</button>)}
     </div>
-    <EmailBrandingSettings onSaved={() => setBrandingRevision(n => n + 1)} />
+    <EmailBrandingSettings onDraftChange={setBrandingDraft} onSaved={() => setBrandingRevision(n => n + 1)} />
     <div className="booking-email-workspace">
       <section className="booking-email-card booking-email-editor" aria-label="Email content editor">
         <div className="booking-email-card-heading"><h2>Email content</h2>
@@ -156,7 +157,7 @@ export default function WebsiteBookingEmails() {
         </div>
       </section>
       <aside className="booking-email-preview-column">
-        <BookingEmailPreview type={type} content={draft} brandingRevision={brandingRevision} />
+        <BookingEmailPreview type={type} content={draft} brandingRevision={brandingRevision} branding={brandingDraft} />
       </aside>
     </div>
   </div>

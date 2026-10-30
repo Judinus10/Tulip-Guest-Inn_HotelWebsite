@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { CheckCircle2, Loader2, Mail } from 'lucide-react'
 import { sendBookingEmailTest } from '@/services/bookingEmailSettings'
 
-export default function BookingEmailTest({ type, content, scenario }) {
+export default function BookingEmailTest({ type, content, scenario, brandingUnsaved = false }) {
   const [recipient, setRecipient] = useState('')
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -13,7 +13,7 @@ export default function BookingEmailTest({ type, content, scenario }) {
   useEffect(() => { active.current = true; return () => { active.current = false } }, [])
   async function send(event) {
     event.preventDefault()
-    if (inFlight.current) return
+    if (inFlight.current || brandingUnsaved) return
     inFlight.current = true
     setBusy(true); setError(''); setMessage('')
     const address = recipient.trim()
@@ -33,11 +33,12 @@ export default function BookingEmailTest({ type, content, scenario }) {
     {open && <form id="booking-email-test-form" onSubmit={send} className="booking-email-test-form">
     <label htmlFor="booking-email-test-recipient" className="text-sm font-semibold text-text-primary">Send a test email</label>
     <p className="mb-3 mt-1 text-xs leading-5 text-text-secondary">{type === 'admin_daily_summary' ? 'Uses the current draft and sample daily summary. Real guest records and the scheduled summary are not affected.' : type.startsWith('contact_') ? 'Uses the current draft and sample enquiry. This does not save changes or create an enquiry.' : 'Uses the current draft and selected sample booking. This does not save your changes or create a reservation.'}</p>
+    {brandingUnsaved && <p role="status" className="mb-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Save or discard your email branding changes before sending a test email.</p>}
     <div className="flex flex-wrap gap-2">
       <input id="booking-email-test-recipient" type="email" autoComplete="email" required maxLength={190} value={recipient} disabled={busy}
         onChange={e => { setRecipient(e.target.value); setMessage(''); setError('') }} placeholder="Enter your email address"
         className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-white px-3 text-sm text-text-primary outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-50" />
-      <button type="submit" disabled={busy} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50">
+      <button type="submit" disabled={busy || brandingUnsaved} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50">
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}{busy ? 'Queueing...' : 'Send test email'}
       </button>
     </div>

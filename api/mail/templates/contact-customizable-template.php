@@ -26,6 +26,7 @@ function tulip_render_contact_email(string $type, array $content, array $enquiry
     if(!empty($brand['website']))$contacts[]='<a href="'.$e($brand['website']).'" style="color:#647067;">'.$e(parse_url($brand['website'],PHP_URL_HOST)).'</a>';
     $width=max(40,min(240,(int)($brand['logo_width']??76)));
     $logo=!empty($brand['logo_src'])?'<img width="'.$width.'" src="'.$e($brand['logo_src']).'" alt="'.$e($brand['name']).'" style="display:block;width:'.$width.'px;max-width:100%;height:auto;margin:0 auto 12px;">':'';
+    if ($preview) $logo = '<div data-email-brand-logo="true">' . $logo . '</div>';
     $reply='';
     if($admin && filter_var($enquiry['email']??'',FILTER_VALIDATE_EMAIL))$reply='<tr><td class="pad" style="padding:0 28px 24px;text-align:center;">'.($test?'<span style="display:block;background:#19352B;color:white;padding:12px;">Reply to customer (sample)</span>':'<a style="display:block;padding:13px;background:#19352B;color:white;text-decoration:none;border-radius:5px;font-weight:bold;" href="mailto:'.$e($enquiry['email']).'">Reply to customer</a>').'</td></tr>';
     $safeHead=$preview?'<meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;;img-src data:;style-src &#39;unsafe-inline&#39;;"><style>a{pointer-events:none!important}</style>':'';

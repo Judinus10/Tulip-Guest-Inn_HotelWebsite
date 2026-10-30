@@ -1,9 +1,10 @@
 import BookingEmailTest from '@/components/ui/BookingEmailTest'
-import { useEffect, useRef, useState } from 'react'
+import { applyEmailBrandingPreview } from '@/services/emailBrandingPreview'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertCircle, Loader2, Monitor, RefreshCw, Smartphone } from 'lucide-react'
 import { previewBookingEmail } from '@/services/bookingEmailSettings'
 
-export default function BookingEmailPreview({ type, content, brandingRevision = 0 }) {
+export default function BookingEmailPreview({ type, content, brandingRevision = 0, branding = null }) {
   const [device, setDevice] = useState('desktop')
   const [scenario, setScenario] = useState('single')
   const [preview, setPreview] = useState(null)
@@ -32,6 +33,7 @@ export default function BookingEmailPreview({ type, content, brandingRevision = 
     }, 400)
     return () => { active = false; clearTimeout(timer); controller.abort() }
   }, [fingerprint, refresh, brandingRevision]) // A change to any draft field schedules a fresh, cancellable preview.
+  const previewHtml = useMemo(() => applyEmailBrandingPreview(preview?.html || '', branding), [preview?.html, branding?.logo, branding?.width])
   const isContact = type.startsWith('contact_')
   const stale = preview && preview.fingerprint !== fingerprint
   useEffect(() => {
@@ -64,7 +66,7 @@ export default function BookingEmailPreview({ type, content, brandingRevision = 
     </div>
     <div className="booking-email-preview-meta">
       <p title={preview?.subject || ''}>{preview ? <>Subject: {preview.subject}</> : 'Sample booking data · Saved hotel details'}</p>
-      <span role="status" className="inline-flex shrink-0 items-center gap-1">{busy ? <><Loader2 className="h-3 w-3 animate-spin" />Updating...</> : stale ? 'Showing last valid preview' : error ? 'Preview unavailable' : 'Up to date'}</span>
+      <span role="status" className="inline-flex shrink-0 items-center gap-1">{busy ? <><Loader2 className="h-3 w-3 animate-spin" />Updating...</> : stale ? 'Showing last valid preview' : error ? 'Preview unavailable' : branding?.preparing ? 'Preparing logo…' : branding?.dirty ? 'Unsaved logo preview' : 'Up to date'}</span>
       <button type="button" aria-label="Refresh email preview" title="Refresh hotel details" onClick={() => setRefresh(n => n + 1)}><RefreshCw className="h-3.5 w-3.5" /></button>
     </div>
     {error && <p role="alert" className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{error}</p>}
@@ -72,13 +74,13 @@ export default function BookingEmailPreview({ type, content, brandingRevision = 
       <div className="booking-email-preview-stage">
         <div ref={stage}>
           <div className="booking-email-preview-frame" style={{ width: frameWidth * scale, height: 820 * scale }}>
-            <iframe title={`Sample ${isContact ? 'contact enquiry' : isDaily ? 'daily admin summary' : type.startsWith('admin_') ? 'admin notification' : type.replaceAll('_', ' ')} email preview`} sandbox="" referrerPolicy="no-referrer" srcDoc={preview.html}
+            <iframe title={`Sample ${isContact ? 'contact enquiry' : isDaily ? 'daily admin summary' : type.startsWith('admin_') ? 'admin notification' : type.replaceAll('_', ' ')} email preview`} sandbox="" referrerPolicy="no-referrer" srcDoc={previewHtml}
               style={{ display: 'block', border: 0, width: frameWidth, height: 820, transform: `scale(${scale})`, transformOrigin: 'top left' }} />
           </div>
         </div>
       </div>
       <p className="booking-email-preview-note">{isDaily ? 'Sample daily operations data.' : isContact ? 'Sample enquiry data.' : 'Sample booking data.'} Links are inactive. Previewing does not save or send an email.</p>
     </> : <div className="flex min-h-[420px] items-center justify-center rounded-lg border border-dashed border-border bg-slate-50 p-6 text-center text-sm text-text-secondary">{busy ? 'Preparing your email preview...' : 'Complete the required fields to see the email preview.'}</div>}
-    <BookingEmailTest type={type} content={content} scenario={selectedScenario} />
+    <BookingEmailTest type={type} content={content} scenario={selectedScenario} brandingUnsaved={Boolean(branding?.dirty || branding?.preparing)} />
   </section>
 }
