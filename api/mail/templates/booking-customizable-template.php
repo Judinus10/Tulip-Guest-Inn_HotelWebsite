@@ -111,6 +111,16 @@ function tulip_booking_email_plain_text(string $text, array $tokens): string
     return strtr($text, $replacements);
 }
 
+/** Shared optional note row for guest, contact and internal notification emails. */
+function tulip_email_note_row(string $text, array $tokens, string $padClass = 'email-pad', int $padding = 32): string
+{
+    if (trim($text) === '') return '';
+    $note = nl2br(tulip_booking_email_escape(tulip_booking_email_plain_text($text, $tokens)));
+    $padClass = in_array($padClass, ['email-pad', 'pad', 'summary-pad'], true) ? $padClass : 'email-pad';
+    $padding = max(18, min(32, $padding));
+    return '<tr><td class="' . $padClass . '" style="padding:0 ' . $padding . 'px 22px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td bgcolor="#fff5df" style="padding:16px 18px;background:#fff5df;color:#865d1c;border-radius:6px;line-height:1.7;word-break:break-word;overflow-wrap:anywhere;"><strong>Please note:</strong> ' . $note . '</td></tr></table></td></tr>';
+}
+
 /** Pure email renderer, shared by preview now and delivery integration in the following step. */
 function tulip_render_booking_email(string $type, array $content, array $booking, array $brand, string $billUrl = '', bool $preview = false): array
 {
@@ -204,11 +214,7 @@ function tulip_render_booking_email(string $type, array $content, array $booking
     } elseif ($preview || (filter_var($billUrl, FILTER_VALIDATE_URL) && preg_match('~^https?://~i', $billUrl))) {
         $action = '<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" bgcolor="#19352B" style="border-radius:6px;"><a href="' . ($preview ? '#' : $e($billUrl)) . '" target="_blank" rel="noopener noreferrer" style="display:block;padding:15px 20px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;">' . $actionLabel . '</a></td></tr></table>';
     }
-    $pleaseNote = '';
-    if (!$isAdmin && ($content['please_note'] ?? '') !== '') {
-        $noteText = nl2br($e(tulip_booking_email_plain_text($content['please_note'], $tokens)));
-        $pleaseNote = '<tr><td class="email-pad" style="padding:0 32px 22px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td bgcolor="#fff5df" style="padding:16px 18px;background:#fff5df;color:#865d1c;border-radius:6px;line-height:1.7;word-break:break-word;overflow-wrap:anywhere;"><strong>Please note:</strong> ' . $noteText . '</td></tr></table></td></tr>';
-    }
+    $pleaseNote = tulip_email_note_row($content['please_note'] ?? '', $tokens);
     $whatsapp = '';
     $whatsappUrl = $isAdmin ? '' : tulip_booking_whatsapp_url((string) ($brand['whatsapp'] ?? ''), $tokens['booking_reference']);
     if ($whatsappUrl !== '') {

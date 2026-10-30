@@ -150,13 +150,13 @@ export default function WebsiteBookingEmails() {
           </div>
         </div>
         <div className="booking-email-fields" key={type}>
-          {Object.entries(fieldLabels).filter(([field]) => field !== 'please_note' || (category === 'booking' && !isAdminBooking)).map(([field, label]) => <div key={field} className={`booking-email-field ${field === 'closing_html' ? 'booking-email-field--closing' : ''}`}>
+          {Object.entries(fieldLabels).map(([field, label]) => <div key={field} className={`booking-email-field ${field === 'closing_html' ? 'booking-email-field--closing' : ''}`}>
             <div className="mb-2 flex items-center justify-between gap-3"><Label id={`email-${field}-label`} htmlFor={`email-${field}`}>{label}{['subject', 'greeting', 'introduction_html'].includes(field) && <span className="ml-1 text-blue-600">*</span>}</Label>
 </div>
             {field.endsWith('_html') ? <BookingEmailTextEditor ref={field === 'introduction_html' ? intro : closing} id={`email-${field}`} value={draft[field] ?? ''} onChange={value => change(field, value)} onFocus={() => setTarget(field)} disabled={busy} />
               : ['footer_note', 'please_note'].includes(field) ? <Textarea id={`email-${field}`} value={draft[field] ?? ''} disabled={busy} ref={node => { inputs.current[field] = node }} onFocus={e => remember(field, e.target)} onSelect={e => remember(field, e.target)} onBlur={e => remember(field, e.target)} onChange={e => change(field, e.target.value)} />
                 : <Input id={`email-${field}`} value={draft[field] ?? ''} disabled={busy} ref={node => { inputs.current[field] = node }} onFocus={e => remember(field, e.target)} onSelect={e => remember(field, e.target)} onBlur={e => remember(field, e.target)} onChange={e => change(field, e.target.value)} />}
-            {field === 'please_note'}
+            {field === 'please_note' && <p className="mt-2 text-xs text-text-secondary">Shown in a highlighted box near the end of the email. Leave empty to hide. Saved separately for each email template; maximum 1,500 UTF-8 bytes.</p>}
           </div>)}
         </div>
         <div className="booking-email-insert">

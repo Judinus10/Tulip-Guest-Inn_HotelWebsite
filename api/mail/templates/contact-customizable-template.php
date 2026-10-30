@@ -39,6 +39,7 @@ function tulip_render_contact_email(string $type, array $content, array $enquiry
 <tr><td class="pad" style="padding:0 28px 20px;"><div style="padding:12px 16px;background:#f6f3ec;border-radius:5px;"><span style="font-size:11px;color:#647067;">ENQUIRY REFERENCE</span><br><strong style="font-size:18px;">'.$e($tokens['enquiry_reference']).'</strong></div></td></tr>
 <tr><td class="pad" style="padding:0 28px 20px;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #e8e3da;table-layout:fixed;">'.$rows.'<tr><td colspan="2" style="padding:16px;"><strong>Message</strong><div style="margin-top:8px;word-break:break-word;overflow-wrap:anywhere;">'.nl2br($e($enquiry['message']??'')).'</div></td></tr></table></td></tr>'.$reply.'
 <tr><td class="pad" style="padding:0 28px 22px;word-break:break-word;">'.$closing.($footer!==''?'<p style="color:#647067;">'.$footer.'</p>':'').'</td></tr>
+'.tulip_email_note_row($content['please_note'] ?? '', $tokens, 'pad', 28).'
 <tr><td data-email-theme-footer="true" class="pad" style="padding:20px 28px;text-align:center;border-top:1px solid #C7A86B;font-size:12px;color:#647067;"><strong style="font-family:Georgia,serif;font-size:17px;color:#19352B;">'.$e($brand['name']).'</strong><div>'.nl2br($e($brand['address']??'')).'</div><div>'.implode(' &nbsp;|&nbsp; ',$contacts).'</div></td></tr></table><!--[if mso]></td></tr></table><![endif]--></td></tr></table></body></html>';
     return ['subject'=>$subject,'html'=>tulip_email_apply_theme($html,$brand['colors']??theme_default_colors())];
 }

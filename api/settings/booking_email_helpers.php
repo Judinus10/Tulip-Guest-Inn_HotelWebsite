@@ -14,13 +14,6 @@ function booking_email_editor_placeholders(?string $type = null): array
     return $type === null ? array_merge($booking, $contact, $payment, $summary) : $booking;
 }
 
-/** Only guest booking templates have a customer-facing notice box. */
-function booking_email_editor_has_note(?string $type): bool
-{
-    return in_array($type, ['received', 'confirmed', 'payment_pending', 'payment_failed',
-        'payment_received', 'expired', 'cancelled', 'status_updated'], true);
-}
-
 function booking_email_editor_defaults(): array
 {
     $common = ['greeting' => 'Hello {guest_name},',
@@ -52,7 +45,7 @@ function booking_email_editor_defaults(): array
         ]),
     ];
     foreach ($defaults as $type => &$content) {
-        if (booking_email_editor_has_note($type)) $content['please_note'] = $type === 'received'
+        $content['please_note'] = $type === 'received'
             ? 'This is an acknowledgement that we have received your request. Your reservation is only confirmed when you receive a booking confirmation email.' : '';
     }
     unset($content);
@@ -120,10 +113,8 @@ function booking_email_editor_validate(mixed $content, ?string $type = null): ar
     if (!is_array($content)) throw new InvalidArgumentException('Provide the email content fields.');
     // Existing saved templates and older clients contain only the original five fields.
     // An absent notice stays empty, preserving previously saved wording.
-    if (booking_email_editor_has_note($type)) {
-        $limits['please_note'] = 1500;
-        if (!array_key_exists('please_note', $content)) $content['please_note'] = '';
-    }
+    $limits['please_note'] = 1500;
+    if (!array_key_exists('please_note', $content)) $content['please_note'] = '';
     if (array_diff(array_keys($content), array_keys($limits)) || array_diff(array_keys($limits), array_keys($content))) {
         throw new InvalidArgumentException('Provide the supported email content fields.');
     }

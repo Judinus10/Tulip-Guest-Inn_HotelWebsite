@@ -102,6 +102,7 @@ function tulip_render_daily_summary_email(array $content, array $summary, array 
         .'<h2 style="font-family:Georgia,serif;font-size:22px;color:#19352B;margin:24px 0 8px;">Today’s check-ins</h2>'.tulip_daily_summary_list($arrivals, 'No check-ins scheduled for today.')
         .'<h2 style="font-family:Georgia,serif;font-size:22px;color:#19352B;margin:24px 0 8px;">Today’s check-outs</h2>'.tulip_daily_summary_list($departures, 'No check-outs scheduled for today.').$action.'</td></tr>'
         .'<tr><td class="summary-pad" style="padding:0 32px 22px;">'.tulip_booking_email_rich_text($content['closing_html'], $tokens).'<p style="color:#647067;">'.nl2br($e(tulip_booking_email_plain_text($content['footer_note'], $tokens))).'</p></td></tr>'
+        .tulip_email_note_row($content['please_note'] ?? '', $tokens, 'summary-pad')
         .'<tr><td data-email-theme-footer="true" align="center" style="padding:20px;border-top:1px solid #C7A86B;font-size:12px;color:#647067;">Internal operations summary · '.$e($brand['name']).'</td></tr></table><!--[if mso]></td></tr></table><![endif]--></td></tr></table></body></html>';
     return ['subject'=>$subject, 'html'=>tulip_email_apply_theme($html, $brand['colors'] ?? theme_default_colors())];
 }
