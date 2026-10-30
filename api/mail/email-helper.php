@@ -177,6 +177,15 @@ function send_html_email(string $to, string $subject, string $htmlBody, ?string 
             }
         }
 
+        // Each queued custom logo keeps its own CID and immutable file reference.
+        if (preg_match_all('/cid:(tulip-email-logo-([a-f0-9]{32}\.(?:png|jpg)))/', $htmlBody, $logoMatches, PREG_SET_ORDER)) {
+            foreach ($logoMatches as $match) {
+                $path = email_branding_logo_path($match[2]);
+                if (!is_file($path)) throw new RuntimeException('The queued email logo is missing.');
+                $mail->addEmbeddedImage($path, $match[1], basename($path), 'base64', email_image_mime_type($path));
+            }
+        }
+
         if (str_contains($htmlBody, 'cid:complyx-brand-logo')) {
             $companyLogoPath = email_company_logo_path();
             if ($companyLogoPath !== '') {

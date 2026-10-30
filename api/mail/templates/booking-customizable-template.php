@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/../../settings/booking_email_helpers.php';
+require_once __DIR__ . '/../../settings/email_branding_helpers.php';
 require_once __DIR__ . '/../../bookings/guest-display-helper.php';
 
 function tulip_booking_email_escape(mixed $value): string
@@ -32,15 +33,17 @@ function tulip_booking_email_brand(PDO $pdo, bool $inlineLogo = true): array
         $normalized = preg_replace('/[^+0-9]/', '', $number);
         if ($number !== '' && preg_match('/[0-9]/', $normalized)) $phones[$normalized] = $number;
     }
-    $logoPath = dirname(__DIR__, 2) . '/invoices/assets/tulip-logo-full.jpg';
+    $branding = email_branding_read($pdo);
+    $logoPath = email_branding_logo_path($branding['logo_file']);
     $logo = '';
-    if (is_file($logoPath)) $logo = $inlineLogo ? 'data:image/jpeg;base64,' . base64_encode((string) file_get_contents($logoPath)) : 'cid:jebal-brand-logo';
+    if (is_file($logoPath)) $logo = $inlineLogo ? email_branding_data_uri($logoPath)
+        : ($branding['logo_file'] !== '' ? 'cid:tulip-email-logo-' . $branding['logo_file'] : 'cid:jebal-brand-logo');
     $timeHint = static function (string $value, string $prefix): string {
         if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/D', $value)) return '';
         $time = DateTimeImmutable::createFromFormat('!H:i', $value);
         return $prefix . $time->format('g:i A');
     };
-    return ['name' => ($settings['business_name'] ?? '') ?: 'Tulip Guest Inn', 'logo_src' => $logo,
+    return ['name' => ($settings['business_name'] ?? '') ?: 'Tulip Guest Inn', 'logo_src' => $logo, 'logo_width' => $branding['width'],
         'address' => $settings['address'] ?? '', 'phones' => array_values($phones),
         'email' => filter_var($settings['email'] ?? '', FILTER_VALIDATE_EMAIL) ? $settings['email'] : '',
         'website' => $website,
@@ -126,7 +129,8 @@ function tulip_render_booking_email(string $type, array $content, array $booking
     $contactHtml = $contacts ? '<div style="margin-top:7px;">' . implode(' &nbsp;|&nbsp; ', $contacts) . '</div>' : '';
     if (!empty($brand['email'])) $contactHtml .= '<div style="margin-top:7px;"><a style="color:#56635b;text-decoration:none;" href="mailto:' . $e($brand['email']) . '">' . $e($brand['email']) . '</a></div>';
     if (!empty($brand['website'])) $contactHtml .= '<div style="margin-top:7px;"><a style="color:#56635b;text-decoration:none;" href="' . $e($brand['website']) . '">' . $e(parse_url($brand['website'], PHP_URL_HOST) ?: $brand['website']) . '</a></div>';
-    $logo = !empty($brand['logo_src']) ? '<img src="' . $e($brand['logo_src']) . '" width="76" alt="' . $e($brand['name']) . '" style="display:block;width:76px;max-width:100%;height:auto;margin:0 auto 12px;border:0;">' : '';
+    $logoWidth = max(40, min(240, (int) ($brand['logo_width'] ?? 76)));
+    $logo = !empty($brand['logo_src']) ? '<img src="' . $e($brand['logo_src']) . '" width="' . $logoWidth . '" alt="' . $e($brand['name']) . '" style="display:block;width:' . $logoWidth . 'px;max-width:100%;height:auto;margin:0 auto 12px;border:0;">' : '';
     $isTest = !empty($booking['is_test_email']);
     $testBanner = $isTest ? '<tr><td style="padding:12px 20px;background:#fff5df;color:#865d1c;text-align:center;font-size:12px;font-weight:bold;">TEST EMAIL - Sample booking data. No reservation was created.</td></tr>' : '';
     $bookedBy = '';

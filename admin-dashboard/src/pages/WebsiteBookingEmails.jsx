@@ -1,3 +1,4 @@
+import EmailBrandingSettings from '@/components/ui/EmailBrandingSettings'
 import './WebsiteBookingEmails.css'
 import BookingEmailPreview from '@/components/ui/BookingEmailPreview'
 import { useEffect, useRef, useState } from 'react'
@@ -17,6 +18,7 @@ const same = (a, b) => Object.keys(limits).every(key => a?.[key] === b?.[key])
 
 export default function WebsiteBookingEmails() {
   const [type, setType] = useState('received')
+  const [brandingRevision, setBrandingRevision] = useState(0)
   const [settings, setSettings] = useState(null)
   const [drafts, setDrafts] = useState({})
   const [loading, setLoading] = useState(true)
@@ -82,6 +84,7 @@ export default function WebsiteBookingEmails() {
   if (loading) return <SectionCard><p role="status" className="flex items-center gap-2 text-sm text-text-secondary"><Loader2 className="h-4 w-4 animate-spin" />Loading booking emails...</p></SectionCard>
   if (loadError) return <SectionCard><p role="alert" className="text-sm text-red-700">{loadError}</p><Button className="mt-4" variant="outline" onClick={() => window.location.reload()}>Reload settings</Button></SectionCard>
   return <div className="booking-email-page">
+    <EmailBrandingSettings onSaved={() => setBrandingRevision(n => n + 1)} />
     <div className="booking-email-workspace">
       <section className="booking-email-card booking-email-editor" aria-label="Email content editor">
         <div className="booking-email-card-heading"><h2>Email content</h2>
@@ -123,7 +126,7 @@ export default function WebsiteBookingEmails() {
         </div>
       </section>
       <aside className="booking-email-preview-column">
-        <BookingEmailPreview type={type} content={draft} />
+        <BookingEmailPreview type={type} content={draft} brandingRevision={brandingRevision} />
       </aside>
     </div>
   </div>

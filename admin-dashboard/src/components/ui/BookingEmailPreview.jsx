@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AlertCircle, Loader2, Monitor, RefreshCw, Smartphone } from 'lucide-react'
 import { previewBookingEmail } from '@/services/bookingEmailSettings'
 
-export default function BookingEmailPreview({ type, content }) {
+export default function BookingEmailPreview({ type, content, brandingRevision = 0 }) {
   const [device, setDevice] = useState('desktop')
   const [scenario, setScenario] = useState('single')
   const [preview, setPreview] = useState(null)
@@ -28,7 +28,7 @@ export default function BookingEmailPreview({ type, content }) {
       } finally { if (active && request === sequence.current) setBusy(false) }
     }, 400)
     return () => { active = false; clearTimeout(timer); controller.abort() }
-  }, [fingerprint, refresh]) // A change to any draft field schedules a fresh, cancellable preview.
+  }, [fingerprint, refresh, brandingRevision]) // A change to any draft field schedules a fresh, cancellable preview.
   const stale = preview && preview.fingerprint !== fingerprint
   useEffect(() => {
     const node = stage.current
