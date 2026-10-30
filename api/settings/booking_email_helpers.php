@@ -14,6 +14,20 @@ function booking_email_editor_placeholders(?string $type = null): array
     return $type === null ? array_merge($booking, $contact, $payment, $summary) : $booking;
 }
 
+/** Default body headings are separate from inbox subject lines. */
+function booking_email_editor_default_headings(): array
+{
+    return ['received'=>'We received your booking', 'confirmed'=>'Your booking is confirmed',
+        'payment_pending'=>'Online payment pending', 'payment_failed'=>'Payment unsuccessful',
+        'payment_received'=>'Payment received', 'expired'=>'Your booking hold has expired',
+        'cancelled'=>'Your booking has been cancelled', 'status_updated'=>'Your booking details have changed',
+        'admin_new_booking'=>'New booking received', 'admin_payment_received'=>'Payment received',
+        'admin_payment_failed'=>'Payment failed', 'admin_payment_pending'=>'Online payment pending',
+        'admin_booking_expired'=>'Booking hold expired', 'admin_booking_cancelled'=>'Booking cancelled',
+        'contact_customer'=>'We received your message', 'contact_admin'=>'New contact enquiry',
+        'admin_daily_summary'=>'Daily stay summary'];
+}
+
 function booking_email_editor_defaults(): array
 {
     $common = ['greeting' => 'Hello {guest_name},',
@@ -45,6 +59,7 @@ function booking_email_editor_defaults(): array
         ]),
     ];
     foreach ($defaults as $type => &$content) {
+        $content['heading'] = booking_email_editor_default_headings()[$type];
         $content['please_note'] = $type === 'received'
             ? 'This is an acknowledgement that we have received your request. Your reservation is only confirmed when you receive a booking confirmation email.' : '';
     }
@@ -109,10 +124,11 @@ function booking_email_editor_sanitize(string $html): string
 
 function booking_email_editor_validate(mixed $content, ?string $type = null): array
 {
-    $limits = ['subject' => 200, 'greeting' => 200, 'introduction_html' => 6000, 'closing_html' => 4000, 'footer_note' => 500];
+    $limits = ['subject' => 200, 'heading' => 200, 'greeting' => 200, 'introduction_html' => 6000, 'closing_html' => 4000, 'footer_note' => 500];
     if (!is_array($content)) throw new InvalidArgumentException('Provide the email content fields.');
-    // Existing saved templates and older clients contain only the original five fields.
-    // An absent notice stays empty, preserving previously saved wording.
+    // Preserve existing saved templates and accept older clients without optional additions.
+    // Missing headings retain the original title for that email type; absent notes stay empty.
+    if (!array_key_exists('heading', $content)) $content['heading'] = $type === null ? '' : (booking_email_editor_default_headings()[$type] ?? '');
     $limits['please_note'] = 1500;
     if (!array_key_exists('please_note', $content)) $content['please_note'] = '';
     if (array_diff(array_keys($content), array_keys($limits)) || array_diff(array_keys($limits), array_keys($content))) {
@@ -125,15 +141,15 @@ function booking_email_editor_validate(mixed $content, ?string $type = null): ar
             throw new InvalidArgumentException('Email field ' . $key . ' is invalid or too long (maximum ' . $limit . ' UTF-8 bytes).');
         }
         if (preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', $value)
-            || (in_array($key, ['subject', 'greeting'], true) && preg_match('/[\r\n]/', $value))) {
+            || (in_array($key, ['subject', 'heading', 'greeting'], true) && preg_match('/[\r\n]/', $value))) {
             throw new InvalidArgumentException('Remove invalid control characters from ' . $key . '.');
         }
         $rich = str_ends_with($key, '_html');
         if (!$rich && preg_match('/[<>]/', $value)) throw new InvalidArgumentException('HTML is not allowed in ' . $key . '.');
         $value = $rich ? booking_email_editor_sanitize($value) : trim($value);
         $text = html_entity_decode(strip_tags($value), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        if (in_array($key, ['subject', 'greeting', 'introduction_html'], true) && trim(str_replace("\xc2\xa0", ' ', $text)) === '') {
-            throw new InvalidArgumentException('Subject, greeting and introduction cannot be empty.');
+        if ((in_array($key, ['subject', 'greeting', 'introduction_html'], true) || ($key === 'heading' && $type !== null)) && trim(str_replace("\xc2\xa0", ' ', $text)) === '') {
+            throw new InvalidArgumentException('Subject, email heading, greeting and introduction cannot be empty.');
         }
         preg_match_all('/\{([^{}]*)\}/u', $text, $matches);
         foreach ($matches[1] as $token) {

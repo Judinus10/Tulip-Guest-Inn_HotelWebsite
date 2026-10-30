@@ -10,7 +10,7 @@ function tulip_render_contact_email(string $type, array $content, array $enquiry
         'enquiry_subject'=>(string)($enquiry['subject']??''),'hotel_name'=>$brand['name']];
     $subject=trim(preg_replace('/[\x00-\x1f\x7f]+/u',' ',tulip_booking_email_plain_text($content['subject'],$tokens))??'');
     $admin=$type==='contact_admin';$test=!empty($enquiry['is_test_email']);
-    $heading=$admin?'New contact enquiry':'We received your message';
+    $heading=tulip_booking_email_plain_text($content['heading'],$tokens);
     $intro=tulip_booking_email_rich_text($content['introduction_html'],$tokens);
     $closing=tulip_booking_email_rich_text($content['closing_html'],$tokens);
     $greeting=$e(tulip_booking_email_plain_text($content['greeting'],$tokens));
@@ -35,7 +35,7 @@ function tulip_render_contact_email(string $type, array $content, array $enquiry
 <!--[if mso]><table role="presentation" width="600"><tr><td><![endif]-->
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:white;border:1px solid #e8e3da;">
 <tr><td class="pad" style="padding:24px 28px;text-align:center;border-bottom:2px solid #C7A86B;">'.$logo.'<strong style="font-family:Georgia,serif;font-size:20px;color:#19352B;">'.$e($brand['name']).'</strong></td></tr>'.($test?'<tr><td style="padding:10px;background:#fff5df;text-align:center;">TEST EMAIL - Sample enquiry data. No enquiry was created.</td></tr>':'').'
-<tr><td class="pad" style="padding:24px 28px 12px;"><h1 class="title" style="margin:0;font-family:Georgia,serif;font-size:30px;line-height:1.3;color:#19352B;">'.$heading.'</h1><p style="font-weight:bold;margin:18px 0 12px;">'.$greeting.'</p>'.$intro.'</td></tr>
+<tr><td class="pad" style="padding:24px 28px 12px;"><h1 class="title" style="margin:0;font-family:Georgia,serif;font-size:30px;line-height:1.3;color:#19352B;">'.$e($heading).'</h1><p style="font-weight:bold;margin:18px 0 12px;">'.$greeting.'</p>'.$intro.'</td></tr>
 <tr><td class="pad" style="padding:0 28px 20px;"><div style="padding:12px 16px;background:#f6f3ec;border-radius:5px;"><span style="font-size:11px;color:#647067;">ENQUIRY REFERENCE</span><br><strong style="font-size:18px;">'.$e($tokens['enquiry_reference']).'</strong></div></td></tr>
 <tr><td class="pad" style="padding:0 28px 20px;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #e8e3da;table-layout:fixed;">'.$rows.'<tr><td colspan="2" style="padding:16px;"><strong>Message</strong><div style="margin-top:8px;word-break:break-word;overflow-wrap:anywhere;">'.nl2br($e($enquiry['message']??'')).'</div></td></tr></table></td></tr>'.$reply.'
 <tr><td class="pad" style="padding:0 28px 22px;word-break:break-word;">'.$closing.($footer!==''?'<p style="color:#647067;">'.$footer.'</p>':'').'</td></tr>

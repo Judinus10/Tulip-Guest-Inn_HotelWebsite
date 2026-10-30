@@ -26,8 +26,8 @@ const types = { admin_daily_summary: { title: 'Daily stay summary', description:
   admin_payment_received: { title: 'Payment received', description: 'Sent to the hotel after a successful payment.' },
   admin_payment_failed: { title: 'Payment failed', description: 'Sent to the hotel after a failed payment attempt.' } }
 const categoryOf = key => key === 'admin_daily_summary' ? 'daily' : key.startsWith('contact_') ? 'contact' : 'booking'
-const fieldLabels = { subject: 'Subject', greeting: 'Greeting', introduction_html: 'Introduction', please_note: 'Please note (optional)', closing_html: 'Closing message', footer_note: 'Footer note' }
-const limits = { subject: 200, greeting: 200, introduction_html: 6000, please_note: 1500, closing_html: 4000, footer_note: 500 }
+const fieldLabels = { subject: 'Subject', heading: 'Email heading', greeting: 'Greeting', introduction_html: 'Introduction', please_note: 'Please note (optional)', closing_html: 'Closing message', footer_note: 'Footer note' }
+const limits = { subject: 200, heading: 200, greeting: 200, introduction_html: 6000, please_note: 1500, closing_html: 4000, footer_note: 500 }
 const bytes = text => new TextEncoder().encode(text).length
 const same = (a, b) => Object.keys(limits).every(key => (a?.[key] ?? '') === (b?.[key] ?? ''))
 
@@ -151,11 +151,13 @@ export default function WebsiteBookingEmails() {
         </div>
         <div className="booking-email-fields" key={type}>
           {Object.entries(fieldLabels).map(([field, label]) => <div key={field} className={`booking-email-field ${field === 'closing_html' ? 'booking-email-field--closing' : ''}`}>
-            <div className="mb-2 flex items-center justify-between gap-3"><Label id={`email-${field}-label`} htmlFor={`email-${field}`}>{label}{['subject', 'greeting', 'introduction_html'].includes(field) && <span className="ml-1 text-blue-600">*</span>}</Label>
+            <div className="mb-2 flex items-center justify-between gap-3"><Label id={`email-${field}-label`} htmlFor={`email-${field}`}>{label}{['subject', 'heading', 'greeting', 'introduction_html'].includes(field) && <span className="ml-1 text-blue-600">*</span>}</Label>
 </div>
             {field.endsWith('_html') ? <BookingEmailTextEditor ref={field === 'introduction_html' ? intro : closing} id={`email-${field}`} value={draft[field] ?? ''} onChange={value => change(field, value)} onFocus={() => setTarget(field)} disabled={busy} />
               : ['footer_note', 'please_note'].includes(field) ? <Textarea id={`email-${field}`} value={draft[field] ?? ''} disabled={busy} ref={node => { inputs.current[field] = node }} onFocus={e => remember(field, e.target)} onSelect={e => remember(field, e.target)} onBlur={e => remember(field, e.target)} onChange={e => change(field, e.target.value)} />
                 : <Input id={`email-${field}`} value={draft[field] ?? ''} disabled={busy} ref={node => { inputs.current[field] = node }} onFocus={e => remember(field, e.target)} onSelect={e => remember(field, e.target)} onBlur={e => remember(field, e.target)} onChange={e => change(field, e.target.value)} />}
+            {field === 'subject' && <p className="mt-2 text-xs text-text-secondary">Shown in the recipient’s inbox and above the preview.</p>}
+            {field === 'heading' && <p className="mt-2 text-xs text-text-secondary">The large title inside the email. Changes appear in the live preview.</p>}
             {field === 'please_note' && <p className="mt-2 text-xs text-text-secondary">Shown in a highlighted box near the end of the email. Leave empty to hide. Saved separately for each email template; maximum 1,500 UTF-8 bytes.</p>}
           </div>)}
         </div>

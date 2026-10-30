@@ -130,15 +130,8 @@ function tulip_render_booking_email(string $type, array $content, array $booking
     $tokens = tulip_booking_email_tokens($booking, $brand);
     $subject = trim(preg_replace('/[\x00-\x1F\x7F]+/u', ' ', tulip_booking_email_plain_text($content['subject'], $tokens)) ?? '');
     $isAdmin = str_starts_with($type, 'admin_');
-    $headings = ['received'=>'We received your booking', 'confirmed'=>'Your booking is confirmed',
-        'payment_pending'=>'Online payment pending', 'payment_failed'=>'Payment unsuccessful',
-        'payment_received'=>'Payment received', 'expired'=>'Your booking hold has expired',
-        'cancelled'=>'Your booking has been cancelled', 'status_updated'=>'Your booking details have changed',
-        'admin_new_booking'=>'New booking received', 'admin_payment_received'=>'Payment received',
-        'admin_payment_failed'=>'Payment failed', 'admin_payment_pending'=>'Online payment pending',
-        'admin_booking_expired'=>'Booking hold expired', 'admin_booking_cancelled'=>'Booking cancelled'];
-    if (!isset($headings[$type])) throw new InvalidArgumentException('Choose a booking email template.');
-    $heading = $headings[$type];
+    if (in_array($type, ['contact_customer', 'contact_admin', 'admin_daily_summary'], true)) throw new InvalidArgumentException('Choose a booking email template.');
+    $heading = tulip_booking_email_plain_text($content['heading'], $tokens);
     $status = match($type) {
         'received'=>'Awaiting confirmation', 'confirmed'=>'Confirmed',
         'payment_pending','admin_payment_pending'=>'Payment pending',
@@ -239,7 +232,7 @@ function tulip_render_booking_email(string $type, array $content, array $booking
 <!--[if mso]><table role="presentation" width="600"><tr><td><![endif]-->
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#ffffff" style="max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #e8e3da;">
 <tr><td align="center" class="email-pad" style="padding:26px 32px 20px;border-bottom:2px solid #C7A86B;">' . $logo . '<div style="font-family:Georgia,Times,serif;font-size:20px;font-weight:bold;color:#19352B;">' . $e($brand['name']) . '</div></td></tr>' . $testBanner . '
-<tr><td class="email-pad" style="padding:26px 32px 14px;text-align:center;"><span style="display:inline-block;border-radius:20px;padding:4px 13px;font-size:12px;font-weight:bold;background:' . $badgeStyle . ';">' . $status . '</span><h1 class="email-title" style="margin:13px 0 8px;font-family:Georgia,Times,serif;font-size:31px;line-height:1.25;color:#19352B;">' . $heading . '</h1></td></tr>
+<tr><td class="email-pad" style="padding:26px 32px 14px;text-align:center;"><span style="display:inline-block;border-radius:20px;padding:4px 13px;font-size:12px;font-weight:bold;background:' . $badgeStyle . ';">' . $status . '</span><h1 class="email-title" style="margin:13px 0 8px;font-family:Georgia,Times,serif;font-size:31px;line-height:1.25;color:#19352B;">' . $e($heading) . '</h1></td></tr>
 <tr><td class="email-pad" style="padding:12px 32px 18px;word-break:break-word;overflow-wrap:anywhere;"><p style="margin:0 0 12px;font-weight:bold;">' . $greeting . '</p>' . $intro . $bookedBy . '</td></tr>' . $customerDetails . '
 <tr><td class="email-pad" style="padding:0 32px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#f6f3ec" style="border-radius:5px;"><tr><td style="padding:13px 17px;"><div style="font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:#647067;">Booking reference</div><strong style="font-size:19px;color:#19352B;">' . $e($tokens['booking_reference']) . '</strong></td></tr></table></td></tr>
 <tr><td class="email-pad" style="padding:0 32px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8e3da;border-radius:6px;word-break:break-word;overflow-wrap:anywhere;">
