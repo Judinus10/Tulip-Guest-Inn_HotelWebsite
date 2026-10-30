@@ -9,7 +9,7 @@ import { Input, Label, Textarea } from '@/components/ui/input'
 import BookingEmailTextEditor from '@/components/ui/BookingEmailTextEditor'
 import { fetchBookingEmailSettings, saveBookingEmailSettings } from '@/services/bookingEmailSettings'
 
-const types = { received: { title: 'Booking Received', description: 'Sent when a booking request is submitted. This does not confirm the reservation.' },
+const types = { admin_daily_summary: { title: 'Daily stay summary', description: 'One scheduled email for the hotel, containing today’s arrivals and departures. Booking details are filled automatically. The existing cron schedule controls delivery.' }, received: { title: 'Booking Received', description: 'Sent when a booking request is submitted. This does not confirm the reservation.' },
   payment_pending: { title: 'Payment pending', description: 'Sent to the guest. Your online payment has not been completed. Your reservation is not confirmed by this message. Please review your booking before the hold expires.' },
   payment_failed: { title: 'Payment failed', description: 'Sent to the guest. Your payment attempt was unsuccessful. Please review your booking or contact us before trying again. This email does not confirm a reservation.' },
   payment_received: { title: 'Payment received', description: 'Sent to the guest. We have recorded your payment. Please check the booking status below; a payment receipt alone does not confirm a reservation.' },
@@ -25,7 +25,7 @@ const types = { received: { title: 'Booking Received', description: 'Sent when a
   admin_new_booking: { title: 'New booking', description: 'Sent to the hotel when a booking is received.' },
   admin_payment_received: { title: 'Payment received', description: 'Sent to the hotel after a successful payment.' },
   admin_payment_failed: { title: 'Payment failed', description: 'Sent to the hotel after a failed payment attempt.' } }
-const categoryOf = key => key.startsWith('contact_') ? 'contact' : key.startsWith('admin_') ? 'admin' : 'guest'
+const categoryOf = key => key === 'admin_daily_summary' ? 'daily' : key.startsWith('contact_') ? 'contact' : 'booking'
 const fieldLabels = { subject: 'Subject', greeting: 'Greeting', introduction_html: 'Introduction', closing_html: 'Closing message', footer_note: 'Footer note' }
 const limits = { subject: 200, greeting: 200, introduction_html: 6000, closing_html: 4000, footer_note: 500 }
 const bytes = text => new TextEncoder().encode(text).length
@@ -50,6 +50,8 @@ export default function WebsiteBookingEmails() {
   const requestId = useRef(0)
   const draft = drafts[type]
   const isContact = type.startsWith('contact_')
+  const isDaily = type === 'admin_daily_summary'
+  const isAdminBooking = type.startsWith('admin_') && !isDaily
   const category = categoryOf(type)
   const placeholders = settings?.placeholders_by_type?.[type] || settings?.placeholders || {}
   const dirty = settings && draft && !same(draft, settings.templates[type].content)
@@ -103,7 +105,7 @@ export default function WebsiteBookingEmails() {
   if (loadError) return <SectionCard><p role="alert" className="text-sm text-red-700">{loadError}</p><Button className="mt-4" variant="outline" onClick={() => window.location.reload()}>Reload settings</Button></SectionCard>
   return <div className="booking-email-page">
     <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Email category">
-      {[['received', 'Guest bookings'], ['contact_customer', 'Contact enquiries'], ['admin_new_booking', 'Admin notifications']].map(([key, title]) => <button key={key} type="button" disabled={busy} aria-pressed={categoryOf(key) === category}
+      {[['received', 'Booking emails'], ['contact_customer', 'Contact emails'], ['admin_daily_summary', 'Daily admin summary']].map(([key, title]) => <button key={key} type="button" disabled={busy} aria-pressed={categoryOf(key) === category}
         onClick={() => { setType(key); setTarget('introduction_html'); positions.current = {}; setError(''); setMessage('') }}
         className={`rounded-lg border px-4 py-2 text-sm font-semibold ${categoryOf(key) === category ? 'border-blue-600 bg-blue-600 text-white' : 'border-border bg-white text-text-secondary'}`}>{title}</button>)}
     </div>
@@ -113,8 +115,13 @@ export default function WebsiteBookingEmails() {
         <div className="booking-email-card-heading"><h2>Email content</h2>
           {dirty && <span className="booking-email-draft-badge">Unsaved changes</span>}
         </div>
+        {category === 'booking' && <div className="mb-3 flex gap-2" role="group" aria-label="Booking email recipient">
+          {[['received','Guest emails',false],['admin_new_booking','Admin booking notifications',true]].map(([key,label,admin]) => <button key={key} type="button" disabled={busy} aria-pressed={isAdminBooking === admin}
+            onClick={() => { setType(key); setTarget('introduction_html'); positions.current = {}; setError(''); setMessage(''); setLinkReload(false) }}
+            className={`rounded-lg border px-3 py-2 text-xs font-semibold ${isAdminBooking === admin ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-border text-text-secondary'}`}>{label}</button>)}
+        </div>}
         <div role="tablist" aria-label="Email type" className="booking-email-type-tabs booking-email-type-tabs--extended">
-          {Object.entries(types).filter(([key]) => categoryOf(key) === category).map(([key, item]) => <button key={key} type="button" role="tab" aria-selected={type === key} disabled={busy}
+          {Object.entries(types).filter(([key]) => categoryOf(key) === category && (category !== 'booking' || key.startsWith('admin_') === isAdminBooking)).map(([key, item]) => <button key={key} type="button" role="tab" aria-selected={type === key} disabled={busy}
             onClick={() => { setType(key); setTarget('introduction_html'); positions.current = {}; setError(''); setMessage(''); setLinkReload(false) }}
             className={`flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition disabled:opacity-50 ${type === key ? 'bg-blue-600 text-white shadow-sm' : 'text-text-secondary hover:bg-white'}`}>{item.title}{settings && !same(drafts[key], settings.templates[key].content) ? ' •' : ''}</button>)}
         </div>
@@ -131,17 +138,17 @@ export default function WebsiteBookingEmails() {
           </div>)}
         </div>
         <div className="booking-email-insert">
-          <Label htmlFor="email-placeholder">Insert {isContact ? 'enquiry' : 'booking'} detail</Label>
+          <Label htmlFor="email-placeholder">Insert {isDaily ? 'summary' : isContact ? 'enquiry' : 'booking'} detail</Label>
           <div className="booking-email-insert-row">
             <div className="relative"><select id="email-placeholder" value="" disabled={busy} onChange={e => insert(e.target.value)} aria-describedby="email-placeholder-target">
-              <option value="">Insert {isContact ? 'enquiry' : 'booking'} detail</option>{Object.entries(placeholders).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+              <option value="">Insert {isDaily ? 'summary' : isContact ? 'enquiry' : 'booking'} detail</option>{Object.entries(placeholders).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
             </select><ChevronDown className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-text-secondary" /></div>
             <div className="booking-email-token-chips">{Object.entries(placeholders).filter(([key]) => key !== 'hotel_name').map(([key, label]) =>
               <button type="button" key={key} disabled={busy} title={`Insert ${label.toLowerCase()}`} onMouseDown={e => e.preventDefault()} onClick={() => insert(key)}>{'{' + key + '}'}</button>)}</div>
           </div>
           <p id="email-placeholder-target" className="booking-email-insert-target">Insert into: <strong>{fieldLabels[target]}</strong></p>
         </div>
-        <div className="booking-email-info"><Info className="h-4 w-4 shrink-0" /><span>{isContact ? 'Sender details and the original enquiry message are filled in automatically.' : 'Room assignments, guest counts and payment details are filled in automatically.'}</span></div>
+        <div className="booking-email-info"><Info className="h-4 w-4 shrink-0" /><span>{isDaily ? 'Arrival and departure lists, room assignments, guest counts and payment statuses are filled automatically. No occupancy or daily revenue estimates are included.' : isContact ? 'Sender details and the original enquiry message are filled in automatically.' : 'Room assignments, guest counts and payment details are filled in automatically.'}</span></div>
         <div className="booking-email-actions">
           <button type="button" disabled={busy || !dirty} onClick={() => { setDrafts(current => ({ ...current, [type]: { ...settings.templates[type].content } })); setError(''); setMessage('Changes discarded.') }} className="text-sm font-semibold text-text-secondary hover:text-blue-700 disabled:opacity-40">Discard changes</button>
           <div className="flex flex-wrap gap-3"><Button variant="outline" disabled={busy} onClick={() => { setDrafts(current => ({ ...current, [type]: { ...settings.defaults[type] } })); setError(''); setMessage('Default wording restored in the editor. Save to apply it.') }}><RotateCcw className="h-4 w-4" />Reset to default</Button>

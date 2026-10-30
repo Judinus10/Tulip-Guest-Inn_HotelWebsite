@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../mail/email-helper.php';
+require_once __DIR__ . '/../mail/templates/daily-summary-customizable-template.php';
 
 $isCli = PHP_SAPI === 'cli';
 
@@ -28,39 +29,7 @@ if (!$isCli) {
 
 function stay_reminder_fetch_bookings(PDO $pdo, string $date, string $field): array
 {
-    if (!in_array($field, ['check_in_date', 'check_out_date'], true)) {
-        throw new InvalidArgumentException('Invalid stay reminder date field.');
-    }
-
-    $stmt = $pdo->prepare(
-        "SELECT
-            b.id,
-            CONCAT('BK-', LPAD(b.id, 5, '0')) AS booking_no,
-            b.full_name,
-            b.email,
-            b.phone,
-            CASE WHEN b.is_booking_for_other = 1 AND COALESCE(NULLIF(b.staying_guest_name, ''), '') <> '' THEN b.staying_guest_name ELSE b.full_name END AS guest_name,
-            CASE WHEN b.is_booking_for_other = 1 AND COALESCE(NULLIF(b.staying_guest_email, ''), '') <> '' THEN b.staying_guest_email ELSE b.email END AS guest_email,
-            CASE WHEN b.is_booking_for_other = 1 AND COALESCE(NULLIF(b.staying_guest_phone, ''), '') <> '' THEN b.staying_guest_phone ELSE b.phone END AS guest_phone,
-            b.room_name,
-            b.check_in_date,
-            b.check_out_date,
-            b.guests,
-            b.amount,
-            b.currency,
-            b.status,
-            b.payment_status,
-            b.created_at,
-            b.updated_at
-         FROM bookings b
-         WHERE b.$field = :stay_date
-           AND LOWER(COALESCE(b.status, '')) NOT IN ('cancelled', 'canceled', 'no_show', 'checked_out', 'expired')
-           AND LOWER(COALESCE(b.payment_status, '')) NOT IN ('cancelled', 'canceled', 'failed', 'refunded', 'expired')
-         ORDER BY b.room_name ASC, b.check_in_date ASC, b.id ASC"
-    );
-    $stmt->execute([':stay_date' => $date]);
-
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    return tulip_daily_summary_bookings($pdo, $date, $field);
 }
 
 function stay_reminder_booking_rows(array $booking): array
@@ -106,28 +75,16 @@ function queue_stay_reminder_email(PDO $pdo, string $date, array $checkIns, arra
         return 0;
     }
 
-    $body = function_exists('stay_reminder_email_html')
-        ? stay_reminder_email_html($date, $checkIns, $checkOuts)
-        : email_shell(
-            'Today\'s stay reminders',
-            '<p style="margin:0 0 16px;">These are the bookings that need admin attention today.</p>' .
-            email_badge($checkInCount . ' check-in' . ($checkInCount === 1 ? '' : 's'), 'blue') .
-            ' <span style="display:inline-block;width:8px;"></span>' .
-            email_badge($checkOutCount . ' check-out' . ($checkOutCount === 1 ? '' : 's'), 'gold') .
-            '<h2 style="margin:26px 0 10px;font-size:18px;color:#111827;">Today check-ins</h2>' .
-            stay_reminder_bookings_html($checkIns, 'No check-ins scheduled for today.') .
-            '<h2 style="margin:26px 0 10px;font-size:18px;color:#111827;">Today check-outs</h2>' .
-            stay_reminder_bookings_html($checkOuts, 'No check-outs scheduled for today.'),
-            'Today check-in and check-out reminders for Tulip Guest Inn.'
-        );
+    $summary = tulip_render_daily_summary_email(tulip_saved_booking_template($pdo, 'admin_daily_summary'),
+        ['date'=>$date, 'check_ins'=>$checkIns, 'check_outs'=>$checkOuts], tulip_booking_email_brand($pdo, false));
 
     return enqueue_email(
         $pdo,
         'admin_stay_reminder',
         (int) str_replace('-', '', $date),
         $adminEmail,
-        'Today check-in/check-out reminders - Tulip Guest Inn - ' . $date,
-        $body,
+        $summary['subject'],
+        $summary['html'],
         'admin_stay_reminder_' . str_replace('-', '', $date),
         null,
         3,

@@ -32,7 +32,7 @@ export default function BookingEmailTest({ type, content, scenario }) {
     <button type="button" aria-expanded={open} aria-controls="booking-email-test-form" onClick={() => setOpen(value => !value)} className="booking-email-test-open"><Mail className="h-4 w-4" />Send test email</button>
     {open && <form id="booking-email-test-form" onSubmit={send} className="booking-email-test-form">
     <label htmlFor="booking-email-test-recipient" className="text-sm font-semibold text-text-primary">Send a test email</label>
-    <p className="mb-3 mt-1 text-xs leading-5 text-text-secondary">{type.startsWith('contact_') ? 'Uses the current draft and sample enquiry. This does not save changes or create an enquiry.' : 'Uses the current draft and selected sample booking. This does not save your changes or create a reservation.'}</p>
+    <p className="mb-3 mt-1 text-xs leading-5 text-text-secondary">{type === 'admin_daily_summary' ? 'Uses the current draft and sample daily summary. Real guest records and the scheduled summary are not affected.' : type.startsWith('contact_') ? 'Uses the current draft and sample enquiry. This does not save changes or create an enquiry.' : 'Uses the current draft and selected sample booking. This does not save your changes or create a reservation.'}</p>
     <div className="flex flex-wrap gap-2">
       <input id="booking-email-test-recipient" type="email" autoComplete="email" required maxLength={190} value={recipient} disabled={busy}
         onChange={e => { setRecipient(e.target.value); setMessage(''); setError('') }} placeholder="Enter your email address"

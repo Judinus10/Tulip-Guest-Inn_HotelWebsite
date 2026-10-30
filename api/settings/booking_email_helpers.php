@@ -3,13 +3,15 @@ declare(strict_types=1);
 
 function booking_email_editor_placeholders(?string $type = null): array
 {
+    $summary = ['summary_date'=>'Summary date', 'check_in_count'=>'Arriving reservations', 'check_out_count'=>'Departing reservations', 'hotel_name'=>'Hotel name'];
+    if ($type === 'admin_daily_summary') return $summary;
     $contact = ['sender_name'=>'Sender name','enquiry_reference'=>'Enquiry reference','enquiry_subject'=>'Enquiry subject','hotel_name'=>'Hotel name'];
     if ($type !== null && str_starts_with($type, 'contact_')) return $contact;
     $booking = ['guest_name' => 'Guest name', 'booking_reference' => 'Booking reference',
         'check_in' => 'Check-in date', 'check_out' => 'Check-out date', 'hotel_name' => 'Hotel name'];
     $payment = ['payment_status'=>'Payment status','payment_amount'=>'Payment amount', 'booking_status'=>'Booking status'];
     if ($type !== null && !str_starts_with($type,'contact_')) return array_merge($booking,$payment);
-    return $type === null ? array_merge($booking, $contact, $payment) : $booking;
+    return $type === null ? array_merge($booking, $contact, $payment, $summary) : $booking;
 }
 
 function booking_email_editor_defaults(): array
@@ -18,6 +20,7 @@ function booking_email_editor_defaults(): array
         'closing_html' => '<p>If you have any questions before your stay, please contact us.</p>',
         'footer_note' => 'We look forward to welcoming you to Point Pedro.'];
     return [
+        'admin_daily_summary' => ['subject'=>'Daily stay summary - {summary_date}', 'greeting'=>'Hello team,', 'introduction_html'=>'<p>Here are the arrivals and departures scheduled for {summary_date}. Review room assignments and payment statuses before welcoming guests.</p>', 'closing_html'=>'<p>Open the admin panel to review or update the booking records.</p>', 'footer_note'=>'Internal daily operations summary for {hotel_name}.'],
         'received' => array_merge($common, [
             'subject' => 'We received your booking - {booking_reference}',
             'introduction_html' => '<p>Thank you for choosing {hotel_name}. We have received your booking request and will confirm availability shortly.</p>',

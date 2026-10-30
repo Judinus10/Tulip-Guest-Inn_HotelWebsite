@@ -13,7 +13,10 @@ export default function BookingEmailPreview({ type, content, brandingRevision = 
   const stage = useRef(null)
   const [stageWidth, setStageWidth] = useState(600)
   const sequence = useRef(0)
-  const fingerprint = JSON.stringify({ type, content, scenario })
+  const isDaily = type === 'admin_daily_summary'
+  const [summaryScenario, setSummaryScenario] = useState('single')
+  const selectedScenario = isDaily ? summaryScenario : scenario
+  const fingerprint = JSON.stringify({ type, content, scenario: selectedScenario })
   useEffect(() => {
     const controller = new AbortController()
     const request = ++sequence.current
@@ -21,7 +24,7 @@ export default function BookingEmailPreview({ type, content, brandingRevision = 
     setBusy(true); setError('')
     const timer = setTimeout(async () => {
       try {
-        const result = await previewBookingEmail(type, content, scenario, controller.signal)
+        const result = await previewBookingEmail(type, content, selectedScenario, controller.signal)
         if (active && request === sequence.current) setPreview({ ...result, fingerprint })
       } catch (e) {
         if (active && e.name !== 'AbortError' && request === sequence.current) setError(e.message || 'Could not update the email preview.')
@@ -51,7 +54,9 @@ export default function BookingEmailPreview({ type, content, brandingRevision = 
           {[['desktop', 'Desktop', Monitor], ['mobile', 'Mobile', Smartphone]].map(([key, label, Icon]) => <button key={key} type="button" aria-pressed={device === key} onClick={() => setDevice(key)}><Icon className="h-3.5 w-3.5" />{label}</button>)}
         </div>
         <label className="sr-only" htmlFor="email-sample-scenario">Sample booking</label>
-        {isContact ? <span className="booking-email-sample-select">Sample enquiry</span> : <select id="email-sample-scenario" value={scenario} onChange={e => setScenario(e.target.value)} className="booking-email-sample-select" title="Select sample booking">
+        {isDaily ? <select aria-label="Sample daily summary" value={summaryScenario} onChange={e => setSummaryScenario(e.target.value)} className="booking-email-sample-select">
+          <option value="single">Sample day</option><option value="no_arrivals">No arrivals</option><option value="no_departures">No departures</option><option value="empty">No stays scheduled</option>
+        </select> : isContact ? <span className="booking-email-sample-select">Sample enquiry</span> : <select id="email-sample-scenario" value={scenario} onChange={e => setScenario(e.target.value)} className="booking-email-sample-select" title="Select sample booking">
           <option value="single">Pay on arrival · one room</option><option value="group">Pay on arrival · multiple rooms</option>
           <option value="single_online">Online · one room</option><option value="group_online">Online · multiple rooms</option>
         </select>}
@@ -67,13 +72,13 @@ export default function BookingEmailPreview({ type, content, brandingRevision = 
       <div className="booking-email-preview-stage">
         <div ref={stage}>
           <div className="booking-email-preview-frame" style={{ width: frameWidth * scale, height: 820 * scale }}>
-            <iframe title={`Sample ${isContact ? 'contact enquiry' : type.startsWith('admin_') ? 'admin notification' : type.replaceAll('_', ' ')} email preview`} sandbox="" referrerPolicy="no-referrer" srcDoc={preview.html}
+            <iframe title={`Sample ${isContact ? 'contact enquiry' : isDaily ? 'daily admin summary' : type.startsWith('admin_') ? 'admin notification' : type.replaceAll('_', ' ')} email preview`} sandbox="" referrerPolicy="no-referrer" srcDoc={preview.html}
               style={{ display: 'block', border: 0, width: frameWidth, height: 820, transform: `scale(${scale})`, transformOrigin: 'top left' }} />
           </div>
         </div>
       </div>
-      <p className="booking-email-preview-note">{isContact ? 'Sample enquiry data.' : 'Sample booking data.'} Links are inactive. Previewing does not save or send an email.</p>
+      <p className="booking-email-preview-note">{isDaily ? 'Sample daily operations data.' : isContact ? 'Sample enquiry data.' : 'Sample booking data.'} Links are inactive. Previewing does not save or send an email.</p>
     </> : <div className="flex min-h-[420px] items-center justify-center rounded-lg border border-dashed border-border bg-slate-50 p-6 text-center text-sm text-text-secondary">{busy ? 'Preparing your email preview...' : 'Complete the required fields to see the email preview.'}</div>}
-    <BookingEmailTest type={type} content={content} scenario={scenario} />
+    <BookingEmailTest type={type} content={content} scenario={selectedScenario} />
   </section>
 }

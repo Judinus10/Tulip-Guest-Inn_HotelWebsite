@@ -2203,8 +2203,9 @@ function enqueue_email(
         return false;
     }
     // Freeze customized booking content when first queued, including duplicate workflow calls.
-    $duplicateSubject = $customTemplate !== null ? 'subject' : 'VALUES(subject)';
-    $duplicateBody = $customTemplate !== null ? 'body_html' : 'VALUES(body_html)';
+    $freezeContent = $customTemplate !== null || $relatedType === 'admin_stay_reminder';
+    $duplicateSubject = $freezeContent ? 'subject' : 'VALUES(subject)';
+    $duplicateBody = $freezeContent ? 'body_html' : 'VALUES(body_html)';
 
     $stmt = $pdo->prepare(
         "INSERT INTO email_queue
