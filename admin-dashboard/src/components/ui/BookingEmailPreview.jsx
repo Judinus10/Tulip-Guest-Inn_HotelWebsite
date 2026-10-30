@@ -16,6 +16,11 @@ export default function BookingEmailPreview({ type, content, brandingRevision = 
   const [stageWidth, setStageWidth] = useState(600)
   const sequence = useRef(0)
   const lastNotifiedError = useRef('')
+  useEffect(() => {
+    const refreshAppearance = () => setRefresh(value => value + 1)
+    window.addEventListener('tulip:appearance-saved', refreshAppearance)
+    return () => window.removeEventListener('tulip:appearance-saved', refreshAppearance)
+  }, [])
   const isDaily = type === 'admin_daily_summary'
   const [summaryScenario, setSummaryScenario] = useState('single')
   const selectedScenario = isDaily ? summaryScenario : scenario

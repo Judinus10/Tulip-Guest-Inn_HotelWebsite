@@ -46,6 +46,7 @@ export default function WebsiteAppearance() {
       const response = await apiFetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ colors }) })
       const result = await readJsonResponse(response)
       setSaved(result.data.colors); setDraft(result.data.colors)
+      window.dispatchEvent(new Event('tulip:appearance-saved'))
       setMessage('Colours saved. Refresh the public website to see your changes.')
     } catch (err) { setError(err.message || 'Could not save appearance settings.') }
     finally { setSaving(false) }
