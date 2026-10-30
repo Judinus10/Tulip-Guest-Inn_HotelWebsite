@@ -6,13 +6,21 @@ require_once __DIR__ . '/templates/booking-customizable-template.php';
 function tulip_booking_template_event(string $emailType): ?string
 {
     return match ($emailType) {
-        'admin_new_booking', 'admin_manual_booking', 'booking_payment_pending_admin' => 'admin_new_booking',
+        'admin_new_booking', 'admin_manual_booking' => 'admin_new_booking',
+        'booking_payment_pending_admin' => 'admin_payment_pending',
+        'booking_expired_admin' => 'admin_booking_expired',
+        'admin_booking_cancelled' => 'admin_booking_cancelled',
+        'booking_payment_pending_customer' => 'payment_pending',
+        'payment_failed' => 'payment_failed',
+        'booking_expired_customer' => 'expired',
+        'booking_cancelled' => 'cancelled',
+        'payment_status_updated', 'booking_status_updated', 'combined_status_updated' => 'status_updated',
         'admin_payment_received' => 'admin_payment_received',
         'admin_payment_failed' => 'admin_payment_failed',
-        'booking_inquiry_received', 'booking_manual_received', 'booking_payment_pending_customer',
+        'booking_inquiry_received', 'booking_manual_received',
         'staying_guest_booking_received', 'staying_guest_manual_booking' => 'received',
         'booking_confirmed', 'staying_guest_booking_confirmed', 'payment_successful',
-        'staying_guest_payment_successful', 'booking_status_updated', 'combined_status_updated' => 'confirmed',
+        'staying_guest_payment_successful' => 'confirmed',
         default => null,
     };
 }
@@ -43,9 +51,11 @@ function tulip_booking_email_for_queue(PDO $pdo, ?string $relatedType, ?int $boo
     $status = strtolower(trim((string) ($booking['status'] ?? '')));
     $isAdmin = str_starts_with($event, 'admin_');
     // A payment receipt alone must never claim an unconfirmed reservation is confirmed.
-    if (!$isAdmin && $event === 'confirmed' && $status !== 'confirmed') return null;
+    if (!$isAdmin && $event === 'confirmed' && $status !== 'confirmed'
+        && !in_array($emailType, ['payment_successful','staying_guest_payment_successful'], true)) return null;
     if (!$isAdmin && $event === 'received' && !in_array($status, ['pending', 'confirmed'], true)) return null;
-    $type = $isAdmin ? $event : ($status === 'confirmed' ? 'confirmed' : 'received');
+    $type = $event;
+    if (!$isAdmin && $event === 'received') $type = $status === 'confirmed' ? 'confirmed' : 'received';
     $groupId = (int) ($booking['booking_group_id'] ?? 0);
     $primaryId = $bookingId;
     if ($groupId > 0) {
@@ -70,12 +80,37 @@ function tulip_booking_email_for_queue(PDO $pdo, ?string $relatedType, ?int $boo
     $payment = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
     $booking['payment_method'] = (string) ($payment['method'] ?? 'Not available');
     $booking['payment_status'] = (string) ($payment['status'] ?? $booking['payment_status'] ?? 'Payment Pending');
+    $paymentState = strtolower(trim($booking['payment_status']));
+    $booking['payment_amount'] = $payment['amount'] ?? null;
+    $booking['payment_currency'] = $payment['currency'] ?? $booking['currency'] ?? 'LKR';
+    $booking['transaction_id'] = trim((string) ($payment['payment_id'] ?? '')) ?: (string) ($payment['order_id'] ?? '');
+    if (in_array($emailType, ['payment_successful','staying_guest_payment_successful'], true)) {
+        if ($paymentState !== 'paid') return null;
+        $type = $status === 'confirmed' ? 'confirmed' : 'payment_received';
+    }
+    if ($event === 'status_updated') {
+        // Booking termination takes priority over payment updates. Paid is not a refund.
+        $type = match (true) {
+            in_array($status, ['cancelled','canceled'], true) => 'cancelled',
+            $status === 'expired' => 'expired',
+            $emailType !== 'booking_status_updated' && $paymentState === 'failed' => 'payment_failed',
+            $emailType !== 'payment_status_updated' && $status === 'confirmed' => 'confirmed',
+            $emailType !== 'booking_status_updated' && $paymentState === 'paid' => 'payment_received',
+            default => 'status_updated',
+        };
+    }
+    if (in_array($event, ['payment_pending','admin_payment_pending'], true)
+        && ($status !== 'pending' || !in_array($paymentState, ['payment pending','pending'], true))) return null;
+    if ($event === 'payment_failed' && $paymentState !== 'failed') return null;
+    // Legacy expiry stores Cancelled; the expiry event carries the more precise reason.
+    if (in_array($event, ['expired','admin_booking_expired'], true)
+        && !in_array($status, ['expired','cancelled','canceled'], true)) return null;
+    if (in_array($event, ['cancelled','admin_booking_cancelled'], true)
+        && !in_array($status, ['cancelled','canceled'], true)) return null;
+
     if ($isAdmin) {
         if ($event === 'admin_payment_received' && strtolower($booking['payment_status']) !== 'paid') return null;
         if ($event === 'admin_payment_failed' && strtolower($booking['payment_status']) !== 'failed') return null;
-        $booking['payment_amount'] = $payment['amount'] ?? null;
-        $booking['payment_currency'] = $payment['currency'] ?? $booking['currency'] ?? 'LKR';
-        $booking['transaction_id'] = trim((string) ($payment['payment_id'] ?? '')) ?: (string) ($payment['order_id'] ?? '');
     }
     if (str_starts_with($emailType, 'staying_guest_') && !empty($booking['is_booking_for_other'])) {
         $guestEmail = trim((string) ($booking['staying_guest_email'] ?? ''));
@@ -83,8 +118,16 @@ function tulip_booking_email_for_queue(PDO $pdo, ?string $relatedType, ?int $boo
         $booking['booked_by'] = ['name' => $booking['full_name'] ?? '', 'email' => $booking['email'] ?? '', 'phone' => $booking['phone'] ?? ''];
         $booking['full_name'] = trim((string) ($booking['staying_guest_name'] ?? '')) ?: 'Guest';
     }
-    if (!$isAdmin && str_contains(strtolower($booking['payment_method']), 'payhere') && strtolower($booking['payment_status']) === 'payment pending') {
+    if (!$isAdmin && $status === 'pending' && str_contains(strtolower($booking['payment_method']), 'payhere') && $paymentState === 'payment pending') {
         $booking['payment_notice'] = 'Online payment is pending. Use the booking link to complete payment before your reservation hold expires.';
+    }
+    if (!$isAdmin && in_array(strtolower($booking['payment_method']), ['cash','cash on arrival','pay on arrival'], true)
+        && in_array($paymentState, ['pending','payment pending'], true)) {
+        $booking['payment_notice'] = 'Payment is due on arrival. No online payment is required for this payment method.';
+    }
+    if (in_array($type, ['expired','admin_booking_expired'], true)) $booking['status'] = 'Expired';
+    if ($type === 'payment_received' && $status === 'pending') {
+        $booking['payment_notice'] = 'Your payment has been recorded. Your reservation is awaiting confirmation.';
     }
     $brand = tulip_booking_email_brand($pdo, false);
     $content = tulip_saved_booking_template($pdo, $type);

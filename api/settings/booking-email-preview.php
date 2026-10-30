@@ -19,7 +19,7 @@ try {
     if (!is_string($scenario)) throw new InvalidArgumentException('Choose a sample booking.');
     $isAdmin = str_starts_with($type, 'admin_');
     $isContact = str_starts_with($type, 'contact_');
-    $booking = $isContact ? tulip_contact_sample() : ($isAdmin ? booking_email_admin_preview_data($type, $scenario) : booking_email_preview_data($scenario));
+    $booking = $isContact ? tulip_contact_sample() : booking_email_event_preview_data($type, $scenario);
     $pdo = get_db_connection();
     ensure_contact_settings_table($pdo);
     $brand = tulip_booking_email_brand($pdo);

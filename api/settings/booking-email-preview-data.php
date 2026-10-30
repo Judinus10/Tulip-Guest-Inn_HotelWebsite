@@ -31,3 +31,29 @@ function booking_email_admin_preview_data(string $type, string $scenario): array
     $booking['transaction_id'] = 'SAMPLE-TRANSACTION';
     return $booking;
 }
+
+/** Match preview facts to the selected event; optional online examples never modify real bookings. */
+function booking_email_event_preview_data(string $type, string $scenario): array
+{
+    $online = str_ends_with($scenario, '_online');
+    $base = $online ? substr($scenario, 0, -7) : $scenario;
+    $booking = str_starts_with($type, 'admin_') ? booking_email_admin_preview_data($type, $base) : booking_email_preview_data($base);
+    $booking['status'] = $type === 'confirmed' ? 'Confirmed' : 'Pending';
+    $booking['payment_method'] = $online ? 'PayHere' : 'Cash on arrival';
+    $booking['payment_status'] = $online && $type === 'confirmed' ? 'Paid' : 'Payment Pending';
+    if (in_array($type, ['payment_pending','admin_payment_pending','payment_failed','admin_payment_failed','payment_received','admin_payment_received','expired','admin_booking_expired'], true)) {
+        $booking['payment_method'] = 'PayHere';
+        $booking['payment_status'] = match($type) {
+            'payment_failed','admin_payment_failed'=>'Failed',
+            'payment_received','admin_payment_received'=>'Paid',
+            'expired','admin_booking_expired'=>'Cancelled', default=>'Payment Pending',
+        };
+    }
+    if (in_array($type, ['expired','admin_booking_expired'], true)) $booking['status'] = 'Expired';
+    if (in_array($type, ['cancelled','admin_booking_cancelled'], true)) $booking['status'] = 'Cancelled';
+    if ($type === 'admin_payment_received') $booking['status'] = 'Confirmed';
+    if ($type === 'payment_received') $booking['payment_notice'] = 'Your payment has been recorded. Your reservation is awaiting confirmation.';
+    if ($type === 'confirmed' && !$online) $booking['payment_notice'] = 'Payment is due on arrival. No online payment is required for this payment method.';
+    $booking['payment_amount'] = $booking['amount']; $booking['payment_currency'] = $booking['currency'];
+    return $booking;
+}

@@ -10,6 +10,15 @@ import BookingEmailTextEditor from '@/components/ui/BookingEmailTextEditor'
 import { fetchBookingEmailSettings, saveBookingEmailSettings } from '@/services/bookingEmailSettings'
 
 const types = { received: { title: 'Booking Received', description: 'Sent when a booking request is submitted. This does not confirm the reservation.' },
+  payment_pending: { title: 'Payment pending', description: 'Sent to the guest. Your online payment has not been completed. Your reservation is not confirmed by this message. Please review your booking before the hold expires.' },
+  payment_failed: { title: 'Payment failed', description: 'Sent to the guest. Your payment attempt was unsuccessful. Please review your booking or contact us before trying again. This email does not confirm a reservation.' },
+  payment_received: { title: 'Payment received', description: 'Sent to the guest. We have recorded your payment. Please check the booking status below; a payment receipt alone does not confirm a reservation.' },
+  expired: { title: 'Booking hold expired', description: 'Sent to the guest. Your unpaid online booking hold has expired and the room is no longer held. Please check availability before making a new booking.' },
+  cancelled: { title: 'Booking cancelled', description: 'Sent to the guest. Your reservation has been cancelled. Please contact us if you have questions. Any refund must be verified separately.' },
+  status_updated: { title: 'Booking details updated', description: 'Sent to the guest. Your booking or payment details have changed. Please review the current statuses below.' },
+  admin_payment_pending: { title: 'Payment pending', description: 'Sent to the hotel. Online payment for the booking by {guest_name} has not been completed. Review the current booking and payment status.' },
+  admin_booking_expired: { title: 'Booking hold expired', description: 'Sent to the hotel. The unpaid online reservation hold for {guest_name} has expired. Review the booking record before following up.' },
+  admin_booking_cancelled: { title: 'Booking cancelled', description: 'Sent to the hotel. The booking by {guest_name} has been cancelled. Review the booking and any refund requirements separately.' },
   confirmed: { title: 'Booking Confirmed', description: 'Sent when the property confirms the reservation.' },
   contact_customer: { title: 'Customer acknowledgement', description: 'Sent to the customer after a contact enquiry is received.' },
   contact_admin: { title: 'Admin enquiry notification', description: 'Sent to the hotel with enquiry details. Reply goes to the customer.' },
@@ -104,7 +113,7 @@ export default function WebsiteBookingEmails() {
         <div className="booking-email-card-heading"><h2>Email content</h2>
           {dirty && <span className="booking-email-draft-badge">Unsaved changes</span>}
         </div>
-        <div role="tablist" aria-label="Email type" className="booking-email-type-tabs">
+        <div role="tablist" aria-label="Email type" className="booking-email-type-tabs booking-email-type-tabs--extended">
           {Object.entries(types).filter(([key]) => categoryOf(key) === category).map(([key, item]) => <button key={key} type="button" role="tab" aria-selected={type === key} disabled={busy}
             onClick={() => { setType(key); setTarget('introduction_html'); positions.current = {}; setError(''); setMessage(''); setLinkReload(false) }}
             className={`flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition disabled:opacity-50 ${type === key ? 'bg-blue-600 text-white shadow-sm' : 'text-text-secondary hover:bg-white'}`}>{item.title}{settings && !same(drafts[key], settings.templates[key].content) ? ' •' : ''}</button>)}

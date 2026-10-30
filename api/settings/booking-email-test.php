@@ -23,7 +23,7 @@ try {
     if (!is_string($scenario)) throw new InvalidArgumentException('Choose a sample booking.');
     $isAdmin = str_starts_with($type, 'admin_');
     $isContact = str_starts_with($type, 'contact_');
-    $booking = $isContact ? tulip_contact_sample() : ($isAdmin ? booking_email_admin_preview_data($type, $scenario) : booking_email_preview_data($scenario));
+    $booking = $isContact ? tulip_contact_sample() : booking_email_event_preview_data($type, $scenario);
     $booking['is_test_email'] = true;
     rate_limit_or_fail('booking_email_test', 3, 10);
     $pdo = get_db_connection();
@@ -31,7 +31,7 @@ try {
     $brand = tulip_booking_email_brand($pdo, false);
     $email = $isContact ? tulip_render_contact_email($type, $content, $booking, $brand) : tulip_render_booking_email($type, $content, $booking, $brand);
     $queued = enqueue_email($pdo, 'booking_email_test', null, trim($recipient), '[TEST] ' . $email['subject'], $email['html'],
-        ($isContact ? ($type === 'contact_customer' ? 'contact_auto_template_test' : 'contact_template_test') : ($isAdmin && $type !== 'admin_new_booking' ? 'booking_payment_template_test' : 'booking_template_test')), null, 3, ($isContact ? contact_from_email() : booking_from_email()), ($isContact ? contact_from_name() : booking_from_name()));
+        ($isContact ? ($type === 'contact_customer' ? 'contact_auto_template_test' : 'contact_template_test') : (str_contains($type, 'payment') ? 'booking_payment_template_test' : 'booking_template_test')), null, 3, ($isContact ? contact_from_email() : booking_from_email()), ($isContact ? contact_from_name() : booking_from_name()));
     if (!$queued) json_response(false, 'The test email could not be queued. Check that booking email delivery is enabled in Mail Integrations.', 503);
     json_response(true, 'Test email queued. It will be sent by the email queue worker.', 200, ['data' => ['queued' => true]]);
 } catch (InvalidArgumentException $e) {

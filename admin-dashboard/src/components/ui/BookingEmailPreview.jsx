@@ -52,7 +52,8 @@ export default function BookingEmailPreview({ type, content, brandingRevision = 
         </div>
         <label className="sr-only" htmlFor="email-sample-scenario">Sample booking</label>
         {isContact ? <span className="booking-email-sample-select">Sample enquiry</span> : <select id="email-sample-scenario" value={scenario} onChange={e => setScenario(e.target.value)} className="booking-email-sample-select" title="Select sample booking">
-          <option value="single">Sample booking</option><option value="group">Multiple rooms</option>
+          <option value="single">Pay on arrival · one room</option><option value="group">Pay on arrival · multiple rooms</option>
+          <option value="single_online">Online · one room</option><option value="group_online">Online · multiple rooms</option>
         </select>}
       </div>
     </div>
@@ -66,7 +67,7 @@ export default function BookingEmailPreview({ type, content, brandingRevision = 
       <div className="booking-email-preview-stage">
         <div ref={stage}>
           <div className="booking-email-preview-frame" style={{ width: frameWidth * scale, height: 820 * scale }}>
-            <iframe title={`Sample ${isContact ? 'contact enquiry' : type.startsWith('admin_') ? 'admin notification' : type === 'received' ? 'booking received' : 'booking confirmed'} email preview`} sandbox="" referrerPolicy="no-referrer" srcDoc={preview.html}
+            <iframe title={`Sample ${isContact ? 'contact enquiry' : type.startsWith('admin_') ? 'admin notification' : type.replaceAll('_', ' ')} email preview`} sandbox="" referrerPolicy="no-referrer" srcDoc={preview.html}
               style={{ display: 'block', border: 0, width: frameWidth, height: 820, transform: `scale(${scale})`, transformOrigin: 'top left' }} />
           </div>
         </div>

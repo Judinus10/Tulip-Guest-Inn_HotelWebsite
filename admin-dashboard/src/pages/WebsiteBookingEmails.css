@@ -56,3 +56,7 @@
 .booking-email-test-open:hover{background:#f2f6ff}
 .booking-email-test-form{margin-top:10px}
 @container booking-emails (max-width:520px){.booking-email-card{padding:13px}.booking-email-actions>div{width:100%;margin-left:0}.booking-email-actions>div>button{flex:1}.booking-email-preview-controls{width:100%;justify-content:space-between}.booking-email-token-chips{flex-basis:100%}}
+
+/* Additional booking states wrap without squeezing labels on narrow panels. */
+.booking-email-page .booking-email-type-tabs--extended{flex-wrap:wrap}
+.booking-email-page .booking-email-type-tabs--extended>button{flex:1 1 140px}
