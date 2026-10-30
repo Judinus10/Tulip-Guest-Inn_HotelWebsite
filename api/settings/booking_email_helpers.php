@@ -14,12 +14,19 @@ function booking_email_editor_placeholders(?string $type = null): array
     return $type === null ? array_merge($booking, $contact, $payment, $summary) : $booking;
 }
 
+/** Only guest booking templates have a customer-facing notice box. */
+function booking_email_editor_has_note(?string $type): bool
+{
+    return in_array($type, ['received', 'confirmed', 'payment_pending', 'payment_failed',
+        'payment_received', 'expired', 'cancelled', 'status_updated'], true);
+}
+
 function booking_email_editor_defaults(): array
 {
     $common = ['greeting' => 'Hello {guest_name},',
         'closing_html' => '<p>If you have any questions before your stay, please contact us.</p>',
         'footer_note' => 'We look forward to welcoming you to Point Pedro.'];
-    return [
+    $defaults = [
         'admin_daily_summary' => ['subject'=>'Daily stay summary - {summary_date}', 'greeting'=>'Hello team,', 'introduction_html'=>'<p>Here are the arrivals and departures scheduled for {summary_date}. Review room assignments and payment statuses before welcoming guests.</p>', 'closing_html'=>'<p>Open the admin panel to review or update the booking records.</p>', 'footer_note'=>'Internal daily operations summary for {hotel_name}.'],
         'received' => array_merge($common, [
             'subject' => 'We received your booking - {booking_reference}',
@@ -44,6 +51,12 @@ function booking_email_editor_defaults(): array
             'introduction_html' => '<p>Thank you for choosing {hotel_name}. Your booking is confirmed. We look forward to welcoming you.</p>',
         ]),
     ];
+    foreach ($defaults as $type => &$content) {
+        if (booking_email_editor_has_note($type)) $content['please_note'] = $type === 'received'
+            ? 'This is an acknowledgement that we have received your request. Your reservation is only confirmed when you receive a booking confirmation email.' : '';
+    }
+    unset($content);
+    return $defaults;
 }
 
 function booking_email_editor_type(mixed $type): string
@@ -104,8 +117,15 @@ function booking_email_editor_sanitize(string $html): string
 function booking_email_editor_validate(mixed $content, ?string $type = null): array
 {
     $limits = ['subject' => 200, 'greeting' => 200, 'introduction_html' => 6000, 'closing_html' => 4000, 'footer_note' => 500];
-    if (!is_array($content) || array_diff(array_keys($content), array_keys($limits)) || array_diff(array_keys($limits), array_keys($content))) {
-        throw new InvalidArgumentException('Provide all five email content fields.');
+    if (!is_array($content)) throw new InvalidArgumentException('Provide the email content fields.');
+    // Existing saved templates and older clients contain only the original five fields.
+    // An absent notice stays empty, preserving previously saved wording.
+    if (booking_email_editor_has_note($type)) {
+        $limits['please_note'] = 1500;
+        if (!array_key_exists('please_note', $content)) $content['please_note'] = '';
+    }
+    if (array_diff(array_keys($content), array_keys($limits)) || array_diff(array_keys($limits), array_keys($content))) {
+        throw new InvalidArgumentException('Provide the supported email content fields.');
     }
     $result = [];
     foreach ($limits as $key => $limit) {
