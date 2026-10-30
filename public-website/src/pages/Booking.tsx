@@ -1,6 +1,6 @@
 import { useGuestAgePolicy } from '../services/guestAgePolicy';
 import GuestPartyFields from '../components/ui/GuestPartyFields';
-import { readParty, writeParty, partyError, partyTotal, partyRequest } from '../services/guestOccupancy';
+import { readParty, writeParty, partyError, partyTotal, partyRequest, bookingRoomOptions, roomGuestLabel } from '../services/guestOccupancy';
 import { useContactPhones } from '../hooks/useContactPhones';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -75,9 +75,12 @@ export default function Booking() {
     paymentMethod: 'Cash',
   });
   const [bookingRooms, setBookingRooms] = useState<Room[]>([]);
+  const [multiRoomCount, setMultiRoomCount] = useState(0);
+  const [roomSelectionNotice, setRoomSelectionNotice] = useState('');
   const [submitError, setSubmitError] = useState('');
   const availabilityKey = `${form.checkIn}|${form.checkOut}|${JSON.stringify(party)}|${maxChildAge}`;
   const [checkedAvailabilityKey, setCheckedAvailabilityKey] = useState('');
+  const [availabilityAttempt, setAvailabilityAttempt] = useState(0);
   const [availabilityError, setAvailabilityError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [onlinePaymentEnabled, setOnlinePaymentEnabled] = useState(false);
@@ -135,37 +138,62 @@ export default function Booking() {
     let mounted = true;
 
     const params: Record<string, string> = {};
-    const hasDateFilter = Boolean(form.checkIn && form.checkOut);
-
-    if (hasDateFilter) {
-      params.check_in_date = form.checkIn;
-      params.check_out_date = form.checkOut;
-    }
-
-    if (form.guests) {
-      params.guests = form.guests;
-    }
-
-    if (partyError(party, false, maxChildAge)) { setBookingRooms([]); setAvailabilityError(partyError(party, false, maxChildAge)); return; }
-    Object.assign(params, Object.fromEntries(writeParty(new URLSearchParams(), party)));
     setBookingRooms([]);
+    setMultiRoomCount(0);
+    setRoomSelectionNotice('');
+    setSubmitError('');
     setAvailabilityError('');
+    setCheckedAvailabilityKey('');
+    if (!form.checkIn || !form.checkOut || form.checkOut <= form.checkIn) {
+      setCheckedAvailabilityKey('');
+      return () => { mounted = false; };
+    }
+    const guestError = partyError(party, false, maxChildAge);
+    if (guestError) {
+      setAvailabilityError(guestError);
+      return () => { mounted = false; };
+    }
+    // Fetch date availability without a party filter so alternative single rooms
+    // and multi-room combinations are checked against the same available stock.
+    params.check_in_date = form.checkIn;
+    params.check_out_date = form.checkOut;
     fetchPublicRooms(params)
       .then((backendRooms) => {
-        if (mounted) { setBookingRooms(backendRooms); setCheckedAvailabilityKey(availabilityKey); }
+        if (!mounted) return;
+        const options = bookingRoomOptions(backendRooms, party, form.roomType);
+        setBookingRooms(options.matches);
+        setMultiRoomCount(options.multiRoomCount);
+        setCheckedAvailabilityKey(availabilityKey);
+        if (options.selected) {
+          setForm(current => ({ ...current, roomType: options.selected!.slug }));
+          if (form.roomType && options.selected.slug !== form.roomType) {
+            const message = `The previous room cannot accommodate this group for these dates. ${options.selected.name} has been selected instead. Review the room and updated price before continuing.`;
+            setRoomSelectionNotice(message);
+            toast.warning(message);
+          }
+        } else {
+          setForm(current => ({ ...current, roomType: '' }));
+          toast.warning(options.multiRoomCount >= 2
+            ? 'No single room can accommodate this group. Choose multiple rooms before entering guest details.'
+            : 'No available room combination can accommodate this group. Change your dates or guest count.');
+        }
       })
       .catch(() => {
-        if (mounted) { setBookingRooms([]); setAvailabilityError('Unable to check room availability. Please try again.'); setCheckedAvailabilityKey(availabilityKey); }
+        if (mounted) { setBookingRooms([]); setAvailabilityError('Unable to check room availability. Change the search or retry.'); setCheckedAvailabilityKey(availabilityKey); }
       });
 
     return () => {
       mounted = false;
     };
-  }, [form.checkIn, form.checkOut, form.guests, JSON.stringify(party), maxChildAge]);
+  }, [form.checkIn, form.checkOut, form.guests, JSON.stringify(party), maxChildAge, availabilityAttempt]);
 
-  const availabilityReady = checkedAvailabilityKey === availabilityKey && !availabilityError;
+  const validStayDates = Boolean(form.checkIn && form.checkOut && form.checkOut > form.checkIn);
+  const availabilityReady = validStayDates && checkedAvailabilityKey === availabilityKey && !availabilityError;
   const roomTypeOptions = buildRoomTypeOptions(availabilityReady ? bookingRooms : []);
   const selectedRoom = (availabilityReady ? bookingRooms : []).find((r) => r.slug === form.roomType);
+
+  const canEnterGuestDetails = availabilityReady && Boolean(selectedRoom);
+  const multipleRoomPath = `/multi-room-booking?${writeParty(new URLSearchParams({checkin:form.checkIn,checkout:form.checkOut,rooms:String(multiRoomCount)}),party).toString()}`;
 
   const nights =
     form.checkIn && form.checkOut
@@ -185,6 +213,10 @@ export default function Booking() {
     setSubmitError('');
 
     if (partyError(party, false, maxChildAge)) { setSubmitError(partyError(party, false, maxChildAge)); toast.warning(partyError(party, false, maxChildAge)); return; }
+    if (!canEnterGuestDetails) {
+      toast.warning(availabilityError || (multiRoomCount >= 2 ? 'Choose multiple rooms before entering guest details.' : 'Choose an available room for your dates and guest count first.'));
+      return;
+    }
     const emailIsValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
     const phoneDigits = form.phone.replace(/\D/g, '');
     const validationMessage = !form.firstName.trim() || !form.lastName.trim()
@@ -364,7 +396,6 @@ export default function Booking() {
                           Guests *
                         </label>
                         <GuestPartyFields value={party} disabled={isSubmitting} onChange={next => { setParty(next); setForm(prev => ({...prev,guests:String(partyTotal(next))})); }} />
-                        {availabilityReady && bookingRooms.length===0 && !partyError(party, false, maxChildAge) && <a className="mt-2 block text-xs text-gold underline" href={`/rooms?${writeParty(new URLSearchParams({checkin:form.checkIn,checkout:form.checkOut}),party).toString()}`}>Find suitable rooms or a multi-room combination</a>}
                       </div>
                       <div>
                         <label className="block text-[9px] tracking-[0.2em] uppercase text-muted mb-2">
@@ -386,6 +417,7 @@ export default function Booking() {
                         <label className="block text-[9px] tracking-[0.2em] uppercase text-muted mb-2">Room Type</label>
                         <select
                           name="roomType"
+                          disabled={!availabilityReady || isSubmitting}
                           value={form.roomType}
                           onChange={handleChange}
                           className="w-full border border-border px-5 py-3.5 text-sm outline-hidden focus:border-gold transition-colors duration-200 bg-background"
@@ -396,9 +428,21 @@ export default function Booking() {
                         </select>
                       </div>
                     </div>
+                    {selectedRoom && <p className="mt-3 text-xs leading-relaxed text-muted">{roomGuestLabel(selectedRoom)}</p>}
+                    {roomSelectionNotice && availabilityReady && <p role="status" className="mt-4 border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{roomSelectionNotice}</p>}
+                    {!validStayDates ? <p role="status" className="mt-4 text-sm text-muted">Select valid check-in and check-out dates to choose a room before entering guest details.</p>
+                      : availabilityError ? <div role="alert" className="mt-4 border border-red-200 bg-red-50 p-4 text-sm text-red-700">{availabilityError}<button type="button" className="ml-3 underline" onClick={() => setAvailabilityAttempt(current => current + 1)}>Retry availability</button></div>
+                      : !availabilityReady ? <p role="status" className="mt-4 text-sm text-muted">Checking rooms for your updated guest count…</p>
+                      : bookingRooms.length === 0 && <div role="alert" className="mt-4 border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+                        <p className="font-semibold">{multiRoomCount >= 2 ? 'Your group needs multiple rooms.' : 'No suitable rooms are available for this group.'}</p>
+                        <p className="mt-2">{multiRoomCount >= 2 ? `No single available room can accommodate ${party.adults} adults and ${party.children} children. Continue with ${multiRoomCount} rooms to review the allocation before entering guest details.` : 'Change the stay dates or guest count to continue. Guest details and payment are unavailable until suitable rooms are selected.'}</p>
+                        {multiRoomCount >= 2 && <a className="btn-primary mt-4 w-full justify-center sm:w-auto" href={multipleRoomPath}>Choose {multiRoomCount} rooms</a>}
+                      </div>}
                   </div>
                 </AnimatedSection>
 
+                <fieldset disabled={!canEnterGuestDetails || isSubmitting} className="min-w-0 space-y-10 disabled:opacity-50">
+                <legend className="sr-only">Guest details and payment — choose suitable rooms first</legend>
                 <AnimatedSection delay={0.15}>
                   <div className="bg-surface border border-border p-8">
                     <h3 className="font-serif text-2xl font-light text-dark mb-5">Payment Method</h3>
@@ -590,6 +634,7 @@ export default function Booking() {
                     ? form.paymentMethod === 'Cash' ? 'Submitting Booking...' : 'Preparing Payment...'
                     : form.paymentMethod === 'Cash' ? 'Submit Booking' : 'Continue to Payment'}
                 </button>
+                </fieldset>
               </form>
 
               {/* Price Summary */}

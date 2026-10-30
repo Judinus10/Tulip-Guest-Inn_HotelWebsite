@@ -71,3 +71,20 @@ export function allocateParty<R extends OccupancyRoom>(rooms: R[], p: GuestParty
   }
   return [];
 }
+
+/** Individual maxima do not override the combined guest limit. */
+export function roomGuestLabel(room: OccupancyRoom): string {
+  const total = roomMaxOccupancy(room);
+  const capacity = Number(room.max_guests ?? room.guests ?? room.capacity ?? 0);
+  const adults = Math.min(Number(room.max_adults ?? capacity), total);
+  const children = Math.min(Number(room.max_children ?? 0), total);
+  return `${total} ${total === 1 ? 'Guest' : 'Guests'} (max ${adults} ${adults === 1 ? 'adult' : 'adults'}, ${children} ${children === 1 ? 'child' : 'children'})`;
+}
+
+/** Prefer a single room; suggest a real, available combination only if none fits. */
+export function bookingRoomOptions<R extends OccupancyRoom & { slug: string }>(rooms: R[], party: GuestParty, preferredSlug: string) {
+  const matches = rooms.filter(room => occupancy(room, party).fits);
+  const selected = matches.find(room => room.slug === preferredSlug) ?? matches[0];
+  const multiRoomCount = matches.length ? 0 : allocateParty(rooms, party).length;
+  return { matches, selected, multiRoomCount: multiRoomCount >= 2 ? multiRoomCount : 0 };
+}

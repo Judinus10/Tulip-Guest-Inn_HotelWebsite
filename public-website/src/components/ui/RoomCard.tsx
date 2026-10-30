@@ -2,7 +2,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Users, BedDouble, Maximize } from 'lucide-react';
 import type { Room } from '../../data/rooms';
-import { roomMaxOccupancy } from '../../services/guestOccupancy';
+import { roomGuestLabel } from '../../services/guestOccupancy';
 import { formatMoney } from '../../services/formatters';
 
 interface RoomCardProps {
@@ -77,10 +77,10 @@ export default function RoomCard({ room, index = 0, bookingPath }: RoomCardProps
         <p className="text-sm text-muted leading-relaxed mb-6">{room.description}</p>
 
         {/* Room Details */}
-        <div className="flex items-center gap-6 mb-7 pt-4 border-t border-border">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3 mb-7 pt-4 border-t border-border">
           <div className="flex items-center gap-1.5 text-muted">
             <Users size={14} className="text-gold" />
-            <span className="whitespace-nowrap text-xs">{roomMaxOccupancy(room)} {roomMaxOccupancy(room) === 1 ? 'Guest' : 'Guests'}</span>
+            <span className="text-xs leading-relaxed">{roomGuestLabel(room)}</span>
           </div>
           <div className="flex items-center gap-1.5 text-muted">
             <BedDouble size={14} className="text-gold" />
