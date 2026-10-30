@@ -57,7 +57,8 @@ function tulip_booking_email_tokens(array $booking, array $brand): array
         'booking_reference' => (string) ($booking['booking_no'] ?? ''),
         'check_in' => tulip_booking_email_date((string) ($booking['check_in_date'] ?? '')),
         'check_out' => tulip_booking_email_date((string) ($booking['check_out_date'] ?? '')),
-        'hotel_name' => (string) $brand['name']];
+        'hotel_name' => (string) $brand['name'], 'payment_status' => (string) ($booking['payment_status'] ?? 'Not available'),
+        'payment_amount' => isset($booking['payment_amount']) ? (string) ($booking['payment_currency'] ?? $booking['currency'] ?? 'LKR') . ' ' . number_format((float) $booking['payment_amount'], 2) : 'Not available'];
 }
 
 /** Replace text nodes only, so guest values cannot introduce HTML or alter links. */
@@ -98,12 +99,16 @@ function tulip_booking_email_plain_text(string $text, array $tokens): string
 function tulip_render_booking_email(string $type, array $content, array $booking, array $brand, string $billUrl = '', bool $preview = false): array
 {
     $type = booking_email_editor_type($type);
-    $content = booking_email_editor_validate($content);
+    $content = booking_email_editor_validate($content, $type);
     $e = 'tulip_booking_email_escape';
     $tokens = tulip_booking_email_tokens($booking, $brand);
     $subject = trim(preg_replace('/[\x00-\x1F\x7F]+/u', ' ', tulip_booking_email_plain_text($content['subject'], $tokens)) ?? '');
+    $isAdmin = str_starts_with($type, 'admin_');
+    $adminHeadings = ['admin_new_booking'=>'New booking received', 'admin_payment_received'=>'Payment received', 'admin_payment_failed'=>'Payment failed'];
     $heading = $type === 'received' ? 'We received your booking' : 'Your booking is confirmed';
     $status = $type === 'received' ? 'Awaiting confirmation' : 'Confirmed';
+    if ($isAdmin) { $heading = $adminHeadings[$type]; $status = match($type) { 'admin_new_booking'=>'New booking', 'admin_payment_received'=>'Payment received', default=>'Payment failed' }; }
+    $badgeStyle = $type === 'admin_payment_failed' ? '#fff0ee;color:#a52b24' : (($type === 'received' || $type === 'admin_new_booking') ? '#fff5df;color:#865d1c' : '#edf6ee;color:#245d35');
     $greeting = $e(tulip_booking_email_plain_text($content['greeting'], $tokens));
     $intro = tulip_booking_email_rich_text($content['introduction_html'], $tokens);
     $closing = tulip_booking_email_rich_text($content['closing_html'], $tokens);
@@ -139,11 +144,29 @@ function tulip_render_booking_email(string $type, array $content, array $booking
         $bookedBy = '<p style="margin:12px 0 0;color:#647067;"><strong>Booked for you by:</strong> ' . $e(implode(' | ', $details)) . '</p>';
     }
     $paymentNotice = !empty($booking['payment_notice']) ? '<p style="margin:12px 0 0;color:#865d1c;">' . $e($booking['payment_notice']) . '</p>' : '';
+    $customerDetails = ''; $paymentExtra = '';
+    if ($isAdmin) {
+        $fields = ['Customer'=>$booking['full_name']??'', 'Email'=>$booking['email']??'', 'Phone'=>$booking['phone']??'', 'Booking status'=>$booking['status']??''];
+        if (!empty($booking['is_booking_for_other'])) {
+            $fields['Staying guest']=$booking['staying_guest_name']??'';
+            $fields['Staying guest email']=$booking['staying_guest_email']??'';
+            $fields['Staying guest phone']=$booking['staying_guest_phone']??'';
+        }
+        $customerDetails = '<tr><td class="email-pad" style="padding:0 32px 20px;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #e8e3da;word-break:break-word;">';
+        foreach ($fields as $label=>$value) if (trim((string)$value)!=='') $customerDetails .= '<tr><td style="padding:8px 12px;color:#647067;vertical-align:top;">'.$e($label).'</td><td style="padding:8px 12px;font-weight:bold;">'.$e($value).'</td></tr>';
+        $customerDetails .= '</table></td></tr>';
+        if (isset($booking['payment_amount'])) {
+            $label = $type === 'admin_payment_received' ? 'Received amount' : ($type === 'admin_payment_failed' ? 'Attempted amount' : 'Payment record amount');
+            $paymentExtra .= '<tr><td style="padding:8px 0;">'.$label.'</td><td align="right" style="padding:8px 0;font-weight:bold;">'.$e($tokens['payment_amount']).'</td></tr>';
+        }
+        if (!empty($booking['transaction_id'])) $paymentExtra .= '<tr><td style="padding:8px 0;vertical-align:top;">Transaction / order ID</td><td align="right" style="padding:8px 0;word-break:break-all;">'.$e($booking['transaction_id']).'</td></tr>';
+    }
+    $actionLabel = $isAdmin ? 'Open booking in admin' : 'View booking &amp; bill';
     $action = '';
     if ($isTest) {
-        $action = '<div style="padding:15px 20px;background:#19352B;border-radius:6px;color:#ffffff;text-align:center;font-weight:bold;">View booking &amp; bill <span style="font-size:11px;">(sample)</span></div>';
+        $action = '<div style="padding:15px 20px;background:#19352B;border-radius:6px;color:#ffffff;text-align:center;font-weight:bold;">' . $actionLabel . ' <span style="font-size:11px;">(sample)</span></div>';
     } elseif ($preview || (filter_var($billUrl, FILTER_VALIDATE_URL) && preg_match('~^https?://~i', $billUrl))) {
-        $action = '<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" bgcolor="#19352B" style="border-radius:6px;"><a href="' . ($preview ? '#' : $e($billUrl)) . '" style="display:block;padding:15px 20px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;">View booking &amp; bill</a></td></tr></table>';
+        $action = '<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" bgcolor="#19352B" style="border-radius:6px;"><a href="' . ($preview ? '#' : $e($billUrl)) . '" style="display:block;padding:15px 20px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;">' . $actionLabel . '</a></td></tr></table>';
     }
     $previewHead = $preview ? '<meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; img-src data:; style-src &#39;unsafe-inline&#39;;"><style>a{pointer-events:none!important;cursor:default!important}</style>' : '';
     $html = '<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . $e($subject) . '</title>' . $previewHead . '
@@ -154,19 +177,19 @@ function tulip_render_booking_email(string $type, array $content, array $booking
 <!--[if mso]><table role="presentation" width="600"><tr><td><![endif]-->
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#ffffff" style="max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #e8e3da;">
 <tr><td align="center" class="email-pad" style="padding:26px 32px 20px;border-bottom:2px solid #C7A86B;">' . $logo . '<div style="font-family:Georgia,Times,serif;font-size:20px;font-weight:bold;color:#19352B;">' . $e($brand['name']) . '</div></td></tr>' . $testBanner . '
-<tr><td class="email-pad" style="padding:26px 32px 14px;text-align:center;"><span style="display:inline-block;border-radius:20px;padding:4px 13px;font-size:12px;font-weight:bold;background:' . ($type === 'received' ? '#fff5df;color:#865d1c' : '#edf6ee;color:#245d35') . ';">' . $status . '</span><h1 class="email-title" style="margin:13px 0 8px;font-family:Georgia,Times,serif;font-size:31px;line-height:1.25;color:#19352B;">' . $heading . '</h1></td></tr>
-<tr><td class="email-pad" style="padding:12px 32px 18px;word-break:break-word;overflow-wrap:anywhere;"><p style="margin:0 0 12px;font-weight:bold;">' . $greeting . '</p>' . $intro . $bookedBy . '</td></tr>
+<tr><td class="email-pad" style="padding:26px 32px 14px;text-align:center;"><span style="display:inline-block;border-radius:20px;padding:4px 13px;font-size:12px;font-weight:bold;background:' . $badgeStyle . ';">' . $status . '</span><h1 class="email-title" style="margin:13px 0 8px;font-family:Georgia,Times,serif;font-size:31px;line-height:1.25;color:#19352B;">' . $heading . '</h1></td></tr>
+<tr><td class="email-pad" style="padding:12px 32px 18px;word-break:break-word;overflow-wrap:anywhere;"><p style="margin:0 0 12px;font-weight:bold;">' . $greeting . '</p>' . $intro . $bookedBy . '</td></tr>' . $customerDetails . '
 <tr><td class="email-pad" style="padding:0 32px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#f6f3ec" style="border-radius:5px;"><tr><td style="padding:13px 17px;"><div style="font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:#647067;">Booking reference</div><strong style="font-size:19px;color:#19352B;">' . $e($tokens['booking_reference']) . '</strong></td></tr></table></td></tr>
 <tr><td class="email-pad" style="padding:0 32px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8e3da;border-radius:6px;word-break:break-word;overflow-wrap:anywhere;">
-<tr><td style="padding:15px 20px 0;font-family:Georgia,Times,serif;font-size:20px;font-weight:bold;color:#19352B;">Your stay</td></tr>
+<tr><td style="padding:15px 20px 0;font-family:Georgia,Times,serif;font-size:20px;font-weight:bold;color:#19352B;">' . ($isAdmin ? 'Stay details' : 'Your stay') . '</td></tr>
 <tr><td style="padding:8px 20px 15px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
 <td class="email-date" width="50%" valign="top" style="padding:8px 12px 8px 0;"><div style="font-size:11px;color:#647067;letter-spacing:0.7px;">CHECK-IN</div><strong style="font-size:17px;color:#19352B;">' . $e($tokens['check_in']) . '</strong><div style="font-size:12px;color:#647067;">' . $e($brand['check_in_hint'] ?? '') . '</div></td>
 <td class="email-date" width="50%" valign="top" style="padding:8px 0 8px 18px;border-left:1px solid #e8e3da;"><div style="font-size:11px;color:#647067;letter-spacing:0.7px;">CHECK-OUT</div><strong style="font-size:17px;color:#19352B;">' . $e($tokens['check_out']) . '</strong><div style="font-size:12px;color:#647067;">' . $e($brand['check_out_hint'] ?? '') . '</div></td>
 </tr></table></td></tr>' . $roomRows . '<tr><td style="padding:13px 20px;background:#faf9f6;border-top:1px solid #e8e3da;"><strong>Booking total:</strong> ' . $e(booking_guest_summary($booking)) . '</td></tr></table></td></tr>
 <tr><td class="email-pad" style="padding:0 32px 22px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8e3da;border-radius:6px;"><tr><td style="padding:15px 20px 8px;font-family:Georgia,Times,serif;font-size:20px;font-weight:bold;color:#19352B;">Payment details</td></tr><tr><td style="padding:0 20px 16px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">
 <tr><td class="email-payment-label" style="padding:8px 0;">Payment method</td><td class="email-payment-value" align="right" style="padding:8px 0;font-weight:bold;">' . $payment . '</td></tr>
-<tr><td class="email-payment-label" style="padding:8px 0;border-top:1px solid #e8e3da;font-weight:bold;">Total amount</td><td class="email-payment-value" align="right" style="padding:8px 0;border-top:1px solid #e8e3da;font-weight:bold;">' . $currency . ' ' . $amount . '</td></tr>
-</table><div style="margin-top:9px;padding:8px 12px;background:#f6f3ec;border-radius:4px;font-size:12px;text-align:center;">' . $paymentStatus . '</div>' . $paymentNotice . '</td></tr></table></td></tr>
+<tr><td class="email-payment-label" style="padding:8px 0;border-top:1px solid #e8e3da;font-weight:bold;">' . ($isAdmin ? 'Booking total' : 'Total amount') . '</td><td class="email-payment-value" align="right" style="padding:8px 0;border-top:1px solid #e8e3da;font-weight:bold;">' . $currency . ' ' . $amount . '</td></tr>
+' . $paymentExtra . '</table><div style="margin-top:9px;padding:8px 12px;background:#f6f3ec;border-radius:4px;font-size:12px;text-align:center;">' . $paymentStatus . '</div>' . $paymentNotice . '</td></tr></table></td></tr>
 <tr><td class="email-pad" style="padding:0 32px 22px;">' . $action . '</td></tr>
 <tr><td class="email-pad" style="padding:0 32px 22px;word-break:break-word;overflow-wrap:anywhere;">' . $closing . ($footer !== '' ? '<p style="margin:10px 0 0;color:#647067;">' . $footer . '</p>' : '') . '</td></tr>
 <tr><td class="email-pad" align="center" style="padding:20px 32px 26px;border-top:1px solid #C7A86B;font-size:12px;line-height:1.8;color:#56635b;word-break:break-word;overflow-wrap:anywhere;"><strong style="font-family:Georgia,Times,serif;font-size:17px;color:#19352B;">' . $e($brand['name']) . '</strong>' . (!empty($brand['address']) ? '<div style="margin-top:5px;">' . nl2br($e($brand['address'])) . '</div>' : '') . $contactHtml . '</td></tr></table>

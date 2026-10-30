@@ -66,7 +66,7 @@ export default function BookingEmailPreview({ type, content, brandingRevision = 
       <div className="booking-email-preview-stage">
         <div ref={stage}>
           <div className="booking-email-preview-frame" style={{ width: frameWidth * scale, height: 820 * scale }}>
-            <iframe title={`Sample ${isContact ? 'contact enquiry' : type === 'received' ? 'booking received' : 'booking confirmed'} email preview`} sandbox="" referrerPolicy="no-referrer" srcDoc={preview.html}
+            <iframe title={`Sample ${isContact ? 'contact enquiry' : type.startsWith('admin_') ? 'admin notification' : type === 'received' ? 'booking received' : 'booking confirmed'} email preview`} sandbox="" referrerPolicy="no-referrer" srcDoc={preview.html}
               style={{ display: 'block', border: 0, width: frameWidth, height: 820, transform: `scale(${scale})`, transformOrigin: 'top left' }} />
           </div>
         </div>

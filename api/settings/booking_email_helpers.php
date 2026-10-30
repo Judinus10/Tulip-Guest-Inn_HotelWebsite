@@ -7,7 +7,9 @@ function booking_email_editor_placeholders(?string $type = null): array
     if ($type !== null && str_starts_with($type, 'contact_')) return $contact;
     $booking = ['guest_name' => 'Guest name', 'booking_reference' => 'Booking reference',
         'check_in' => 'Check-in date', 'check_out' => 'Check-out date', 'hotel_name' => 'Hotel name'];
-    return $type === null ? array_merge($booking, $contact) : $booking;
+    $payment = ['payment_status'=>'Payment status','payment_amount'=>'Payment amount'];
+    if ($type !== null && str_starts_with($type,'admin_')) return array_merge($booking,$payment);
+    return $type === null ? array_merge($booking, $contact, $payment) : $booking;
 }
 
 function booking_email_editor_defaults(): array
@@ -22,6 +24,9 @@ function booking_email_editor_defaults(): array
         ]),
         'contact_customer' => ['subject'=>'We received your enquiry - {enquiry_reference}','greeting'=>'Hello {sender_name},','introduction_html'=>'<p>Thank you for contacting {hotel_name}. We have received your message and will get back to you.</p>','closing_html'=>'<p>You can reply to this email if you need to add anything to your enquiry.</p>','footer_note'=>'Thank you for getting in touch.'],
         'contact_admin' => ['subject'=>'New enquiry - {enquiry_reference}: {enquiry_subject}','greeting'=>'Hello team,','introduction_html'=>'<p>A new website enquiry has been received. Review the details below and reply to the customer.</p>','closing_html'=>'<p>Use Reply in your email app to contact the sender.</p>','footer_note'=>'Website enquiry notification.'],
+        'admin_new_booking' => ['subject'=>'New booking - {booking_reference}','greeting'=>'Hello team,','introduction_html'=>'<p>A booking from {guest_name} has been received. Review the reservation and payment details below.</p>','closing_html'=>'<p>Open the admin panel to manage this reservation.</p>','footer_note'=>'Internal booking notification.'],
+        'admin_payment_received' => ['subject'=>'Payment received - {booking_reference}','greeting'=>'Hello team,','introduction_html'=>'<p>A payment for the booking by {guest_name} has been received. Review the transaction details below.</p>','closing_html'=>'<p>Open the admin panel to review the booking and payment record.</p>','footer_note'=>'Internal payment notification.'],
+        'admin_payment_failed' => ['subject'=>'Payment failed - {booking_reference}','greeting'=>'Hello team,','introduction_html'=>'<p>A payment attempt for the booking by {guest_name} has failed. Review the booking and follow up if needed.</p>','closing_html'=>'<p>Check the payment record before contacting the customer.</p>','footer_note'=>'A failed payment attempt does not confirm a reservation.'],
         'confirmed' => array_merge($common, [
             'subject' => 'Your booking is confirmed - {booking_reference}',
             'introduction_html' => '<p>Thank you for choosing {hotel_name}. Your booking is confirmed. We look forward to welcoming you.</p>',

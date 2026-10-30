@@ -19,3 +19,15 @@ function booking_email_preview_data(string $scenario): array
         'payment_method' => 'Cash on arrival', 'payment_status' => 'Payment Pending',
     ];
 }
+
+function booking_email_admin_preview_data(string $type, string $scenario): array
+{
+    $booking = booking_email_preview_data($scenario);
+    $booking['email'] = 'guest@example.test'; $booking['phone'] = '+94 77 000 0000';
+    $booking['status'] = $type === 'admin_payment_received' ? 'Confirmed' : 'Pending';
+    $booking['payment_status'] = match($type) { 'admin_payment_received'=>'Paid', 'admin_payment_failed'=>'Failed', default=>'Payment Pending' };
+    $booking['payment_method'] = $type === 'admin_new_booking' ? 'Cash on arrival' : 'PayHere';
+    $booking['payment_amount'] = $booking['amount']; $booking['payment_currency'] = $booking['currency'];
+    $booking['transaction_id'] = 'SAMPLE-TRANSACTION';
+    return $booking;
+}

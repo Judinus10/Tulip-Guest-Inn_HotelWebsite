@@ -12,7 +12,11 @@ import { fetchBookingEmailSettings, saveBookingEmailSettings } from '@/services/
 const types = { received: { title: 'Booking Received', description: 'Sent when a booking request is submitted. This does not confirm the reservation.' },
   confirmed: { title: 'Booking Confirmed', description: 'Sent when the property confirms the reservation.' },
   contact_customer: { title: 'Customer acknowledgement', description: 'Sent to the customer after a contact enquiry is received.' },
-  contact_admin: { title: 'Admin enquiry notification', description: 'Sent to the hotel with enquiry details. Reply goes to the customer.' } }
+  contact_admin: { title: 'Admin enquiry notification', description: 'Sent to the hotel with enquiry details. Reply goes to the customer.' },
+  admin_new_booking: { title: 'New booking', description: 'Sent to the hotel when a booking is received.' },
+  admin_payment_received: { title: 'Payment received', description: 'Sent to the hotel after a successful payment.' },
+  admin_payment_failed: { title: 'Payment failed', description: 'Sent to the hotel after a failed payment attempt.' } }
+const categoryOf = key => key.startsWith('contact_') ? 'contact' : key.startsWith('admin_') ? 'admin' : 'guest'
 const fieldLabels = { subject: 'Subject', greeting: 'Greeting', introduction_html: 'Introduction', closing_html: 'Closing message', footer_note: 'Footer note' }
 const limits = { subject: 200, greeting: 200, introduction_html: 6000, closing_html: 4000, footer_note: 500 }
 const bytes = text => new TextEncoder().encode(text).length
@@ -37,6 +41,7 @@ export default function WebsiteBookingEmails() {
   const requestId = useRef(0)
   const draft = drafts[type]
   const isContact = type.startsWith('contact_')
+  const category = categoryOf(type)
   const placeholders = settings?.placeholders_by_type?.[type] || settings?.placeholders || {}
   const dirty = settings && draft && !same(draft, settings.templates[type].content)
   const anyDirty = settings && Object.keys(types).some(key => !same(drafts[key], settings.templates[key].content))
@@ -89,9 +94,9 @@ export default function WebsiteBookingEmails() {
   if (loadError) return <SectionCard><p role="alert" className="text-sm text-red-700">{loadError}</p><Button className="mt-4" variant="outline" onClick={() => window.location.reload()}>Reload settings</Button></SectionCard>
   return <div className="booking-email-page">
     <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Email category">
-      {[['received', 'Guest bookings'], ['contact_customer', 'Contact enquiries']].map(([key, title]) => <button key={key} type="button" disabled={busy} aria-pressed={key.startsWith('contact_') === isContact}
+      {[['received', 'Guest bookings'], ['contact_customer', 'Contact enquiries'], ['admin_new_booking', 'Admin notifications']].map(([key, title]) => <button key={key} type="button" disabled={busy} aria-pressed={categoryOf(key) === category}
         onClick={() => { setType(key); setTarget('introduction_html'); positions.current = {}; setError(''); setMessage('') }}
-        className={`rounded-lg border px-4 py-2 text-sm font-semibold ${key.startsWith('contact_') === isContact ? 'border-blue-600 bg-blue-600 text-white' : 'border-border bg-white text-text-secondary'}`}>{title}</button>)}
+        className={`rounded-lg border px-4 py-2 text-sm font-semibold ${categoryOf(key) === category ? 'border-blue-600 bg-blue-600 text-white' : 'border-border bg-white text-text-secondary'}`}>{title}</button>)}
     </div>
     <EmailBrandingSettings onSaved={() => setBrandingRevision(n => n + 1)} />
     <div className="booking-email-workspace">
@@ -100,7 +105,7 @@ export default function WebsiteBookingEmails() {
           {dirty && <span className="booking-email-draft-badge">Unsaved changes</span>}
         </div>
         <div role="tablist" aria-label="Email type" className="booking-email-type-tabs">
-          {Object.entries(types).filter(([key]) => key.startsWith('contact_') === isContact).map(([key, item]) => <button key={key} type="button" role="tab" aria-selected={type === key} disabled={busy}
+          {Object.entries(types).filter(([key]) => categoryOf(key) === category).map(([key, item]) => <button key={key} type="button" role="tab" aria-selected={type === key} disabled={busy}
             onClick={() => { setType(key); setTarget('introduction_html'); positions.current = {}; setError(''); setMessage(''); setLinkReload(false) }}
             className={`flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition disabled:opacity-50 ${type === key ? 'bg-blue-600 text-white shadow-sm' : 'text-text-secondary hover:bg-white'}`}>{item.title}{settings && !same(drafts[key], settings.templates[key].content) ? ' •' : ''}</button>)}
         </div>
