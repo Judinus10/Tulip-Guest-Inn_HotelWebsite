@@ -210,12 +210,17 @@ function tulip_render_booking_email(string $type, array $content, array $booking
     $whatsapp = '';
     $whatsappUrl = $isAdmin ? '' : tulip_booking_whatsapp_url((string) ($brand['whatsapp'] ?? ''), $tokens['booking_reference']);
     if ($whatsappUrl !== '') {
-        $buttonStyle = 'display:block;padding:13px 18px;color:#064E3B;font-size:14px;font-weight:bold;text-align:center;text-decoration:none;line-height:1.5;';
-        $label = 'Have questions? Chat with us on WhatsApp';
+        // Keep WhatsApp branding independent of the website palette. Embed the PNG in
+        // outgoing emails; previews use the same image inline under their data-only CSP.
+        $iconPath = __DIR__ . '/../assets/email-icons/whatsapp-white.png';
+        $iconSrc = $preview ? 'data:image/png;base64,' . base64_encode((string) file_get_contents($iconPath))
+            : 'cid:jebal-email-icon-whatsapp-white';
+        $buttonStyle = 'display:block;padding:10px 12px;border-radius:999px;color:rgb(255,255,255);font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;text-align:center;text-decoration:none;line-height:24px;';
+        $label = '<img src="' . $e($iconSrc) . '" width="22" height="25" alt="" style="display:inline-block;vertical-align:middle;margin-right:7px;border:0;" /><span style="vertical-align:middle;color:rgb(255,255,255);">Have questions? Chat with us on WhatsApp</span>';
         $button = ($preview || $isTest)
-            ? '<span aria-disabled="true" style="' . $buttonStyle . '">' . $label . ($isTest ? ' (sample)' : '') . '</span>'
+            ? '<span aria-disabled="true" style="' . $buttonStyle . '">' . $label . '</span>'
             : '<a href="' . $e($whatsappUrl) . '" target="_blank" rel="noopener noreferrer" style="' . $buttonStyle . '">' . $label . '</a>';
-        $whatsapp = '<tr><td class="email-pad" style="padding:0 32px 24px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" bgcolor="#25D366" style="background:#25D366;border-radius:6px;">' . $button . '</td></tr></table></td></tr>';
+        $whatsapp = '<tr><td class="email-pad" style="padding:0 32px 24px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" bgcolor="#25D366" style="background:#25D366;border-radius:999px;">' . $button . '</td></tr></table></td></tr>';
     }
     $previewHead = $preview ? '<meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; img-src data:; style-src &#39;unsafe-inline&#39;;"><style>a{pointer-events:none!important;cursor:default!important}</style>' : '';
     $html = '<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . $e($subject) . '</title>' . $previewHead . '
