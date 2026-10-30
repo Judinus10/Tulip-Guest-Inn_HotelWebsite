@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { FileText, Send } from 'lucide-react'
+import { Send } from 'lucide-react'
 import { SectionCard } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
@@ -69,12 +69,6 @@ export default function LegalContent({ page = 'terms', onDirtyChange }) {
   }
 
   return <div className="space-y-6">
-    <SectionCard>
-      <div className="flex items-start gap-3"><div className="rounded-xl bg-blue-50 p-3 text-blue-600"><FileText className="h-5 w-5" /></div>
-        <div><h2 className="text-lg font-semibold">{titles[page]}</h2>
-          <p className="mt-1 text-sm text-text-secondary">Format this page with fonts, text sizes, headings, links and lists. Publish changes directly to the public website.</p></div>
-      </div>
-    </SectionCard>
     {loading ? <SectionCard>Loading content...</SectionCard> : loadError ? <SectionCard>
       <p className="mb-3 text-sm text-text-secondary">This policy could not be loaded.</p>
       <Button variant="outline" onClick={() => setRetry(value => value + 1)}>Retry</Button>

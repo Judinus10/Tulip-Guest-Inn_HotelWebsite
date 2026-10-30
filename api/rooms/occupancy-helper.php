@@ -18,6 +18,35 @@ function ensure_room_occupancy_schema(PDO $pdo): void
         catch (PDOException $e) { if ((int) ($e->errorInfo[1] ?? 0) !== 1060) throw $e; }
     }
     ensure_contact_settings_table($pdo);
+    // Migrate the former per-room age limit once, before any room-save transaction.
+    $query = $pdo->prepare('SELECT setting_value FROM website_settings WHERE setting_key = ?');
+    $query->execute(['max_child_age']);
+    if ($query->fetchColumn() === false) {
+        $pdo->beginTransaction();
+        try {
+            // Preserve the most common existing rule; ties use the lower age.
+            $age = $pdo->query('SELECT max_child_age FROM rooms WHERE max_child_age BETWEEN 0 AND 17 GROUP BY max_child_age ORDER BY COUNT(*) DESC, max_child_age ASC LIMIT 1')->fetchColumn();
+            $age = $age === false ? 11 : (int) $age;
+            $insert = $pdo->prepare('INSERT IGNORE INTO website_settings (setting_key, setting_value) VALUES (?, ?)');
+            $insert->execute(['max_child_age', (string) $age]);
+            if ($insert->rowCount() === 1) {
+                $pdo->prepare('UPDATE rooms SET max_child_age = ? WHERE max_child_age <> ?')->execute([$age, $age]);
+            }
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
+    }
+}
+
+function room_max_child_age_setting(PDO $pdo): int
+{
+    $stmt = $pdo->prepare('SELECT setting_value FROM website_settings WHERE setting_key = ?');
+    $stmt->execute(['max_child_age']);
+    $value = $stmt->fetchColumn();
+    if ($value === false) throw new RuntimeException('Reload the room list to initialize the shared child age setting.');
+    return room_occupancy_integer($value, 0, 17, 'Shared maximum child age');
 }
 
 function room_count_children_setting(PDO $pdo): bool
@@ -60,18 +89,41 @@ function room_occupancy_input(array $data, array $existing = []): array
     return $limits;
 }
 
-/** Save the room limits and any deliberate global-toggle change as one unit. */
+/** Save room limits and deliberate shared-policy changes in the same transaction. */
 function save_room_occupancy(PDO $pdo, int $roomId, array $data, array $existing = []): void
 {
     if (!$pdo->inTransaction()) throw new LogicException('Occupancy settings must be saved with the room transaction.');
-    $limits = room_occupancy_input($data, $existing);
+    // Serialize shared-policy writes and compare against the value seen when the form opened.
+    $lock = $pdo->query("SELECT setting_key, setting_value FROM website_settings WHERE setting_key IN ('max_child_age','count_children_toward_capacity') ORDER BY setting_key FOR UPDATE");
+    $shared = $lock->fetchAll(PDO::FETCH_KEY_PAIR);
+    if (!array_key_exists('max_child_age', $shared)) throw new InvalidArgumentException('Reopen the room to load the shared child age setting.');
+    $age = room_occupancy_integer($shared['max_child_age'], 0, 17, 'Shared maximum child age');
+    $nextAge = array_key_exists('max_child_age', $data)
+        ? room_occupancy_integer($data['max_child_age'], 0, 17, 'Maximum child age') : $age;
+    if (array_key_exists('expected_max_child_age', $data)) {
+        $expectedAge = room_occupancy_integer($data['expected_max_child_age'], 0, 17, 'Previous maximum child age');
+        if ($age !== $expectedAge) throw new InvalidArgumentException('The shared child age setting changed. Reopen this room and try again.');
+    } elseif ($nextAge !== $age) {
+        throw new InvalidArgumentException('Reopen the room before changing the shared child age setting.');
+    }
+    $countChildren = array_key_exists('count_children_toward_capacity', $shared)
+        ? room_occupancy_boolean($shared['count_children_toward_capacity']) : true;
+    $nextCount = $countChildren;
+    if (array_key_exists('count_children_toward_capacity', $data)) {
+        $nextCount = room_occupancy_boolean($data['count_children_toward_capacity']);
+        if (!array_key_exists('expected_count_children_toward_capacity', $data)) throw new InvalidArgumentException('Reopen the room before changing the shared child-capacity setting.');
+        $expectedCount = room_occupancy_boolean($data['expected_count_children_toward_capacity']);
+        if ($countChildren !== $expectedCount) throw new InvalidArgumentException('The shared child-capacity setting changed. Reopen this room and try again.');
+    }
+    // The room column mirrors the shared age so existing availability readers also
+    // use the common policy. Room-specific adult, child and total limits stay separate.
+    $limits = room_occupancy_input(array_replace($data, ['max_child_age' => $nextAge]), $existing);
     $pdo->prepare('UPDATE rooms SET max_adults = ?, max_children = ?, max_total_occupants = ?, max_child_age = ? WHERE id = ?')
         ->execute([...array_values($limits), $roomId]);
-    if (!array_key_exists('count_children_toward_capacity', $data)) return;
-    $next = room_occupancy_boolean($data['count_children_toward_capacity']);
-    if (!array_key_exists('expected_count_children_toward_capacity', $data)) throw new InvalidArgumentException('Reopen the room before changing the shared child-capacity setting.');
-    $expected = room_occupancy_boolean($data['expected_count_children_toward_capacity']);
-    if (room_count_children_setting($pdo) !== $expected) throw new InvalidArgumentException('The shared child-capacity setting changed. Reopen this room and try again.');
-    $pdo->prepare('INSERT INTO website_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)')
-        ->execute(['count_children_toward_capacity', $next ? '1' : '0']);
+    $write = $pdo->prepare('INSERT INTO website_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)');
+    if ($nextAge !== $age) {
+        $write->execute(['max_child_age', (string) $nextAge]);
+        $pdo->prepare('UPDATE rooms SET max_child_age = ? WHERE max_child_age <> ?')->execute([$nextAge, $nextAge]);
+    }
+    if ($nextCount !== $countChildren) $write->execute(['count_children_toward_capacity', $nextCount ? '1' : '0']);
 }

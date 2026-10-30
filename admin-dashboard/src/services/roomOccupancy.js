@@ -20,3 +20,31 @@ export function validateRoomOccupancy(form) {
   if (Number(form.max_total_occupants) > Number(form.max_adults) + Number(form.max_children)) errors.max_total_occupants = 'Total occupancy cannot exceed the combined adult and child limits.'
   return errors
 }
+
+/** Reconcile dependent limits without increasing the room's configured capacity.
+ * Keep a temporarily empty field while typing; commit fills it with a valid limit.
+ * The shared child age is an independent policy and is never guessed here.
+ */
+export function normalizeRoomOccupancy(form, countChildren, changedKey = null) {
+  if (changedKey && String(form[changedKey] ?? '').trim() === '') return { ...form }
+  const integer = (value, fallback, min, max) => {
+    const number = String(value ?? '').trim() === '' ? fallback : Number(value)
+    return Math.min(max, Math.max(min, Number.isFinite(number) ? Math.floor(number) : fallback))
+  }
+  const capacity = integer(form.capacity, 2, 1, 20)
+  let adults = integer(form.max_adults, capacity, 1, capacity)
+  let children = integer(form.max_children, 0, 0, countChildren ? capacity : 20)
+  const ceiling = countChildren ? capacity : 20
+  let total = integer(form.max_total_occupants, adults, 1, ceiling)
+  if (changedKey === 'max_total_occupants') {
+    // A deliberate lower total also lowers any individual limits above it.
+    total = Math.min(total, adults + children)
+    adults = Math.min(adults, total)
+    children = Math.min(children, total)
+  } else {
+    // Raise the total only when an individual limit requires it; preserve a
+    // separately chosen lower combined limit whenever it remains valid.
+    total = Math.min(ceiling, adults + children, Math.max(total, adults, children))
+  }
+  return { ...form, capacity, max_adults: adults, max_children: children, max_total_occupants: total }
+}

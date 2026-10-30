@@ -1,5 +1,5 @@
 import RoomOccupancyFields from '@/components/ui/RoomOccupancyFields'
-import { validateRoomOccupancy } from '@/services/roomOccupancy'
+import { validateRoomOccupancy, normalizeRoomOccupancy, occupancyFields } from '@/services/roomOccupancy'
 import RoomPhotoOrder from '@/components/ui/RoomPhotoOrder'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -507,12 +507,17 @@ function RoomVideoPreview({ file, savedUrl, onRemove, disabled }) {
 }
 
 function RoomFormModal({ mode, room, amenities, occupancySettings, onClose, onSubmit }) {
-  const [form, setForm] = useState(() => ({ ...emptyForm, ...room,
-    max_adults: room?.max_adults ?? room?.capacity ?? '',
-    max_total_occupants: room?.max_total_occupants ?? room?.capacity ?? '',
-  }))
+  const [form, setForm] = useState(() => {
+    const initial = { ...emptyForm, ...room,
+      max_child_age: occupancySettings.max_child_age,
+      max_adults: room?.max_adults ?? room?.capacity ?? '',
+      max_total_occupants: room?.max_total_occupants ?? room?.capacity ?? '',
+    }
+    return room ? normalizeRoomOccupancy(initial, occupancySettings.count_children_toward_capacity) : initial
+  })
   const [countChildren, setCountChildren] = useState(occupancySettings.count_children_toward_capacity)
   const [initialCountChildren] = useState(occupancySettings.count_children_toward_capacity)
+  const [initialMaxChildAge] = useState(occupancySettings.max_child_age)
   const [errors, setErrors] = useState({})
   const [selectedFiles, setSelectedFiles] = useState([])
   const [photoOrder, setPhotoOrder] = useState([])
@@ -543,8 +548,21 @@ function RoomFormModal({ mode, room, amenities, occupancySettings, onClose, onSu
   const isEdit = mode === 'edit'
 
   function updateField(name, value) {
-    setForm((current) => ({ ...current, [name]: value }))
-    setErrors((current) => ({ ...current, [name]: '' }))
+    const occupancy = occupancyFields.some(({ key }) => key === name && key !== 'max_child_age')
+    setForm(current => occupancy
+      ? normalizeRoomOccupancy({ ...current, [name]: value }, countChildren, name)
+      : { ...current, [name]: value })
+    setErrors(current => ({ ...current, ...(occupancy ? Object.fromEntries(occupancyFields.filter(({ key }) => key !== 'max_child_age').map(({ key }) => [key, ''])) : {}), [name]: '' }))
+  }
+
+  function commitOccupancy() {
+    setForm(current => normalizeRoomOccupancy(current, countChildren))
+  }
+
+  function toggleCountChildren(next) {
+    setCountChildren(next)
+    setForm(current => normalizeRoomOccupancy(current, next))
+    setErrors(current => ({ ...current, ...Object.fromEntries(occupancyFields.filter(({ key }) => key !== 'max_child_age').map(({ key }) => [key, ''])) }))
   }
 
   function toggleAmenity(amenityId) {
@@ -616,18 +634,20 @@ function RoomFormModal({ mode, room, amenities, occupancySettings, onClose, onSu
 
     if (isProcessingImages || isSubmitting) return
 
-    const nextErrors = validateRoomOccupancy(form)
-    if (String(form.booking_ical_url || '').trim() !== String(room?.booking_ical_url || '').trim() && form.booking_ical_url?.trim() && !/^https:\/\/(ical|admin)\.booking\.com\//i.test(form.booking_ical_url.trim())) nextErrors.booking_ical_url = 'Enter a Booking.com iCal URL.'
-    if (!String(form.room_number || '').trim()) nextErrors.room_number = 'Room number is required.'
-    if (!form.room_name.trim()) nextErrors.room_name = 'Room name is required.'
-    if (!form.room_type.trim()) nextErrors.room_type = 'Room type is required.'
-    if (!form.room_category.trim()) nextErrors.room_category = 'Room category is required.'
-    if (!String(form.price_per_night).trim()) nextErrors.price_per_night = 'Price is required.'
-    if (Number(form.price_per_night) <= 0) nextErrors.price_per_night = 'Price must be greater than 0.'
-    if (!String(form.room_size).trim()) nextErrors.room_size = 'Room size is required.'
-    if (Number(form.room_size) <= 0) nextErrors.room_size = 'Room size must be greater than 0.'
-    if (!form.description.trim()) nextErrors.description = 'Description is required.'
-    if (!form.status.trim()) nextErrors.status = 'Status is required.'
+    const submitted = normalizeRoomOccupancy(form, countChildren)
+    setForm(submitted)
+    const nextErrors = validateRoomOccupancy(submitted)
+    if (String(submitted.booking_ical_url || '').trim() !== String(room?.booking_ical_url || '').trim() && submitted.booking_ical_url?.trim() && !/^https:\/\/(ical|admin)\.booking\.com\//i.test(submitted.booking_ical_url.trim())) nextErrors.booking_ical_url = 'Enter a Booking.com iCal URL.'
+    if (!String(submitted.room_number || '').trim()) nextErrors.room_number = 'Room number is required.'
+    if (!submitted.room_name.trim()) nextErrors.room_name = 'Room name is required.'
+    if (!submitted.room_type.trim()) nextErrors.room_type = 'Room type is required.'
+    if (!submitted.room_category.trim()) nextErrors.room_category = 'Room category is required.'
+    if (!String(submitted.price_per_night).trim()) nextErrors.price_per_night = 'Price is required.'
+    if (Number(submitted.price_per_night) <= 0) nextErrors.price_per_night = 'Price must be greater than 0.'
+    if (!String(submitted.room_size).trim()) nextErrors.room_size = 'Room size is required.'
+    if (Number(submitted.room_size) <= 0) nextErrors.room_size = 'Room size must be greater than 0.'
+    if (!submitted.description.trim()) nextErrors.description = 'Description is required.'
+    if (!submitted.status.trim()) nextErrors.status = 'Status is required.'
 
     setErrors(nextErrors)
     setSubmitError('')
@@ -636,13 +656,15 @@ function RoomFormModal({ mode, room, amenities, occupancySettings, onClose, onSu
     setIsSubmitting(true)
     try {
       await onSubmit({
-        ...form,
-        price_per_night: Number(form.price_per_night),
-        capacity: Number(form.capacity),
+        ...submitted,
+        price_per_night: Number(submitted.price_per_night),
+        capacity: Number(submitted.capacity),
         count_children_toward_capacity: countChildren,
         expected_count_children_toward_capacity: initialCountChildren,
+        expected_max_child_age: initialMaxChildAge,
+        shared_age_changed: Number(submitted.max_child_age) !== initialMaxChildAge,
         shared_occupancy_changed: countChildren !== initialCountChildren,
-        room_size: Number(form.room_size),
+        room_size: Number(submitted.room_size),
         images: selectedFiles,
         remove_image_ids: removedImageIds,
         image_order: photoItems.map(item => item.upload_index !== undefined ? { upload_index: item.upload_index } : { id: item.id }),
@@ -770,7 +792,7 @@ function RoomFormModal({ mode, room, amenities, occupancySettings, onClose, onSu
             </div>
 
             <RoomOccupancyFields form={form} errors={errors} onChange={updateField}
-              countChildren={countChildren} onToggle={setCountChildren} disabled={isSubmitting} />
+              countChildren={countChildren} onToggle={toggleCountChildren} onCommit={commitOccupancy} disabled={isSubmitting} />
 
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="booking_ical_url">Booking.com iCal import URL (optional)</Label>
@@ -1122,7 +1144,11 @@ export default function Rooms() {
     payload.append('description', form.description)
     payload.append('max_guests', form.capacity)
     payload.append('capacity', form.capacity)
-    for (const key of ['max_adults', 'max_children', 'max_total_occupants', 'max_child_age']) payload.append(key, String(form[key]))
+    for (const key of ['max_adults', 'max_children', 'max_total_occupants']) payload.append(key, String(form[key]))
+    if (form.shared_age_changed) {
+      payload.append('max_child_age', String(form.max_child_age))
+      payload.append('expected_max_child_age', String(form.expected_max_child_age))
+    }
     if (form.shared_occupancy_changed) {
       payload.append('count_children_toward_capacity', form.count_children_toward_capacity ? '1' : '0')
       payload.append('expected_count_children_toward_capacity', form.expected_count_children_toward_capacity ? '1' : '0')
