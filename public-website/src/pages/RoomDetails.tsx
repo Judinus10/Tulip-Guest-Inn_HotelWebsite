@@ -1,3 +1,4 @@
+import { useGuestAgePolicy } from '../services/guestAgePolicy';
 import GuestPartyFields from '../components/ui/GuestPartyFields';
 import { readParty, writeParty, partyError, partyTotal, occupancy, roomOccupancyLabel } from '../services/guestOccupancy';
 import { useEffect, useRef, useState } from 'react';
@@ -25,6 +26,7 @@ type RoomBookingField = keyof RoomBookingForm;
 const today = () => new Date().toISOString().split('T')[0];
 
 export default function RoomDetails() {
+  const { maxChildAge } = useGuestAgePolicy();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const toast = useToast();
@@ -242,7 +244,7 @@ export default function RoomDetails() {
 
   const handleBookRoom = async () => {
     if (!validateBookingForm() || checkingRoom) return;
-    if (partyError(party)) { toast.warning(partyError(party)); return; }
+    if (partyError(party, false, maxChildAge)) { toast.warning(partyError(party, false, maxChildAge)); return; }
     setCheckingRoom(true);
     try {
       const available = await fetchPublicRooms({ check_in_date: bookingForm.checkIn, check_out_date: bookingForm.checkOut, ...Object.fromEntries(writeParty(new URLSearchParams(), party)) });
@@ -495,7 +497,7 @@ export default function RoomDetails() {
                     <label className="text-[9px] tracking-[0.2em] uppercase text-muted mb-1.5">Guests</label>
                     <GuestPartyFields value={party} onChange={next => { setParty(next); setBookingForm(prev => ({...prev,guests:String(partyTotal(next))})); }} />
                     <p className="mt-3 text-xs text-muted">{roomOccupancyLabel(room)}</p>
-                    {!partyError(party) && !occupancy(room,party).fits && <p className="mt-2 text-xs text-red-600">This group needs a different room or additional rooms. <Link className="underline" to={`/rooms?${writeParty(new URLSearchParams({checkin:bookingForm.checkIn,checkout:bookingForm.checkOut}),party).toString()}`}>Find suitable rooms</Link></p>}
+                    {!partyError(party, false, maxChildAge) && !occupancy(room,party).fits && <p className="mt-2 text-xs text-red-600">This group needs a different room or additional rooms. <Link className="underline" to={`/rooms?${writeParty(new URLSearchParams({checkin:bookingForm.checkIn,checkout:bookingForm.checkOut}),party).toString()}`}>Find suitable rooms</Link></p>}
                   </div>
                 </div>
 

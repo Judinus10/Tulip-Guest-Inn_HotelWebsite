@@ -1,3 +1,4 @@
+import { useGuestAgePolicy } from '../../services/guestAgePolicy';
 import GuestPartyFields from './GuestPartyFields';
 import { readParty, writeParty, partyError, partyTotal } from '../../services/guestOccupancy';
 import { useRef, useState } from 'react';
@@ -26,6 +27,7 @@ const buildBookingQuery = (form: BookingBarForm) => {
 };
 
 export default function BookingBar() {
+  const { maxChildAge } = useGuestAgePolicy();
   const navigate = useNavigate();
   const [party, setParty] = useState(() => readParty(new URLSearchParams()));
   const fieldRefs = useRef<Record<BookingBarField, HTMLInputElement | HTMLSelectElement | null>>({
@@ -93,7 +95,7 @@ export default function BookingBar() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validateForm() || partyError(party)) return;
+    if (!validateForm() || partyError(party, false, maxChildAge)) return;
 
     const query = new URL(buildBookingQuery(form), window.location.origin);
     writeParty(query.searchParams, party);

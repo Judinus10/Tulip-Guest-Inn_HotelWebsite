@@ -142,7 +142,7 @@ try {
         json_response(false, 'Please select a valid available room.', 422);
     }
 
-    $occupancySnapshot = booking_require_room_occupancy($pdo, $room, $party);
+    $occupancySnapshot = booking_require_room_occupancy($pdo, $room, $party, true);
 
     $conflict = $pdo->prepare(
         "SELECT id, check_in_date, check_out_date

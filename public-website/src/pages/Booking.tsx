@@ -1,3 +1,4 @@
+import { useGuestAgePolicy } from '../services/guestAgePolicy';
 import GuestPartyFields from '../components/ui/GuestPartyFields';
 import { readParty, writeParty, partyError, partyTotal, partyRequest } from '../services/guestOccupancy';
 import { useContactPhones } from '../hooks/useContactPhones';
@@ -44,6 +45,7 @@ interface BookingForm {
 }
 
 export default function Booking() {
+  const { maxChildAge } = useGuestAgePolicy();
   const toast = useToast();
   const phones = useContactPhones();
   const [searchParams] = useSearchParams();
@@ -74,7 +76,7 @@ export default function Booking() {
   });
   const [bookingRooms, setBookingRooms] = useState<Room[]>([]);
   const [submitError, setSubmitError] = useState('');
-  const availabilityKey = `${form.checkIn}|${form.checkOut}|${JSON.stringify(party)}`;
+  const availabilityKey = `${form.checkIn}|${form.checkOut}|${JSON.stringify(party)}|${maxChildAge}`;
   const [checkedAvailabilityKey, setCheckedAvailabilityKey] = useState('');
   const [availabilityError, setAvailabilityError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -144,7 +146,7 @@ export default function Booking() {
       params.guests = form.guests;
     }
 
-    if (partyError(party)) { setBookingRooms([]); setAvailabilityError(partyError(party)); return; }
+    if (partyError(party, false, maxChildAge)) { setBookingRooms([]); setAvailabilityError(partyError(party, false, maxChildAge)); return; }
     Object.assign(params, Object.fromEntries(writeParty(new URLSearchParams(), party)));
     setBookingRooms([]);
     setAvailabilityError('');
@@ -159,7 +161,7 @@ export default function Booking() {
     return () => {
       mounted = false;
     };
-  }, [form.checkIn, form.checkOut, form.guests, JSON.stringify(party)]);
+  }, [form.checkIn, form.checkOut, form.guests, JSON.stringify(party), maxChildAge]);
 
   const availabilityReady = checkedAvailabilityKey === availabilityKey && !availabilityError;
   const roomTypeOptions = buildRoomTypeOptions(availabilityReady ? bookingRooms : []);
@@ -182,7 +184,7 @@ export default function Booking() {
     e.preventDefault();
     setSubmitError('');
 
-    if (partyError(party)) { setSubmitError(partyError(party)); toast.warning(partyError(party)); return; }
+    if (partyError(party, false, maxChildAge)) { setSubmitError(partyError(party, false, maxChildAge)); toast.warning(partyError(party, false, maxChildAge)); return; }
     const emailIsValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
     const phoneDigits = form.phone.replace(/\D/g, '');
     const validationMessage = !form.firstName.trim() || !form.lastName.trim()
@@ -362,7 +364,7 @@ export default function Booking() {
                           Guests *
                         </label>
                         <GuestPartyFields value={party} disabled={isSubmitting} onChange={next => { setParty(next); setForm(prev => ({...prev,guests:String(partyTotal(next))})); }} />
-                        {availabilityReady && bookingRooms.length===0 && !partyError(party) && <a className="mt-2 block text-xs text-gold underline" href={`/rooms?${writeParty(new URLSearchParams({checkin:form.checkIn,checkout:form.checkOut}),party).toString()}`}>Find suitable rooms or a multi-room combination</a>}
+                        {availabilityReady && bookingRooms.length===0 && !partyError(party, false, maxChildAge) && <a className="mt-2 block text-xs text-gold underline" href={`/rooms?${writeParty(new URLSearchParams({checkin:form.checkIn,checkout:form.checkOut}),party).toString()}`}>Find suitable rooms or a multi-room combination</a>}
                       </div>
                       <div>
                         <label className="block text-[9px] tracking-[0.2em] uppercase text-muted mb-2">

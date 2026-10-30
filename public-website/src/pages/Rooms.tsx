@@ -1,3 +1,4 @@
+import { useGuestAgePolicy } from '../services/guestAgePolicy';
 import GuestPartyFields from '../components/ui/GuestPartyFields';
 import { readParty, writeParty, partyError, partyTotal, occupancy, allocateParty } from '../services/guestOccupancy';
 import { useEffect, useMemo, useState } from 'react';
@@ -25,6 +26,7 @@ const readFilters = (params: URLSearchParams) => ({
 });
 
 export default function Rooms() {
+  const { maxChildAge } = useGuestAgePolicy();
   const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const urlFilters = useMemo(() => readFilters(searchParams), [searchParams]);
@@ -70,7 +72,7 @@ export default function Rooms() {
   const hasSearched = Boolean(urlFilters.checkIn && urlFilters.checkOut && urlFilters.checkOut > urlFilters.checkIn);
   const datesPending = Boolean((form.checkIn || form.checkOut) && (!form.checkIn || !form.checkOut || form.checkOut <= form.checkIn || form.checkIn !== urlFilters.checkIn || form.checkOut !== urlFilters.checkOut));
   const categoryRooms = active === 'all' ? roomList : roomList.filter((room) => room.category === active);
-  const singleRoomMatches = partyError(form) ? [] : categoryRooms.filter((room) => occupancy(room, form).fits);
+  const singleRoomMatches = partyError(form, false, maxChildAge) ? [] : categoryRooms.filter((room) => occupancy(room, form).fits);
   const suggestedRooms = allocateParty(categoryRooms, form).map(item => item.room);
   const needsMultipleRooms = singleRoomMatches.length === 0 && suggestedRooms.length >= 2;
   const suggestedCapacity = suggestedRooms.reduce((sum, room) => sum + (room.max_total_occupants ?? room.guests), 0);

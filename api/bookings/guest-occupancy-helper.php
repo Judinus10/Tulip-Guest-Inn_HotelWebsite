@@ -58,8 +58,15 @@ function booking_room_occupancy(array $room,array $party,bool $countChildren): a
         'max_child_age'=>$cutoff,'count_children_toward_capacity'=>$countChildren];
 }
 
-function booking_require_room_occupancy(PDO $pdo,array $room,array $party): array
+function booking_require_room_occupancy(PDO $pdo,array $room,array $party,bool $strictChildAge=false): array
 {
+    if ($strictChildAge) {
+        $age = room_max_child_age_setting($pdo);
+        foreach ($party['children_ages'] as $childAge) {
+            if ($childAge > $age) throw new InvalidArgumentException('The child age policy has changed or an age is outside the allowed range. Guests aged ' . ($age + 1) . '+ must be included as adults. Review your guest selection.');
+        }
+        $room['max_child_age'] = $age;
+    }
     $snapshot=booking_room_occupancy($room,$party,room_count_children_setting($pdo));
     if (!$snapshot['fits'])throw new InvalidArgumentException('The selected adults and child ages do not fit '.($room['room_name']??'this room').'. Choose another room or additional rooms.');
     return $snapshot;

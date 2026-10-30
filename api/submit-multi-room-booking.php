@@ -135,7 +135,7 @@ try {
             throw new RuntimeException('One of the assigned rooms is no longer available. Please search again.');
         }
 
-        $selectedRoom['occupancy_snapshot'] = booking_require_room_occupancy($pdo, $selectedRoom, $partyAllocations[$roomId]);
+        $selectedRoom['occupancy_snapshot'] = booking_require_room_occupancy($pdo, $selectedRoom, $partyAllocations[$roomId], true);
         $selectedRoom['allocated_guests'] = $roomGuests;
         $selectedRoom['room_total'] = round((float) $selectedRoom['base_price'] * $nights, 2);
         $totalAmount += $selectedRoom['room_total'];

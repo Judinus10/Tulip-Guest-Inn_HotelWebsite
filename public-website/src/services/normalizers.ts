@@ -77,7 +77,7 @@ export function normalizeRoom(room: BackendRoom, index = 0): Room {
     max_adults: asNumber(room.max_adults, guests),
     max_children: asNumber(room.max_children, 0),
     max_total_occupants: asNumber(room.max_total_occupants, guests),
-    max_child_age: asNumber(room.max_child_age, 11),
+    max_child_age: room.max_child_age !== null && room.max_child_age !== undefined && room.max_child_age !== '' && Number.isInteger(Number(room.max_child_age)) && Number(room.max_child_age) >= 0 && Number(room.max_child_age) <= 17 ? Number(room.max_child_age) : undefined,
     count_children_toward_capacity: room.count_children_toward_capacity !== false,
     beds: asString(room.beds, asString(room.bed_type, 'Comfortable Bed')),
     bathrooms: asNumber(room.bathrooms, 1),
