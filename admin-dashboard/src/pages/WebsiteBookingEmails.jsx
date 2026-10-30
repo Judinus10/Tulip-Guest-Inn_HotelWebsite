@@ -134,10 +134,10 @@ export default function WebsiteBookingEmails() {
             <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
           </div>
         </div> : <>
-        <div role="tablist" aria-label="Email type" className="booking-email-type-tabs booking-email-type-tabs--extended">
-          {Object.entries(types).filter(([key]) => categoryOf(key) === category && (category !== 'booking' || key.startsWith('admin_') === isAdminBooking)).map(([key, item]) => <button key={key} type="button" role="tab" aria-selected={type === key} disabled={busy}
+        <div role="group" aria-label="Email type" className="booking-email-recipient-buttons">
+          {Object.entries(types).filter(([key]) => categoryOf(key) === category && (category !== 'booking' || key.startsWith('admin_') === isAdminBooking)).map(([key, item]) => <button key={key} type="button" aria-pressed={type === key} disabled={busy}
             onClick={() => { setType(key); setTarget('introduction_html'); positions.current = {} }}
-            className={`flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition disabled:opacity-50 ${type === key ? 'bg-blue-600 text-white shadow-sm' : 'text-text-secondary hover:bg-white'}`}>{item.title}{settings && !same(drafts[key], settings.templates[key].content) ? ' •' : ''}</button>)}
+            className={`rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50 ${type === key ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-border text-text-secondary'}`}>{item.title}{settings && !same(drafts[key], settings.templates[key].content) ? ' •' : ''}</button>)}
         </div>
         </>}
         <p className="booking-email-type-description">{types[type].description}</p>
