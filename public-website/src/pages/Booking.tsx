@@ -427,11 +427,9 @@ export default function Booking() {
                       </label>}
                     </div>
                     {!arrivalEnabled && !onlinePaymentEnabled && <p className="mt-3 text-sm text-red-600">Booking is temporarily unavailable. Please contact the property.</p>}
-                    <p className="mt-3 text-[10px] leading-relaxed text-muted">
-                      {form.paymentMethod === 'Cash'
-                        ? 'Booking request submitted successfully. A confirmation email will be sent to your email address shortly'
-                        : 'You will continue to the secure PayHere payment page after submitting.'}
-                    </p>
+                    {form.paymentMethod === 'PayHere' && <p className="mt-3 text-[10px] leading-relaxed text-muted">
+                      You will continue to the secure PayHere payment page after submitting.
+                    </p>}
                   </div>
                 </AnimatedSection>
 
@@ -639,13 +637,7 @@ export default function Booking() {
                           {total > 0 ? `${selectedRoom?.currency ? `${selectedRoom.currency} ` : '$'}${total}` : '—'}
                         </span>
                       </div>
-                      {total > 0 && (
-                        <p className="text-[10px] text-muted mt-1 text-right">
-                          {form.paymentMethod === 'Cash'
-                            ? 'Final amount is verified by the property and collected on arrival'
-                            : 'Final amount is verified by the backend before PayHere checkout'}
-                        </p>
-                      )}
+
                     </div>
                   </div>
 

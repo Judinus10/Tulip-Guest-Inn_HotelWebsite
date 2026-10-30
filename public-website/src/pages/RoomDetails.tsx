@@ -1,6 +1,6 @@
 import { useGuestAgePolicy } from '../services/guestAgePolicy';
 import GuestPartyFields from '../components/ui/GuestPartyFields';
-import { readParty, writeParty, partyError, partyTotal, occupancy, roomOccupancyLabel } from '../services/guestOccupancy';
+import { readParty, writeParty, partyError, partyTotal, occupancy, roomOccupancyLabel, roomMaxOccupancy } from '../services/guestOccupancy';
 import { useEffect, useRef, useState } from 'react';
 import { useParams, Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -396,7 +396,7 @@ export default function RoomDetails() {
                 <div className="flex flex-wrap gap-8 py-6 border-y border-border mb-8">
                   <div className="flex items-center gap-2 text-muted">
                     <Users size={16} className="text-gold" />
-                    <span className="text-sm">{room.guests} Guests</span>
+                    <span className="text-sm">{roomMaxOccupancy(room)} {roomMaxOccupancy(room) === 1 ? 'Guest' : 'Guests'}</span>
                   </div>
                   <div className="flex items-center gap-2 text-muted">
                     <BedDouble size={16} className="text-gold" />

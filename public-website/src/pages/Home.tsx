@@ -194,8 +194,8 @@ export default function Home() {
           </motion.div>
         ))}
         <div className="absolute inset-0 bg-linear-to-b from-black/50 via-black/30 to-black/60" />
-        {heroResource.status !== 'ready' && <div className="absolute inset-x-4 bottom-24 z-20 mx-auto max-w-md rounded bg-black/50 p-3 text-center text-xs text-white" role="status">
-          {heroResource.status === 'loading' ? 'Loading banner…' : <><p>Banner media is temporarily unavailable.</p><button type="button" onClick={heroResource.retry} className="mt-2 underline underline-offset-4">Try again</button></>}
+        {heroResource.status !== 'ready' && heroResource.status !== 'loading' && <div className="absolute inset-x-4 bottom-24 z-20 mx-auto max-w-md rounded bg-black/50 p-3 text-center text-xs text-white" role="status">
+          <p>Banner media is temporarily unavailable.</p><button type="button" onClick={heroResource.retry} className="mt-2 underline underline-offset-4">Try again</button>
         </div>}
 
         <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">

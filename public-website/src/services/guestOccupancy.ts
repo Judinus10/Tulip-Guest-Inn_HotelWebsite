@@ -31,6 +31,12 @@ export function roomOccupancyLabel(room: OccupancyRoom): string {
   const cap = Number(room.max_guests ?? room.guests ?? room.capacity ?? 0);
   return `Up to ${room.max_adults ?? cap} adult places · ${room.max_children ?? 0} child places (ages 0–${room.max_child_age ?? 'unavailable'}) · ${room.max_total_occupants ?? cap} people total`;
 }
+/** Public occupancy summary; the adult/child policy is explained on room details. */
+export function roomMaxOccupancy(room: OccupancyRoom): number {
+  const capacity = Number(room.max_guests ?? room.guests ?? room.capacity ?? 0);
+  const total = Number(room.max_total_occupants ?? capacity);
+  return room.count_children_toward_capacity === false ? total : Math.min(capacity, total);
+}
 export type PartyAllocation<R> = { room: R; party: GuestParty };
 /** Exact search with memoization and symmetry pruning; never substitutes child places for adult places. */
 export function allocateParty<R extends OccupancyRoom>(rooms: R[], p: GuestParty, exactRooms?: number): PartyAllocation<R>[] {

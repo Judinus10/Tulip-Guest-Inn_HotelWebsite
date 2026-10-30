@@ -198,9 +198,11 @@ function tulip_render_booking_email(string $type, array $content, array $booking
     $actionLabel = $isAdmin ? 'Open booking in admin' : 'View booking &amp; bill';
     $action = '';
     if ($isTest) {
-        $action = '<div style="padding:15px 20px;background:#19352B;border-radius:6px;color:#ffffff;text-align:center;font-weight:bold;">' . $actionLabel . ' <span style="font-size:11px;">(sample)</span></div>';
+        // A sample email has no reservation or signed customer bill. Do not render
+        // a button that looks clickable or link it to somebody else's booking.
+        $action = '<p style="margin:0;padding:12px 16px;background:#f6f3ec;border-radius:6px;color:#647067;font-size:12px;line-height:1.6;text-align:center;">Sample booking: no bill is available. Real customer emails link directly to that customer\'s booking and bill.</p>';
     } elseif ($preview || (filter_var($billUrl, FILTER_VALIDATE_URL) && preg_match('~^https?://~i', $billUrl))) {
-        $action = '<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" bgcolor="#19352B" style="border-radius:6px;"><a href="' . ($preview ? '#' : $e($billUrl)) . '" style="display:block;padding:15px 20px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;">' . $actionLabel . '</a></td></tr></table>';
+        $action = '<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" bgcolor="#19352B" style="border-radius:6px;"><a href="' . ($preview ? '#' : $e($billUrl)) . '" target="_blank" rel="noopener noreferrer" style="display:block;padding:15px 20px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;">' . $actionLabel . '</a></td></tr></table>';
     }
     $pleaseNote = '';
     if (!$isAdmin && ($content['please_note'] ?? '') !== '') {
@@ -217,7 +219,7 @@ function tulip_render_booking_email(string $type, array $content, array $booking
             : 'cid:jebal-email-icon-whatsapp-white';
         $buttonStyle = 'display:block;padding:10px 12px;border-radius:999px;color:rgb(255,255,255);font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;text-align:center;text-decoration:none;line-height:24px;';
         $label = '<img src="' . $e($iconSrc) . '" width="22" height="25" alt="" style="display:inline-block;vertical-align:middle;margin-right:7px;border:0;" /><span style="vertical-align:middle;color:rgb(255,255,255);">Have questions? Chat with us on WhatsApp</span>';
-        $button = ($preview || $isTest)
+        $button = $preview
             ? '<span aria-disabled="true" style="' . $buttonStyle . '">' . $label . '</span>'
             : '<a href="' . $e($whatsappUrl) . '" target="_blank" rel="noopener noreferrer" style="' . $buttonStyle . '">' . $label . '</a>';
         $whatsapp = '<tr><td class="email-pad" style="padding:0 32px 24px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" bgcolor="#25D366" style="background:#25D366;border-radius:999px;">' . $button . '</td></tr></table></td></tr>';
