@@ -242,7 +242,13 @@ export default function RoomDetails() {
     if (value) markInvalid(field, false);
   };
 
+  const guestCountFitsRoom = !partyError(party, false, maxChildAge) && occupancy(room, party).fits;
+
   const handleBookRoom = async () => {
+    if (!guestCountFitsRoom) {
+      toast.warning(partyError(party, false, maxChildAge) || 'This group exceeds the room limits. Adjust the guest count or choose suitable rooms.');
+      return;
+    }
     if (!validateBookingForm() || checkingRoom) return;
     if (partyError(party, false, maxChildAge)) { toast.warning(partyError(party, false, maxChildAge)); return; }
     setCheckingRoom(true);
@@ -504,8 +510,8 @@ export default function RoomDetails() {
                 <button
                   type="button"
                   onClick={handleBookRoom}
-                  disabled={checkingRoom}
-                  className="btn-primary w-full justify-center mb-3"
+                  disabled={checkingRoom || !guestCountFitsRoom}
+                  className="btn-primary w-full justify-center mb-3 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {checkingRoom ? 'Checking availability…' : 'Book This Room'}
                 </button>
