@@ -26,7 +26,7 @@ import { Button } from '@/components/ui/button'
 import { Input, Label, Textarea } from '@/components/ui/input'
 import TimeWheelPicker from '@/components/ui/TimeWheelPicker'
 import HeroContent from '@/pages/HeroContent'
-import LegalContent from '@/pages/LegalContent'
+import WebsitePolicies from '@/pages/WebsitePolicies'
 import WebsiteFaqs from '@/pages/WebsiteFaqs'
 import { fetchContactSettings, fetchPropertyContent, saveContactSettings, savePropertyContent } from '@/services/settingsApi'
 
@@ -129,6 +129,7 @@ function FieldWithIcon({ icon: Icon, children, align = 'center' }) {
 export default function WebsiteSettings() {
   const [activeTab, setActiveTab] = useState('contact')
   const [bookingEmailsOpened, setBookingEmailsOpened] = useState(false)
+  const [policiesOpened, setPoliciesOpened] = useState(false)
   const [settings, setSettings] = useState(defaultSettings)
   const [savedSettings, setSavedSettings] = useState(defaultSettings)
   const [propertyContent, setPropertyContent] = useState({ nearby_places: [] })
@@ -252,13 +253,11 @@ export default function WebsiteSettings() {
             { id: 'hero', label: 'Hero Media', icon: Images },
             { id: 'appearance', label: 'Appearance', icon: Palette },
             { id: 'booking-emails', label: 'Email Templates', icon: Mail },
-            { id: 'terms', label: 'Terms & Conditions', icon: FileText },
-            { id: 'privacy', label: 'Privacy Policy', icon: FileText },
-            { id: 'refund', label: 'Refund Policy', icon: FileText },
+            { id: 'policies', label: 'Policies', icon: FileText },
             { id: 'faqs', label: 'FAQs', icon: HelpCircle },
           ].map(({ id, label, icon: Icon }) => (
             <button key={id} type="button" role="tab" aria-selected={activeTab === id}
-              onClick={() => { setActiveTab(id); if (id === 'booking-emails') setBookingEmailsOpened(true) }}
+              onClick={() => { setActiveTab(id); if (id === 'booking-emails') setBookingEmailsOpened(true); if (id === 'policies') setPoliciesOpened(true) }}
               className={`flex shrink-0 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition ${
                 activeTab === id ? 'bg-blue-600 text-white shadow-sm' : 'text-text-secondary hover:bg-slate-100 hover:text-text-primary'
               }`}>
@@ -270,9 +269,7 @@ export default function WebsiteSettings() {
       {activeTab === 'hero' && <HeroContent embedded />}
       {activeTab === 'appearance' && <WebsiteAppearance />}
       {bookingEmailsOpened && <div hidden={activeTab !== 'booking-emails'}><WebsiteBookingEmails /></div>}
-      {activeTab === 'terms' && <LegalContent page="terms" />}
-      {activeTab === 'privacy' && <LegalContent page="privacy" />}
-      {activeTab === 'refund' && <LegalContent page="refund" />}
+      {policiesOpened && <div hidden={activeTab !== 'policies'}><WebsitePolicies /></div>}
       {activeTab === 'faqs' && <WebsiteFaqs embedded />}
       <div hidden={activeTab !== 'contact'}>
       {loadError && (
