@@ -5,6 +5,17 @@ require_once __DIR__ . '/../../settings/email_branding_helpers.php';
 require_once __DIR__ . '/../../bookings/guest-display-helper.php';
 require_once __DIR__ . '/email-theme-helper.php';
 
+/** Compact primary CTA. Theme painting supplies the saved primary colour and contrasting ink. */
+function tulip_email_primary_button(string $label, string $url, bool $inactive = false): string
+{
+    $text = tulip_booking_email_escape($label) . ' <span aria-hidden="true" style="margin-left:8px;">&rarr;</span>';
+    $style = 'display:block;padding:12px 24px;border:1px solid #c7a86b;border-radius:6px;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;line-height:20px;text-align:center;text-decoration:none;mso-padding-alt:0;';
+    $control = $inactive
+        ? '<span aria-disabled="true" style="' . $style . '">' . $text . '</span>'
+        : '<a href="' . tulip_booking_email_escape($url) . '" target="_blank" rel="noopener noreferrer" style="' . $style . '">' . $text . '</a>';
+    return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:6px 0 8px;"><table role="presentation" align="center" cellpadding="0" cellspacing="0" style="width:auto;max-width:100%;margin:0 auto;border-collapse:separate;"><tr><td align="center" bgcolor="#19352B" style="background:#19352B;border-radius:6px;mso-padding-alt:12px 24px;">' . $control . '</td></tr></table></td></tr></table>';
+}
+
 function tulip_booking_email_escape(mixed $value): string
 {
     return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -198,14 +209,14 @@ function tulip_render_booking_email(string $type, array $content, array $booking
         }
         if (!empty($booking['transaction_id'])) $paymentExtra .= '<tr><td style="padding:8px 0;vertical-align:top;">Transaction / order ID</td><td align="right" style="padding:8px 0;word-break:break-all;">'.$e($booking['transaction_id']).'</td></tr>';
     }
-    $actionLabel = $isAdmin ? 'Open booking in admin' : 'View booking &amp; bill';
+    $actionLabel = $isAdmin ? 'Open booking in admin' : 'View booking & bill';
     $action = '';
     if ($isTest) {
         // A sample email has no reservation or signed customer bill. Do not render
         // a button that looks clickable or link it to somebody else's booking.
         $action = '<p style="margin:0;padding:12px 16px;background:#f6f3ec;border-radius:6px;color:#647067;font-size:12px;line-height:1.6;text-align:center;">Sample booking: no bill is available. Real customer emails link directly to that customer\'s booking and bill.</p>';
     } elseif ($preview || (filter_var($billUrl, FILTER_VALIDATE_URL) && preg_match('~^https?://~i', $billUrl))) {
-        $action = '<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" bgcolor="#19352B" style="border-radius:6px;"><a href="' . ($preview ? '#' : $e($billUrl)) . '" target="_blank" rel="noopener noreferrer" style="display:block;padding:15px 20px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;">' . $actionLabel . '</a></td></tr></table>';
+        $action = tulip_email_primary_button($actionLabel, $billUrl, $preview);
     }
     $pleaseNote = tulip_email_note_row($content['please_note'] ?? '', $tokens);
     $whatsapp = '';
@@ -245,7 +256,7 @@ function tulip_render_booking_email(string $type, array $content, array $booking
 <tr><td class="email-payment-label" style="padding:8px 0;">Booking status</td><td class="email-payment-value" align="right" style="padding:8px 0;font-weight:bold;">' . $bookingStatus . '</td></tr>
 <tr><td class="email-payment-label" style="padding:8px 0;">Payment method</td><td class="email-payment-value" align="right" style="padding:8px 0;font-weight:bold;">' . $payment . '</td></tr>
 <tr><td class="email-payment-label" style="padding:8px 0;border-top:1px solid #e8e3da;font-weight:bold;">' . ($isAdmin ? 'Booking total' : 'Total amount') . '</td><td class="email-payment-value" align="right" style="padding:8px 0;border-top:1px solid #e8e3da;font-weight:bold;">' . $currency . ' ' . $amount . '</td></tr>
-' . $paymentExtra . '</table><div style="margin-top:9px;padding:8px 12px;background:#f6f3ec;border-radius:4px;font-size:12px;text-align:center;">' . $paymentStatus . '</div>' . $paymentNotice . '</td></tr></table></td></tr>
+' . $paymentExtra . '</table><div style="margin-top:12px;text-align:right;"><span style="display:inline-block;padding:4px 10px;background:#f6f3ec;border-radius:12px;font-size:12px;line-height:18px;">' . $paymentStatus . '</span></div>' . $paymentNotice . '</td></tr></table></td></tr>
 <tr><td class="email-pad" style="padding:0 32px 22px;">' . $action . '</td></tr>
 <tr><td class="email-pad" style="padding:0 32px 22px;word-break:break-word;overflow-wrap:anywhere;">' . $closing . ($footer !== '' ? '<p style="margin:10px 0 0;color:#647067;">' . $footer . '</p>' : '') . '</td></tr>
 ' . $pleaseNote . $whatsapp . '

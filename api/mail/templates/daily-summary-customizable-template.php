@@ -88,9 +88,9 @@ function tulip_render_daily_summary_email(array $content, array $summary, array 
     if ($preview) $logo = '<div data-email-brand-logo="true">' . $logo . '</div>';
     $action = '';
     if ($preview || !empty($summary['is_test_email'])) {
-        $action = '<div style="padding:13px;text-align:center;background:#19352B;color:#fff;border-radius:5px;font-weight:bold;">Open booking calendar (sample)</div>';
+        $action = tulip_email_primary_button('Open booking calendar (sample)', '', true);
     } elseif (defined('ADMIN_APP_URL') && filter_var(ADMIN_APP_URL, FILTER_VALIDATE_URL) && preg_match('~^https?://~i', ADMIN_APP_URL)) {
-        $action = '<a href="'.$e(rtrim(ADMIN_APP_URL, '/').'/booking-calendar').'" style="display:block;padding:13px;text-align:center;background:#19352B;color:#fff;border-radius:5px;text-decoration:none;font-weight:bold;">Open booking calendar</a>';
+        $action = tulip_email_primary_button('Open booking calendar', rtrim(ADMIN_APP_URL, '/').'/booking-calendar');
     }
     $test = !empty($summary['is_test_email']) ? '<tr><td style="padding:12px;background:#fff5df;color:#865d1c;text-align:center;font-weight:bold;">TEST EMAIL — Sample daily summary. No real guest records.</td></tr>' : '';
     $csp = $preview ? '<meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; img-src data:; style-src &#39;unsafe-inline&#39;;"><style>a{pointer-events:none!important}</style>' : '';
