@@ -68,11 +68,11 @@ export default function BookingBar() {
   };
 
   const inputClass = (field: BookingBarField) =>
-    `bg-transparent text-sm text-dark outline-hidden cursor-pointer w-full transition-colors duration-200 ${
+    `bg-transparent text-sm text-dark outline-hidden cursor-pointer w-full min-w-0 transition-colors duration-200 ${
       invalidFields[field] ? 'booking-field-error' : ''
     }`;
 
-  const fieldClass = (field: BookingBarField, base = 'flex flex-col px-6 py-5 border-r border-border') =>
+  const fieldClass = (field: BookingBarField, base = 'flex min-w-0 flex-col px-4 py-3.5 border-border lg:border-r') =>
     `${base} transition-colors duration-200 ${invalidFields[field] ? 'booking-field-shake bg-red-50/70 ring-1 ring-red-400' : ''}`;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -107,7 +107,7 @@ export default function BookingBar() {
       initial={{ y: 60, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ delay: 0.5, duration: 0.7, ease: 'easeOut' }}
-      className="relative z-20 max-w-5xl mx-auto px-4"
+      className="relative z-20 max-w-4xl mx-auto px-4"
     >
       <style>{`
         @keyframes bookingFieldShake {
@@ -123,16 +123,17 @@ export default function BookingBar() {
       <form
         onSubmit={handleSubmit}
         noValidate
-        className="glass shadow-luxury-lg border border-border grid grid-cols-2 md:grid-cols-3 lg:grid-cols-[1fr_1fr_1.5fr_auto] gap-0"
+        className="glass shadow-luxury-lg border border-border grid grid-cols-2 lg:grid-cols-[minmax(145px,1fr)_minmax(145px,1fr)_minmax(340px,1.9fr)_auto] gap-0"
       >
         {/* Check In */}
         <div className={fieldClass('checkIn')}>
-          <label className="flex items-center gap-1.5 text-[9px] tracking-[0.2em] uppercase text-gold font-medium mb-2">
+          <label htmlFor="home-booking-check-in" className="flex items-center gap-1.5 text-[9px] tracking-[0.2em] uppercase text-gold font-medium mb-2">
             <Calendar size={11} />
             Check In
           </label>
           <input
             ref={(node) => { fieldRefs.current.checkIn = node; }}
+            id="home-booking-check-in"
             type="date"
             name="checkIn"
             value={form.checkIn}
@@ -144,12 +145,13 @@ export default function BookingBar() {
 
         {/* Check Out */}
         <div className={fieldClass('checkOut')}>
-          <label className="flex items-center gap-1.5 text-[9px] tracking-[0.2em] uppercase text-gold font-medium mb-2">
+          <label htmlFor="home-booking-check-out" className="flex items-center gap-1.5 text-[9px] tracking-[0.2em] uppercase text-gold font-medium mb-2">
             <Calendar size={11} />
             Check Out
           </label>
           <input
             ref={(node) => { fieldRefs.current.checkOut = node; }}
+            id="home-booking-check-out"
             type="date"
             name="checkOut"
             value={form.checkOut}
@@ -160,19 +162,19 @@ export default function BookingBar() {
         </div>
 
         {/* Guests */}
-        <div className={fieldClass('guests')}>
-          <label className="flex items-center gap-1.5 text-[9px] tracking-[0.2em] uppercase text-gold font-medium mb-2">
+        <div className={fieldClass('guests', 'col-span-2 flex min-w-0 flex-col border-t border-border px-4 py-3.5 lg:col-span-1 lg:border-t-0 lg:border-r')}>
+          <p className="flex items-center gap-1.5 text-[9px] tracking-[0.2em] uppercase text-gold font-medium mb-2">
             <Users size={11} />
             Guests
-          </label>
-          <GuestPartyFields value={party} onChange={next => { setParty(next); setForm(prev => ({...prev,guests:String(partyTotal(next))})); }} />
+          </p>
+          <GuestPartyFields compact value={party} onChange={next => { setParty(next); setForm(prev => ({...prev,guests:String(partyTotal(next))})); }} />
         </div>
 
         {/* Search */}
-        <div className="col-span-2 md:col-span-3 lg:col-span-1">
+        <div className="col-span-2 lg:col-span-1">
           <button
             type="submit"
-            className="w-full h-full bg-gold hover:bg-deep-green text-white flex items-center justify-center gap-2 text-[10px] tracking-[0.2em] uppercase font-medium transition-colors duration-300 py-5 lg:py-0"
+            className="w-full h-full bg-gold hover:bg-deep-green text-white flex items-center justify-center gap-2 text-[10px] tracking-[0.2em] uppercase font-medium transition-colors duration-300 whitespace-nowrap px-5 py-3.5 lg:py-0"
           >
             <Search size={14} />
             Check Availability
