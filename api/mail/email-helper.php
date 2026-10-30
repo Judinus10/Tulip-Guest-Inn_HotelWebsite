@@ -226,6 +226,7 @@ function email_icon_file_map(): array
         'info' => $base . '/info.png',
         'ref' => $base . '/ref.png',
         'message' => $base . '/message.png',
+        'whatsapp-white' => $base . '/whatsapp-white.png',
         'lock' => $base . '/lock.png',
         'security' => $base . '/security.png',
         'time' => $base . '/time.png',

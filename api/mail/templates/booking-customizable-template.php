@@ -21,7 +21,7 @@ function tulip_booking_email_brand(PDO $pdo, bool $inlineLogo = true): array
 {
     $settings = [];
     $stmt = $pdo->query("SELECT setting_key, setting_value FROM website_settings WHERE setting_key IN
-        ('business_name','address','phone','reception_contact_number','email','check_in_mode','check_in_time','check_out_until','website_theme_colors')");
+        ('business_name','address','phone','reception_contact_number','email','check_in_mode','check_in_time','check_out_until','website_theme_colors','whatsapp_reservation_number')");
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) $settings[$row['setting_key']] = trim((string) $row['setting_value']);
     $website = '';
     foreach (['FRONTEND_URL', 'PUBLIC_APP_URL', 'APP_BASE_URL'] as $key) {
@@ -47,6 +47,7 @@ function tulip_booking_email_brand(PDO $pdo, bool $inlineLogo = true): array
     return ['name' => ($settings['business_name'] ?? '') ?: 'Tulip Guest Inn', 'logo_src' => $logo, 'logo_width' => $branding['width'],
         'address' => $settings['address'] ?? '', 'phones' => array_values($phones),
         'email' => filter_var($settings['email'] ?? '', FILTER_VALIDATE_EMAIL) ? $settings['email'] : '',
+        'whatsapp' => $settings['whatsapp_reservation_number'] ?? '',
         'website' => $website, 'colors' => isset($settings['website_theme_colors'])
             ? theme_valid_colors(json_decode($settings['website_theme_colors'], true, 32, JSON_THROW_ON_ERROR)) : theme_default_colors(),
         'check_in_hint' => ($settings['check_in_mode'] ?? '') === '24_hours' ? '24-hour check-in' : $timeHint($settings['check_in_time'] ?? '', 'From '),
@@ -61,6 +62,19 @@ function tulip_booking_email_tokens(array $booking, array $brand): array
         'check_out' => tulip_booking_email_date((string) ($booking['check_out_date'] ?? '')),
         'hotel_name' => (string) $brand['name'], 'booking_status' => (string) ($booking['status'] ?? 'Not available'), 'payment_status' => (string) ($booking['payment_status'] ?? 'Not available'),
         'payment_amount' => isset($booking['payment_amount']) ? (string) ($booking['payment_currency'] ?? $booking['currency'] ?? 'LKR') . ' ' . number_format((float) $booking['payment_amount'], 2) : 'Not available'];
+}
+
+/** Use only the configured international WhatsApp number, with no fallback to other contacts. */
+function tulip_booking_whatsapp_url(string $number, string $reference): string
+{
+    $number = trim($number);
+    if ($number === '' || !preg_match('/^[+0-9().\s-]+$/D', $number)) return '';
+    $digits = preg_replace('/[^0-9]/', '', $number);
+    if (!preg_match('/^[1-9][0-9]{6,14}$/D', $digits)) return '';
+    $reference = trim($reference);
+    $message = $reference === '' ? 'Hello, I have a question about my booking.'
+        : 'Hello, I have a question about booking ' . $reference . '.';
+    return 'https://wa.me/' . $digits . '?text=' . rawurlencode($message);
 }
 
 /** Replace text nodes only, so guest values cannot introduce HTML or alter links. */
@@ -188,6 +202,26 @@ function tulip_render_booking_email(string $type, array $content, array $booking
     } elseif ($preview || (filter_var($billUrl, FILTER_VALIDATE_URL) && preg_match('~^https?://~i', $billUrl))) {
         $action = '<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" bgcolor="#19352B" style="border-radius:6px;"><a href="' . ($preview ? '#' : $e($billUrl)) . '" style="display:block;padding:15px 20px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;">' . $actionLabel . '</a></td></tr></table>';
     }
+    $pleaseNote = '';
+    if (!$isAdmin && ($content['please_note'] ?? '') !== '') {
+        $noteText = nl2br($e(tulip_booking_email_plain_text($content['please_note'], $tokens)));
+        $pleaseNote = '<tr><td class="email-pad" style="padding:0 32px 22px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td bgcolor="#fff5df" style="padding:16px 18px;background:#fff5df;color:#865d1c;border-radius:6px;line-height:1.7;word-break:break-word;overflow-wrap:anywhere;"><strong>Please note:</strong> ' . $noteText . '</td></tr></table></td></tr>';
+    }
+    $whatsapp = '';
+    $whatsappUrl = $isAdmin ? '' : tulip_booking_whatsapp_url((string) ($brand['whatsapp'] ?? ''), $tokens['booking_reference']);
+    if ($whatsappUrl !== '') {
+        // Keep WhatsApp branding independent of the website palette. Embed the PNG in
+        // outgoing emails; previews use the same image inline under their data-only CSP.
+        $iconPath = __DIR__ . '/../assets/email-icons/whatsapp-white.png';
+        $iconSrc = $preview ? 'data:image/png;base64,' . base64_encode((string) file_get_contents($iconPath))
+            : 'cid:jebal-email-icon-whatsapp-white';
+        $buttonStyle = 'display:block;padding:10px 12px;border-radius:999px;color:rgb(255,255,255);font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;text-align:center;text-decoration:none;line-height:24px;';
+        $label = '<img src="' . $e($iconSrc) . '" width="22" height="25" alt="" style="display:inline-block;vertical-align:middle;margin-right:7px;border:0;" /><span style="vertical-align:middle;color:rgb(255,255,255);">Have questions? Chat with us on WhatsApp</span>';
+        $button = ($preview || $isTest)
+            ? '<span aria-disabled="true" style="' . $buttonStyle . '">' . $label . '</span>'
+            : '<a href="' . $e($whatsappUrl) . '" target="_blank" rel="noopener noreferrer" style="' . $buttonStyle . '">' . $label . '</a>';
+        $whatsapp = '<tr><td class="email-pad" style="padding:0 32px 24px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" bgcolor="#25D366" style="background:#25D366;border-radius:999px;">' . $button . '</td></tr></table></td></tr>';
+    }
     $previewHead = $preview ? '<meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; img-src data:; style-src &#39;unsafe-inline&#39;;"><style>a{pointer-events:none!important;cursor:default!important}</style>' : '';
     $html = '<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . $e($subject) . '</title>' . $previewHead . '
 <style>@media only screen and (max-width:480px){.email-pad{padding-left:18px!important;padding-right:18px!important}.email-title{font-size:27px!important}.email-date{display:block!important;width:auto!important;padding:12px 0!important;border:0!important}.email-payment-label,.email-payment-value{display:block!important;text-align:left!important;padding:6px 0!important;width:auto!important}}</style></head>
@@ -213,6 +247,7 @@ function tulip_render_booking_email(string $type, array $content, array $booking
 ' . $paymentExtra . '</table><div style="margin-top:9px;padding:8px 12px;background:#f6f3ec;border-radius:4px;font-size:12px;text-align:center;">' . $paymentStatus . '</div>' . $paymentNotice . '</td></tr></table></td></tr>
 <tr><td class="email-pad" style="padding:0 32px 22px;">' . $action . '</td></tr>
 <tr><td class="email-pad" style="padding:0 32px 22px;word-break:break-word;overflow-wrap:anywhere;">' . $closing . ($footer !== '' ? '<p style="margin:10px 0 0;color:#647067;">' . $footer . '</p>' : '') . '</td></tr>
+' . $pleaseNote . $whatsapp . '
 <tr><td data-email-theme-footer="true" class="email-pad" align="center" style="padding:20px 32px 26px;border-top:1px solid #C7A86B;font-size:12px;line-height:1.8;color:#56635b;word-break:break-word;overflow-wrap:anywhere;"><strong style="font-family:Georgia,Times,serif;font-size:17px;color:#19352B;">' . $e($brand['name']) . '</strong>' . (!empty($brand['address']) ? '<div style="margin-top:5px;">' . nl2br($e($brand['address'])) . '</div>' : '') . $contactHtml . '</td></tr></table>
 <!--[if mso]></td></tr></table><![endif]-->
 </td></tr></table></body></html>';
