@@ -1469,49 +1469,103 @@ function send_booking_payment_pending_emails_once(PDO $pdo, array $booking, arra
 }
 
 
-function send_booking_expired_emails_once(PDO $pdo, array $booking): void
+/** Current state check shared by outbox recovery and the final SMTP guard. */
+function booking_expiry_notice_is_current(PDO $pdo, array $booking, bool $lock = false): bool
 {
+    $groupId = (int) ($booking['booking_group_id'] ?? 0);
+    $query = $groupId > 0 ? 'SELECT * FROM bookings WHERE booking_group_id = ?' : 'SELECT * FROM bookings WHERE id = ?';
+    $stmt = $pdo->prepare($query . ' ORDER BY id' . ($lock ? ' FOR UPDATE' : ''));
+    $stmt->execute([$groupId > 0 ? $groupId : (int) ($booking['id'] ?? 0)]);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if (!$rows) return false;
+    foreach ($rows as $row) {
+        if (!in_array((string) $row['status'], ['Cancelled','Expired'], true)
+            || !in_array((string) $row['payment_status'], ['Cancelled','Failed','Payment Pending'], true)
+            || booking_seconds_remaining($row) > 0) return false;
+    }
+    $ids = implode(',', array_map(static fn(array $row): int => (int) $row['id'], $rows));
+    $paid = $pdo->query("SELECT id FROM payments WHERE booking_id IN ({$ids})
+        AND (status = 'Paid' OR LOWER(COALESCE(method, '')) = 'cash') LIMIT 1" . ($lock ? ' FOR UPDATE' : ''));
+    return !$paid->fetchColumn();
+}
+
+/** Queue only; the queue worker is the sole SMTP sender. Caller owns the outbox transaction. */
+function send_booking_expired_emails_once(PDO $pdo, array $booking): bool
+{
+    $groupId = (int) ($booking['booking_group_id'] ?? 0);
+    if ($groupId > 0) {
+        $primary = $pdo->prepare('SELECT * FROM bookings WHERE booking_group_id = ? ORDER BY is_group_primary DESC, id ASC LIMIT 1');
+        $primary->execute([$groupId]);
+        $booking = $primary->fetch(PDO::FETCH_ASSOC) ?: $booking;
+    }
     $booking = booking_with_guest_details($pdo, $booking);
     $bookingId = (int) ($booking['id'] ?? 0);
-
-    if ($bookingId < 1) {
-        return;
-    }
-
+    if ($bookingId < 1 || !booking_expiry_notice_is_current($pdo, $booking)) return false;
     $customerType = 'booking_expired_customer';
     $adminType = 'booking_expired_admin';
+    // Respect intentionally disabled mail routes without blocking the other copy.
+    $route = mail_route($pdo, mail_function_key_for_type($customerType, 'booking'));
+    $customerEnabled = $route === null || ((bool) $route['is_enabled'] && (bool) $route['send_customer_copy']);
+    $route = mail_route($pdo, mail_function_key_for_type($adminType, 'booking'));
+    $adminEnabled = $route === null || ((bool) $route['is_enabled'] && (bool) $route['send_hotel_copy']);
+    $customerQueued = !$customerEnabled || booking_email_sent($pdo, $bookingId, [$customerType]) || enqueue_email(
+        $pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''),
+        'Booking hold expired - Tulip Guest Inn #' . $bookingId,
+        booking_email_html('expired', $booking), $customerType);
+    $adminQueued = !$adminEnabled || booking_email_sent($pdo, $bookingId, [$adminType]) || enqueue_email(
+        $pdo, 'booking', $bookingId, booking_admin_email(),
+        'Pending booking expired - Tulip Guest Inn #' . $bookingId,
+        admin_booking_email_html('expired', $booking), $adminType, $booking['email'] ?? null);
+    if (!$customerQueued || !$adminQueued) return false;
+    $enabled = $customerEnabled || $adminEnabled;
+    update_booking_email_status($pdo, $bookingId, $enabled ? 'Expiry Emails Queued' : 'Expiry Mail Disabled');
+    booking_audit_log($pdo, $bookingId, 'expired_email_queued', $enabled ? 'Expiry Emails Queued' : 'Expiry Mail Disabled',
+        'Expiry notification processed using the configured customer/hotel routing preferences.',
+        ['customer_enabled' => $customerEnabled, 'hotel_enabled' => $adminEnabled]);
+    return true;
+}
 
-    if (!booking_email_sent($pdo, $bookingId, [$customerType])) {
-        $bodyCustomer = booking_email_html('expired', $booking);
-
-        send_tracked_email(
-            $pdo,
-            'booking',
-            $bookingId,
-            (string) ($booking['email'] ?? ''),
-            'Booking hold expired - Tulip Guest Inn #' . $bookingId,
-            $bodyCustomer,
-            $customerType
-        );
+/** Recover events even when an availability request already cancelled the booking. */
+function queue_booking_expiry_events(PDO $pdo, int $limit = 50): array
+{
+    if ($pdo->inTransaction()) throw new RuntimeException('Queue expiry events after the inventory transaction commits.');
+    ensure_booking_expiry_events_table($pdo);
+    ensure_email_queue_table($pdo);
+    ensure_booking_audit_table($pdo);
+    ensure_mail_settings_tables($pdo);
+    $limit = max(1, min(100, $limit));
+    $events = $pdo->query("SELECT booking_id FROM booking_expiry_events
+        WHERE processed_at IS NULL AND next_attempt_at <= NOW() ORDER BY next_attempt_at, expired_at, booking_id LIMIT {$limit}")->fetchAll(PDO::FETCH_COLUMN);
+    $result = ['queued' => 0, 'obsolete' => 0, 'deferred' => 0];
+    foreach ($events as $id) {
+        try {
+            $pdo->beginTransaction();
+            $event = $pdo->prepare('SELECT booking_id FROM booking_expiry_events WHERE booking_id = ? AND processed_at IS NULL AND next_attempt_at <= NOW() FOR UPDATE');
+            $event->execute([(int) $id]);
+            if (!$event->fetchColumn()) { $pdo->commit(); continue; }
+            $stmt = $pdo->prepare('SELECT * FROM bookings WHERE id = ? FOR UPDATE');
+            $stmt->execute([(int) $id]);
+            $booking = $stmt->fetch(PDO::FETCH_ASSOC);
+            $outcome = 'obsolete';
+            if ($booking && booking_expiry_notice_is_current($pdo, $booking, true)) {
+                // Both recipient sets and the event acknowledgement commit together.
+                // Any rendering/routing/insert error rolls the entire queue work back.
+                if (!send_booking_expired_emails_once($pdo, $booking)) throw new RuntimeException('Expiry notification could not be queued for all enabled destinations.');
+                $outcome = 'queued';
+            }
+            $done = $pdo->prepare('UPDATE booking_expiry_events SET processed_at = NOW(), outcome = ? WHERE booking_id = ?');
+            $done->execute([$outcome, (int) $id]);
+            $pdo->commit();
+            $result[$outcome]++;
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            $result['deferred']++;
+            $retry = $pdo->prepare('UPDATE booking_expiry_events SET next_attempt_at = DATE_ADD(NOW(), INTERVAL 5 MINUTE) WHERE booking_id = ? AND processed_at IS NULL');
+            $retry->execute([(int) $id]);
+            error_log('Expiry queue event #' . (int) $id . ' deferred: ' . $e->getMessage());
+        }
     }
-
-    if (!booking_email_sent($pdo, $bookingId, [$adminType])) {
-        $bodyAdmin = admin_booking_email_html('expired', $booking);
-
-        send_tracked_email(
-            $pdo,
-            'booking',
-            $bookingId,
-            booking_admin_email(),
-            'Pending booking expired - Tulip Guest Inn #' . $bookingId,
-            $bodyAdmin,
-            $adminType,
-            $booking['email'] ?? null
-        );
-    }
-
-    update_booking_email_status($pdo, $bookingId, 'Expired Email Sent');
-    booking_audit_log($pdo, $bookingId, 'expired_email_sent', 'Expired Email Sent', 'Booking expiry emails were sent or had already been sent.', []);
+    return $result;
 }
 
 
@@ -2404,7 +2458,8 @@ function process_email_queue(PDO $pdo, int $limit = 10): array
 
         $baseType = tulip_booking_email_event_base($emailType);
         $isFailureNotice = in_array($emailType, ['payment_failed', 'admin_payment_failed'], true) || str_contains($emailType, '_failed_attempt_');
-        if ($relatedType === 'booking' && $relatedId !== null && (is_booking_pending_queue_email($emailType) || $isFailureNotice)) {
+        $isExpiryNotice = in_array($emailType, ['booking_expired_customer','booking_expired_admin'], true);
+        if ($relatedType === 'booking' && $relatedId !== null && (is_booking_pending_queue_email($emailType) || $isFailureNotice || $isExpiryNotice)) {
             $latest = $pdo->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1');
             $latest->execute([':id' => $relatedId]);
             $latestBooking = $latest->fetch(PDO::FETCH_ASSOC);
@@ -2424,6 +2479,7 @@ function process_email_queue(PDO $pdo, int $limit = 10): array
                     && booking_can_retry_payment($latestBooking)
                     && (!str_contains($emailType, '_failed_attempt_') || hash_equals($expectedKey, $emailType));
             }
+            if ($isExpiryNotice) $stillPending = is_array($latestBooking) && booking_expiry_notice_is_current($pdo, $latestBooking);
             if (!$stillPending) {
                 $skipUpdate = $pdo->prepare(
                     "UPDATE email_queue

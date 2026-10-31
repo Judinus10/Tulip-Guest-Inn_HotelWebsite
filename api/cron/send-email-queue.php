@@ -40,7 +40,13 @@ try {
         $limit = (int) $_GET['limit'];
     }
 
+    // Release newly expired holds, recover notifications recorded by other
+    // requests, then send through the same existing queue and routing rules.
+    $expiredCount = expire_pending_bookings($pdo, null, false);
+    $expiryNotifications = queue_booking_expiry_events($pdo);
     $result = process_email_queue($pdo, $limit);
+    $result['expired_bookings'] = $expiredCount;
+    $result['expiry_notifications'] = $expiryNotifications;
 
     if ($isCli) {
         echo json_encode([

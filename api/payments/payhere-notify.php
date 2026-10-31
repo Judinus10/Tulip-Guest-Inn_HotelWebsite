@@ -121,6 +121,7 @@ $sideEffects = [
 try {
     $pdo = get_db_connection();
     lock_booking_inventory($pdo);
+    ensure_booking_expiry_events_table($pdo);
     ensure_booking_audit_table($pdo);
     ensure_email_queue_table($pdo);
     if (ics_enabled()) ensure_ics_schema($pdo);
