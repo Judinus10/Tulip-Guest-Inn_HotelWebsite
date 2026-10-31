@@ -65,16 +65,12 @@ function booking_guest_ages(array $row): string
 function booking_guest_detail_rows(array $booking): array
 {
     $rows = ['Guests' => booking_guest_summary($booking)];
-    $ages = booking_guest_ages($booking);
-    if ($ages !== '') $rows['Child ages at check-in (years)'] = $ages;
     $rooms = $booking['room_assignments'] ?? [];
     if (count($rooms) > 1) {
         foreach ($rooms as $index => $room) {
             $label = 'Room ' . ($index + 1) . ' - ' . ($room['room_name'] ?? 'Room');
             $number = trim((string) ($room['room_number'] ?? ''));
             $value = ($number !== '' ? 'Assigned number: ' . $number . '; ' : '') . booking_guest_summary($room);
-            $ages = booking_guest_ages($room);
-            if ($ages !== '') $value .= '; child ages at check-in (years): ' . $ages;
             $rows[$label] = $value;
         }
     }

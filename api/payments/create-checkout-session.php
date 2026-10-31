@@ -227,7 +227,17 @@ try {
 
     $amountFormatted = payhere_format_amount($amount);
     $currency = PAYMENT_CURRENCY;
-    $orderId = generate_payhere_order_id($booking);
+    $registeredStmt = $pdo->prepare('SELECT * FROM payments WHERE booking_id = ? ORDER BY id DESC LIMIT 1 FOR UPDATE');
+    $registeredStmt->execute([$bookingId]);
+    $registered = $registeredStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    $reuseRegistered = ($registered['method'] ?? '') === 'PayHere'
+        && ($registered['status'] ?? '') === 'Payment Pending'
+        && empty($registered['gateway_response'])
+        && str_starts_with((string) ($registered['order_id'] ?? ''), 'ONLINE-');
+    if ($reuseRegistered && (number_format((float) $registered['amount'], 2, '.', '') !== $amountFormatted || strcasecmp((string) $registered['currency'], $currency) !== 0)) {
+        throw new RuntimeException('The booking amount or currency changed. Please contact the hotel before retrying payment.');
+    }
+    $orderId = $reuseRegistered ? (string) $registered['order_id'] : generate_payhere_order_id($booking);
 
     $checkoutToken = create_checkout_token($orderId, $bookingId, $amountFormatted);
     $returnUrl = build_booking_bill_url($bookingId, $orderId, $checkoutToken);
@@ -262,24 +272,26 @@ try {
         strtoupper(md5(payment_runtime()['merchant_secret']))
     ));
 
-    $insertPayment = $pdo->prepare(
-        'INSERT INTO payments (booking_id, order_id, amount, currency, status, method, gateway_response, created_at, updated_at)
-         VALUES (:booking_id, :order_id, :amount, :currency, :status, :method, :gateway_response, NOW(), NOW())'
-    );
-    $insertPayment->execute([
-        ':booking_id' => $bookingId,
-        ':order_id' => $orderId,
-        ':amount' => $amount,
-        ':currency' => $currency,
-        ':status' => 'Payment Pending',
-        ':method' => 'PayHere',
-        ':gateway_response' => json_encode([
-            'checkout_created_at' => date('Y-m-d H:i:s'),
-            'checkout_payload' => $checkoutPayload,
-        ], JSON_UNESCAPED_SLASHES),
-    ]);
-
-    $paymentRowId = (int) $pdo->lastInsertId();
+    $checkoutResponse = json_encode([
+        'checkout_created_at' => date('Y-m-d H:i:s'), 'checkout_payload' => $checkoutPayload,
+    ], JSON_UNESCAPED_SLASHES);
+    if ($reuseRegistered) {
+        // Preserve the order ID and amount used by the email's signed bill link.
+        $pdo->prepare('UPDATE payments SET gateway_response = ?, updated_at = NOW() WHERE id = ?')
+            ->execute([$checkoutResponse, (int) $registered['id']]);
+        $paymentRowId = (int) $registered['id'];
+    } else {
+        $insertPayment = $pdo->prepare(
+            'INSERT INTO payments (booking_id, order_id, amount, currency, status, method, gateway_response, created_at, updated_at)
+             VALUES (:booking_id, :order_id, :amount, :currency, :status, :method, :gateway_response, NOW(), NOW())'
+        );
+        $insertPayment->execute([
+            ':booking_id' => $bookingId, ':order_id' => $orderId, ':amount' => $amount,
+            ':currency' => $currency, ':status' => 'Payment Pending', ':method' => 'PayHere',
+            ':gateway_response' => $checkoutResponse,
+        ]);
+        $paymentRowId = (int) $pdo->lastInsertId();
+    }
 
     booking_audit_log($pdo, $bookingId, 'payment_started', 'Payment Started', 'A PayHere checkout session was created.', [
         'order_id' => $orderId,
@@ -337,7 +349,7 @@ try {
             'currency' => $currency,
             'status' => 'Payment Pending',
             'bill_url' => $returnUrl,
-        ], 10);
+        ], 0);
     } catch (Throwable $queueException) {
         error_log(
             'Pending booking email scheduling failed for booking #'
@@ -347,7 +359,7 @@ try {
         );
     }
 
-    // Pending emails are scheduled through the existing queue for ten minutes later.
+    // Pending emails are immediately eligible; existing reservation/recipient keys avoid duplicate checkout notifications.
     // The queue worker re-checks the latest booking/payment state before delivery.
 
     $baseApiUrl = API_BASE_URL !== '' ? API_BASE_URL : rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/api/payments')), '/');

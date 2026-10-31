@@ -60,8 +60,6 @@ function tulip_daily_summary_list(array $bookings, string $emptyText): string
         foreach ($booking['room_assignments'] ?? [] as $room) {
             $number = trim((string) ($room['room_number'] ?? '')) ?: 'Not available';
             $html .= '<div style="padding:9px 0;border-top:1px solid #e8e3da;"><strong>'.$e($room['room_name'] ?? 'Room').'</strong><br>Assigned room: '.$e($number).'<br>'.$e(booking_guest_summary($room));
-            $ages = booking_guest_ages($room);
-            if ($ages !== '') $html .= '<br><span style="color:#647067;">Child ages at check-in: '.$e($ages).'</span>';
             $html .= '</div>';
         }
         $html .= '<div style="padding-top:9px;border-top:1px solid #e8e3da;">Check-in: '.$e(tulip_booking_email_date((string) ($booking['check_in_date'] ?? '')))

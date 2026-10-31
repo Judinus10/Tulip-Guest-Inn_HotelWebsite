@@ -1629,15 +1629,20 @@ function email_queue_job_exists(PDO $pdo, string $relatedType, int $relatedId, s
     return (int) $stmt->fetchColumn() > 0;
 }
 
-function queue_booking_pending_emails(PDO $pdo, array $booking, array $payment = [], int $delayMinutes = 10): int
+function queue_booking_pending_emails(PDO $pdo, array $booking, array $payment = [], int $delayMinutes = 0): int
 {
-    $booking = booking_with_guest_details($pdo, $booking);
     $bookingId = (int) ($booking['id'] ?? 0);
-    if ($bookingId < 1 || (string) ($booking['status'] ?? '') !== 'Pending' || (string) ($booking['payment_status'] ?? '') !== 'Payment Pending') {
-        return 0;
-    }
+    if ($bookingId < 1) return 0;
+    $current = $pdo->prepare('SELECT * FROM bookings WHERE id = ? LIMIT 1');
+    $current->execute([$bookingId]);
+    $stored = $current->fetch(PDO::FETCH_ASSOC);
+    if (!$stored || ($stored['status'] ?? '') !== 'Pending' || ($stored['payment_status'] ?? '') !== 'Payment Pending') return 0;
+    $method = $pdo->prepare('SELECT method FROM payments WHERE booking_id = ? ORDER BY id DESC LIMIT 1');
+    $method->execute([$bookingId]);
+    if (strcasecmp((string) $method->fetchColumn(), 'PayHere') !== 0) return 0;
+    $booking = booking_with_guest_details($pdo, array_replace($booking, $stored));
 
-    $delayMinutes = max(1, min(1440, $delayMinutes));
+    $delayMinutes = max(0, min(1440, $delayMinutes));
     $availableAt = (new DateTimeImmutable())->modify('+' . $delayMinutes . ' minutes')->format('Y-m-d H:i:s');
     $orderId = trim((string) ($payment['order_id'] ?? ''));
     $billUrl = trim((string) ($payment['bill_url'] ?? latest_booking_bill_url($pdo, $bookingId)));
@@ -1671,8 +1676,8 @@ function queue_booking_pending_emails(PDO $pdo, array $booking, array $payment =
     }
 
     if ($queued > 0) {
-        update_booking_email_status($pdo, $bookingId, 'Pending Email Scheduled');
-        booking_audit_log($pdo, $bookingId, 'pending_email_scheduled', 'Pending Email Scheduled', 'Customer and admin pending-payment emails were scheduled for queue delivery.', [
+        update_booking_email_status($pdo, $bookingId, 'Pending Email Queued');
+        booking_audit_log($pdo, $bookingId, 'pending_email_scheduled', 'Pending Email Queued', 'Customer and admin pending-payment emails were queued for delivery.', [
             'available_at' => $availableAt,
             'delay_minutes' => $delayMinutes,
             'order_id' => $orderId,

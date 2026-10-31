@@ -160,12 +160,11 @@ function tulip_render_booking_email(string $type, array $content, array $booking
     $footer = nl2br($e(tulip_booking_email_plain_text($content['footer_note'], $tokens)));
     $roomRows = '';
     foreach ($booking['room_assignments'] ?? [] as $room) {
-        $ages = booking_guest_ages($room);
         $roomRows .= '<tr><td style="padding:16px 20px;border-top:1px solid #e8e3da;">'
             . '<div style="font-size:16px;font-weight:bold;color:#19352B;">' . $e($room['room_name'] ?? 'Room') . '</div>'
             . '<div style="margin-top:5px;">Assigned room: <strong>' . $e(trim((string) ($room['room_number'] ?? '')) ?: 'Not available') . '</strong></div>'
             . '<div style="margin-top:8px;">' . $e(booking_guest_summary($room)) . '</div>'
-            . ($ages !== '' ? '<div style="margin-top:4px;color:#647067;">Child ages at check-in (years): ' . $e($ages) . '</div>' : '') . '</td></tr>';
+            . '</td></tr>';
     }
     $amount = number_format((float) ($booking['amount'] ?? 0), 2);
     $currency = $e($booking['currency'] ?? 'LKR');

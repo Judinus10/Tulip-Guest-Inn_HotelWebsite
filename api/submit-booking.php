@@ -233,41 +233,27 @@ try {
     $cashOrderId = '';
     $cashBillUrl = '';
 
-    // Pay on Arrival gets its payment row immediately so the bill page can show
-    // the complete booking/payment details. PayHere creates its payment row only
-    // when create-checkout-session.php starts the gateway checkout.
-    if ($isCashPayment) {
-        $cashOrderId = 'CASH-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT);
-
-        $paymentStmt = $pdo->prepare(
-            "INSERT INTO payments
-                (booking_id, order_id, amount, currency, status, method, gateway_response, created_at, updated_at)
-             VALUES
-                (:booking_id, :order_id, :amount, :currency, 'Payment Pending', 'Cash', NULL, NOW(), NOW())"
-        );
-        $paymentStmt->execute([
-            ':booking_id' => $bookingId,
-            ':order_id' => $cashOrderId,
-            ':amount' => $amount,
-            ':currency' => PAYMENT_CURRENCY,
-        ]);
-
-        $amountForToken = number_format($amount, 2, '.', '');
-        $cashBillToken = create_public_token('payment-status', [
-            'order_id' => $cashOrderId,
-            'booking_id' => $bookingId,
-            'amount' => $amountForToken,
-        ], PUBLIC_LINK_TTL_SECONDS);
-
-        $publicBaseUrl = defined('FRONTEND_URL') && FRONTEND_URL !== ''
-            ? FRONTEND_URL
-            : (defined('PUBLIC_APP_URL') && PUBLIC_APP_URL !== '' ? PUBLIC_APP_URL : APP_BASE_URL);
-        $cashBillUrl = rtrim((string) $publicBaseUrl, '/') . '/booking-bill?' . http_build_query([
-            'booking_id' => $bookingId,
-            'order_id' => $cashOrderId,
-            'token' => $cashBillToken,
-        ]);
-    }
+    // Register the selected payment method immediately, without contacting PayHere.
+    // This creates a signed bill/retry link even if the customer leaves before checkout.
+    $cashOrderId = ($isCashPayment ? 'CASH-' : 'ONLINE-') . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT);
+    $paymentStmt = $pdo->prepare(
+        "INSERT INTO payments
+            (booking_id, order_id, amount, currency, status, method, gateway_response, created_at, updated_at)
+         VALUES (:booking_id, :order_id, :amount, :currency, 'Payment Pending', :method, NULL, NOW(), NOW())"
+    );
+    $paymentStmt->execute([
+        ':booking_id' => $bookingId, ':order_id' => $cashOrderId, ':amount' => $amount,
+        ':currency' => PAYMENT_CURRENCY, ':method' => $isCashPayment ? 'Cash' : 'PayHere',
+    ]);
+    $amountForToken = number_format($amount, 2, '.', '');
+    $cashBillToken = create_public_token('payment-status', [
+        'order_id' => $cashOrderId, 'booking_id' => $bookingId, 'amount' => $amountForToken,
+    ], PUBLIC_LINK_TTL_SECONDS);
+    $publicBaseUrl = defined('FRONTEND_URL') && FRONTEND_URL !== ''
+        ? FRONTEND_URL : (defined('PUBLIC_APP_URL') && PUBLIC_APP_URL !== '' ? PUBLIC_APP_URL : APP_BASE_URL);
+    $cashBillUrl = rtrim((string) $publicBaseUrl, '/') . '/booking-bill?' . http_build_query([
+        'booking_id' => $bookingId, 'order_id' => $cashOrderId, 'token' => $cashBillToken,
+    ]);
 
     $pdo->commit();
     $bookingCommitted = true;
@@ -292,6 +278,14 @@ try {
             send_booking_received_emails($pdo, $emailBooking);
         } catch (Throwable $emailError) {
             error_log('Public Cash booking email error: ' . $emailError->getMessage());
+        }
+    }
+
+    if ($isOnlinePayment) {
+        try {
+            queue_booking_pending_emails($pdo, ['id' => $bookingId], [], 0);
+        } catch (Throwable $emailError) {
+            error_log('Public online booking pending email error: ' . $emailError->getMessage());
         }
     }
 

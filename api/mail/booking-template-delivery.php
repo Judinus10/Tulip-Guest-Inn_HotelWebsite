@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/templates/booking-customizable-template.php';
+require_once __DIR__ . '/../bookings/booking-expiry-helper.php';
 
 /** Keep later status changes distinct, while retries of the same change share one queue key. */
 function tulip_booking_status_email_key(string $kind, array $booking, array $payment, array $changes): string
@@ -155,8 +156,15 @@ function tulip_booking_email_for_queue(PDO $pdo, ?string $relatedType, ?int $boo
         $booking['booked_by'] = ['name' => $booking['full_name'] ?? '', 'email' => $booking['email'] ?? '', 'phone' => $booking['phone'] ?? ''];
         $booking['full_name'] = trim((string) ($booking['staying_guest_name'] ?? '')) ?: 'Guest';
     }
-    if (!$isAdmin && $status === 'pending' && str_contains(strtolower($booking['payment_method']), 'payhere') && $paymentState === 'payment pending') {
-        $booking['payment_notice'] = 'Online payment is pending. Use the booking link to complete payment before your reservation hold expires.';
+    if ($status === 'pending' && str_contains(strtolower($booking['payment_method']), 'payhere') && $paymentState === 'payment pending') {
+        $expiresAt = booking_expires_at($booking);
+        $deadline = $expiresAt !== null
+            ? (new DateTimeImmutable($expiresAt))->setTimezone(new DateTimeZone('Asia/Colombo'))->format('d M Y, h:i A') . ' (Sri Lanka time)' : '';
+        $booking['payment_notice'] = $isAdmin
+            ? 'Online payment has not been completed.' . ($deadline !== '' ? ' The unpaid reservation hold expires at ' . $deadline . '.' : '')
+            : 'Your booking is registered, but online payment has not been completed and your reservation is not yet confirmed.'
+                . ($deadline !== '' ? ' Your rooms are held until ' . $deadline . '.' : '')
+                . ' Open your booking to retry payment before the hold expires, or contact the hotel for assistance.';
     }
     if (!$isAdmin && in_array(strtolower($booking['payment_method']), ['cash','cash on arrival','pay on arrival'], true)
         && in_array($paymentState, ['pending','payment pending'], true)) {

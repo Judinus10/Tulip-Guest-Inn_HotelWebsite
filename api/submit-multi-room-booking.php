@@ -219,20 +219,15 @@ try {
         ->execute([':booking_no' => $bookingNumber, ':primary_booking_id' => $primaryBookingId, ':id' => $groupId]);
 
     $orderId = ($isCashPayment ? 'CASH-' : 'ONLINE-') . $bookingNumber;
-    if ($isCashPayment) {
-        $paymentStmt = $pdo->prepare(
-            "INSERT INTO payments
-                (booking_id, order_id, amount, currency, status, method, gateway_response, created_at, updated_at)
-             VALUES
-                (:booking_id, :order_id, :amount, :currency, 'Payment Pending', 'Cash', NULL, NOW(), NOW())"
-        );
-        $paymentStmt->execute([
-            ':booking_id' => $primaryBookingId,
-            ':order_id' => $orderId,
-            ':amount' => $totalAmount,
-            ':currency' => $currency,
-        ]);
-    }
+    $paymentStmt = $pdo->prepare(
+        "INSERT INTO payments
+            (booking_id, order_id, amount, currency, status, method, gateway_response, created_at, updated_at)
+         VALUES (:booking_id, :order_id, :amount, :currency, 'Payment Pending', :method, NULL, NOW(), NOW())"
+    );
+    $paymentStmt->execute([
+        ':booking_id' => $primaryBookingId, ':order_id' => $orderId, ':amount' => $totalAmount,
+        ':currency' => $currency, ':method' => $isCashPayment ? 'Cash' : 'PayHere',
+    ]);
 
     if (!$pdo->inTransaction()) {
         throw new RuntimeException('Multi-room booking transaction ended unexpectedly before commit.');
@@ -277,6 +272,15 @@ try {
             send_booking_received_emails($pdo, $combinedBooking);
         } catch (Throwable $emailError) {
             error_log('Multi-room booking email error: ' . $emailError->getMessage());
+        }
+    }
+
+    if ($isOnlinePayment) {
+        try {
+            // One customer/admin pair for the entire reservation, using its primary booking.
+            queue_booking_pending_emails($pdo, ['id' => $primaryBookingId], [], 0);
+        } catch (Throwable $emailError) {
+            error_log('Multi-room online pending email error: ' . $emailError->getMessage());
         }
     }
 
