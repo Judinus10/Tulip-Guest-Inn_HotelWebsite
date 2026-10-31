@@ -1,6 +1,5 @@
 import LegalDocument from '../components/ui/LegalDocument';
 import { useLegalContent } from '../hooks/useLegalContent';
-import { Link } from 'react-router-dom';
 import PageHero from '../components/ui/PageHero';
 import bannerAbout from '../assets/images/banners/banner-about.jpg';
 
@@ -80,14 +79,6 @@ export default function PrivacyPolicy() {
               </section>
             ))}
             </>}
-            <section>
-              <h2 className="font-serif text-2xl font-light text-dark mb-3">Contact Us</h2>
-              <p className="text-sm text-muted leading-relaxed">
-                For privacy questions or requests, email{' '}
-                <a className="text-gold hover:underline" href="mailto:info@tulipguestinn.com">info@tulipguestinn.com</a>{' '}
-                or use our <Link className="text-gold hover:underline" to="/contact">contact page</Link>.
-              </p>
-            </section>
           </div>
         </div>
       </section>

@@ -1,7 +1,6 @@
 import LegalDocument from '../components/ui/LegalDocument';
 import { useHotelPolicies } from '../hooks/useHotelPolicies';
 import { useLegalContent } from '../hooks/useLegalContent';
-import { Link } from 'react-router-dom';
 import PageHero from '../components/ui/PageHero';
 import bannerBooking from '../assets/images/banners/banner-booking.jpg';
 
@@ -73,14 +72,6 @@ export default function TermsAndConditions() {
               </section>
             ))}
             </>}
-            <section>
-              <h2 className="font-serif text-2xl font-light text-dark mb-3">Contact</h2>
-              <p className="text-sm text-muted leading-relaxed">
-                Questions about a booking or these terms can be sent to{' '}
-                <a className="text-gold hover:underline" href="mailto:info@tulipguestinn.com">info@tulipguestinn.com</a>{' '}
-                or through our <Link className="text-gold hover:underline" to="/contact">contact page</Link>.
-              </p>
-            </section>
           </div>
         </div>
       </section>
