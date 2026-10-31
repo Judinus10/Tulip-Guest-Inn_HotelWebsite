@@ -51,6 +51,32 @@ function payhere_status_for_db(string $statusCode): string
     };
 }
 
+/** Reentrant delivery: unique queue keys make gateway retries safe after a crash. */
+function notify_queue_verified_result(PDO $pdo, int $bookingId, string $orderId): void
+{
+    $booking = get_booking_by_id($pdo, $bookingId);
+    if (!$booking) return;
+    $stmt = $pdo->prepare("SELECT * FROM payments WHERE booking_id = ? ORDER BY (status = 'Paid') DESC, id DESC LIMIT 1");
+    $stmt->execute([$bookingId]);
+    $payment = $stmt->fetch(PDO::FETCH_ASSOC);
+    // A delayed failure for an older attempt must never send a current failure notice.
+    if (!$payment || (string) $payment['order_id'] !== $orderId) return;
+    if ((string) $payment['status'] === 'Paid') {
+        queue_payment_success_emails($pdo, $booking, $payment);
+        // Invoice generation must not prevent the payment receipt from being queued.
+        try {
+            generate_invoice_for_booking($pdo, $bookingId, [
+                'amount' => (float) $payment['amount'], 'currency' => (string) $payment['currency'],
+                'method' => 'PayHere', 'paid_at' => (string) ($payment['updated_at'] ?? date('Y-m-d H:i:s')),
+            ]);
+        } catch (Throwable $e) {
+            error_log('Paid booking invoice generation failed: ' . $e->getMessage());
+        }
+    } elseif (in_array((string) $payment['status'], ['Failed','Cancelled'], true)) {
+        queue_payment_failed_email($pdo, $booking, $orderId);
+    }
+}
+
 $merchantId = clean_string($_POST['merchant_id'] ?? '', 100);
 $orderId = clean_string($_POST['order_id'] ?? '', 100);
 $paymentId = clean_string($_POST['payment_id'] ?? '', 100);
@@ -160,7 +186,8 @@ try {
             'payment_id' => $paymentId,
         ]);
         $pdo->commit();
-        notify_text_response(200, 'OK duplicate ignored');
+        notify_queue_verified_result($pdo, $bookingId, $orderId);
+        notify_text_response(200, 'OK duplicate acknowledged');
     }
 
     // A final result for this PayHere order is immutable. This prevents contradictory
@@ -173,6 +200,7 @@ try {
             'incoming_status' => $incomingPaymentStatus,
         ]);
         $pdo->commit();
+        notify_queue_verified_result($pdo, $bookingId, $orderId);
         notify_text_response(200, 'OK final state already processed');
     }
 
@@ -180,7 +208,10 @@ try {
     $otherPaid = $pdo->prepare("SELECT id FROM payments WHERE booking_id IN ({$scopeSqlIds}) AND id <> ? AND status = 'Paid' LIMIT 1");
     $otherPaid->execute([(int)$existingPayment['id']]);
     $hasOtherPaid = (bool)$otherPaid->fetchColumn();
-    if ($incomingPaymentStatus !== 'Paid' && !$hasOtherPaid) {
+    $latestAttempt = $pdo->query("SELECT id FROM payments WHERE booking_id IN ({$scopeSqlIds}) ORDER BY id DESC LIMIT 1");
+    $isLatestAttempt = (int) $latestAttempt->fetchColumn() === (int) $existingPayment['id'];
+    $applyToBooking = !$hasOtherPaid && ($isLatestAttempt || $incomingPaymentStatus === 'Paid');
+    if ($incomingPaymentStatus !== 'Paid' && $applyToBooking) {
         foreach ($scopeIds as $scopeId) expire_pending_bookings($pdo, $scopeId, false);
     }
 
@@ -197,12 +228,16 @@ try {
         error_log('Paid PayHere booking needs availability review. Booking ID: ' . $bookingId);
     }
 
-    if (in_array($finalPaymentStatus, ['Failed', 'Cancelled', 'Refunded', 'Chargeback'], true)) {
+    if (in_array($finalPaymentStatus, ['Failed', 'Cancelled'], true)) {
+        // A gateway cancellation cancels this attempt, not an active reservation.
+        // Retrying never resets created_at or extends the original hold.
+        $finalBookingStatus = booking_seconds_remaining($booking) > 0 ? 'Pending' : 'Cancelled';
+    } elseif (in_array($finalPaymentStatus, ['Refunded', 'Chargeback'], true)) {
         $finalBookingStatus = 'Cancelled';
     }
 
     // Preserve operational history on delayed payment results.
-    if (in_array((string)$booking['status'], ['Checked In', 'Checked Out', 'No Show', 'Cancelled'], true)) $finalBookingStatus = (string)$booking['status'];
+    if (in_array((string)$booking['status'], ['Confirmed', 'Checked In', 'Checked Out', 'No Show', 'Cancelled', 'Expired'], true)) $finalBookingStatus = (string)$booking['status'];
     $gatewayResponse = $_POST;
     $gatewayResponse['server_status_message'] = $statusMessage;
     $gatewayResponse['verified_by_server'] = true;
@@ -237,7 +272,7 @@ try {
              currency = :currency, updated_at = NOW()
          WHERE id IN ({$scopeSqlIds})"
     );
-    if (!$hasOtherPaid) $updateBooking->execute([
+    if ($applyToBooking) $updateBooking->execute([
         ':status' => $finalBookingStatus,
         ':payment_status' => $finalPaymentStatus,
         ':currency' => $payhereCurrency,
@@ -265,7 +300,7 @@ try {
         ]);
     }
 
-    if (in_array($finalPaymentStatus, ['Paid', 'Failed', 'Cancelled'], true)) {
+    if ($applyToBooking && in_array($finalPaymentStatus, ['Paid', 'Failed', 'Cancelled'], true)) {
         foreach ($scopeIds as $scopeId) {
             cancel_scheduled_pending_booking_emails($pdo, $scopeId, 'PayHere verified final payment status: ' . $finalPaymentStatus);
         }
@@ -273,8 +308,8 @@ try {
 
     $pdo->commit();
 
-    $sideEffects['send_success'] = $finalPaymentStatus === 'Paid' && $currentPaymentStatus !== 'Paid' && $finalBookingStatus === 'Confirmed';
-    $sideEffects['send_failed'] = !$hasOtherPaid && in_array($finalPaymentStatus, ['Failed', 'Cancelled'], true) && !in_array($currentPaymentStatus, ['Failed', 'Cancelled'], true);
+    $sideEffects['send_success'] = $finalPaymentStatus === 'Paid' && $currentPaymentStatus !== 'Paid' && !$hasOtherPaid;
+    $sideEffects['send_failed'] = $applyToBooking && in_array($finalPaymentStatus, ['Failed', 'Cancelled'], true) && !in_array($currentPaymentStatus, ['Failed', 'Cancelled'], true);
     $sideEffects['amount'] = (float) $payhereAmount;
     $sideEffects['currency'] = $payhereCurrency;
     $sideEffects['method'] = $method ?: 'PayHere';
@@ -288,42 +323,13 @@ try {
     notify_text_response(500, 'Server error');
 }
 
-if ($sideEffects['booking_id'] > 0) {
+if ($sideEffects['booking_id'] > 0 && ($sideEffects['send_success'] || $sideEffects['send_failed'])) {
     try {
-        $freshBooking = get_booking_by_id($pdo, (int) $sideEffects['booking_id']);
-
-        if ($freshBooking) {
-            if ($sideEffects['send_success']) {
-                booking_audit_log($pdo, (int) $sideEffects['booking_id'], 'invoice_generation_started', 'Invoice Generation Started', 'Creating invoice after verified PayHere payment.', []);
-
-                $invoice = generate_invoice_for_booking($pdo, (int) $sideEffects['booking_id'], [
-                    'amount' => (float) $sideEffects['amount'],
-                    'currency' => (string) $sideEffects['currency'],
-                    'method' => (string) $sideEffects['method'],
-                    'paid_at' => date('Y-m-d H:i:s'),
-                ]);
-
-                $freshBooking = get_booking_by_id($pdo, (int) $sideEffects['booking_id']) ?: $freshBooking;
-                booking_audit_log($pdo, (int) $sideEffects['booking_id'], 'invoice_generated', 'Invoice Generated', 'Invoice was generated for the successful payment.', [
-                    'invoice_number' => (string) ($invoice['invoice_number'] ?? ''),
-                ]);
-
-                queue_payment_success_emails($pdo, $freshBooking, [
-                    'amount' => (float) $sideEffects['amount'],
-                    'currency' => (string) $sideEffects['currency'],
-                    'method' => (string) $sideEffects['method'],
-                    'payment_id' => (string) $sideEffects['payment_id'],
-                    'transaction_id' => (string) $sideEffects['payment_id'],
-                    'invoice' => $invoice,
-                ]);
-                booking_audit_log($pdo, (int) $sideEffects['booking_id'], 'confirmation_email_queued', 'Confirmation Email Queued', 'Customer, admin, and applicable staying-guest confirmation emails were queued for delivery.', []);
-            } elseif ($sideEffects['send_failed']) {
-                queue_payment_failed_email($pdo, $freshBooking);
-                booking_audit_log($pdo, (int) $sideEffects['booking_id'], 'failed_email_queued', 'Failed Email Queued', 'Customer and admin payment-failed emails were queued for delivery.', []);
-            }
-        }
+        notify_queue_verified_result($pdo, (int) $sideEffects['booking_id'], $orderId);
     } catch (Throwable $e) {
-        error_log('PayHere notify side-effect error after DB update: ' . $e->getMessage());
+        // A repeated verified callback can recover queue work after DB commit.
+        error_log('PayHere notification queue error: ' . $e->getMessage());
+        notify_text_response(500, 'Notification queue temporarily unavailable');
     }
 }
 

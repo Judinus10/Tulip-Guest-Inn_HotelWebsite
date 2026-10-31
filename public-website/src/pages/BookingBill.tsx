@@ -88,6 +88,9 @@ export default function BookingBill() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [retrying, setRetrying] = useState(false);
+  const [retryDeadline, setRetryDeadline] = useState(0);
+  const [clock, setClock] = useState(Date.now());
+  const canRetryPayment = !!booking?.can_retry_payment && retryDeadline > clock;
   const [contactSettings, setContactSettings] = useState<ContactSettings | null>(null);
 
   const loadStatus = useCallback(async () => {
@@ -102,6 +105,8 @@ export default function BookingBill() {
     try {
       const status = await fetchBookingPaymentStatus({ booking_id: bookingId, order_id: orderId, token });
       setBooking(status);
+      setRetryDeadline(Date.now() + Math.max(0, status.seconds_remaining || 0) * 1000);
+      setClock(Date.now());
       setError('');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unable to load payment status.';
@@ -131,13 +136,19 @@ export default function BookingBill() {
   }, []);
 
   useEffect(() => {
-    if (!booking || booking.payment_status !== 'Payment Pending' || booking.payment_method.toLowerCase() === 'cash') return;
+    if (!booking || booking.booking_status !== 'Pending' || booking.payment_status === 'Paid' || booking.payment_method.toLowerCase() === 'cash') return;
     const interval = window.setInterval(loadStatus, 10000);
     return () => window.clearInterval(interval);
   }, [booking, loadStatus]);
 
+  useEffect(() => {
+    if (!booking?.can_retry_payment) return;
+    const timer = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [booking?.can_retry_payment]);
+
   const handleRetryPayment = async () => {
-    if (!booking) return;
+    if (!booking || !booking.can_retry_payment || Date.now() >= retryDeadline || retrying) return;
     setRetrying(true);
     setError('');
 
@@ -157,6 +168,7 @@ export default function BookingBill() {
   const paidAt = latestPayment?.updated_at || latestPayment?.created_at;
   const roomImage = booking?.room_main_image || accommodationFallback;
   const isPaid = booking?.payment_status?.toLowerCase() === 'paid';
+  const isConfirmed = booking?.booking_status === 'Confirmed';
   const isCashPayment = booking?.payment_method?.toLowerCase() === 'cash';
   const heroImage = bannerBooking;
   const phones = getContactPhones(contactSettings);
@@ -207,14 +219,14 @@ export default function BookingBill() {
                   </span>
                   <div>
                     <h2 className="font-sans text-[14px] font-bold text-[#28582f]">
-                      {isCashPayment ? 'Booking Request Received' : isPaid ? 'Your booking is confirmed!' : 'Payment confirmation pending'}
+                      {isCashPayment ? 'Booking Request Received' : isPaid ? (isConfirmed ? 'Your booking is confirmed!' : 'Payment received — awaiting hotel confirmation') : booking.booking_status === 'Cancelled' ? 'Reservation no longer held' : statusLabel(booking.payment_status)}
                     </h2>
                     <p className="mt-1 text-[11px] text-[#51645a]">
                       {isCashPayment
                         ? 'Your booking is pending review. You will receive a confirmation email shortly'
                         : isPaid
-                          ? 'Thank you for choosing Tulip Guest Inn.You will receive a confirmation email shortly. We look forward to welcoming you.'
-                          : 'This page refreshes automatically while PayHere confirms your payment.'}
+                          ? (isConfirmed ? 'Thank you for choosing Tulip Guest Inn. We look forward to welcoming you.' : 'Your payment is recorded. Please contact the hotel about reservation confirmation.')
+                          : canRetryPayment ? 'Payment is not complete. Retry before your original reservation hold expires, or contact the hotel.' : 'Contact the hotel or make a new booking if the reservation hold has expired.'}
                     </p>
                   </div>
                 </div>
@@ -381,8 +393,8 @@ export default function BookingBill() {
                 </article>
               </div>
 
-              <div className={`grid grid-cols-1 gap-4 ${booking.can_retry_payment ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
-                {booking.can_retry_payment && (
+              <div className={`grid grid-cols-1 gap-4 ${canRetryPayment ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+                {canRetryPayment && (
                   <button type="button" onClick={handleRetryPayment} disabled={retrying} className="flex h-11 items-center justify-center gap-2 rounded-[5px] border border-border bg-surface text-[10px] font-bold uppercase tracking-[0.18em] text-dark transition hover:border-gold hover:text-gold">
                     <RefreshCcw size={13} /> {retrying ? 'Restarting' : 'Retry Payment'}
                   </button>

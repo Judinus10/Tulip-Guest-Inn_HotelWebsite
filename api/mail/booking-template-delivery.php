@@ -17,7 +17,8 @@ function tulip_booking_status_email_key(string $kind, array $booking, array $pay
 
 function tulip_booking_email_event_base(string $type): string
 {
-    return preg_match('/^(booking_status_updated|payment_status_updated|combined_status_updated|admin_payment_received|admin_payment_failed)_[a-f0-9]{24}$/D', $type, $match)
+    if (preg_match('/^(payment_failed|admin_payment_failed)_attempt_[a-f0-9]{24}$/D', $type, $attempt)) return $attempt[1];
+    return preg_match('/^(booking_status_updated|payment_status_updated|combined_status_updated|admin_payment_received|admin_payment_failed|payment_failed)_[a-f0-9]{24}$/D', $type, $match)
         ? $match[1] : $type;
 }
 
@@ -113,7 +114,7 @@ function tulip_booking_email_for_queue(PDO $pdo, ?string $relatedType, ?int $boo
     }
     $rooms = booking_guest_rooms($pdo, $bookingId, $groupId);
     $booking = array_merge($booking, booking_guest_totals($rooms), ['room_assignments' => $rooms]);
-    $stmt = $pdo->prepare('SELECT method, status, amount, currency, order_id, payment_id FROM payments WHERE booking_id = ? ORDER BY id DESC LIMIT 1');
+    $stmt = $pdo->prepare('SELECT method, status, amount, currency, order_id, payment_id FROM payments WHERE booking_id = ? ORDER BY (status = \'Paid\') DESC, id DESC LIMIT 1');
     $stmt->execute([$primaryId]);
     $payment = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
     $booking['payment_method'] = (string) ($payment['method'] ?? 'Not available');
@@ -139,7 +140,7 @@ function tulip_booking_email_for_queue(PDO $pdo, ?string $relatedType, ?int $boo
     }
     if (in_array($event, ['payment_pending','admin_payment_pending'], true)
         && ($status !== 'pending' || !in_array($paymentState, ['payment pending','pending'], true))) return null;
-    if ($event === 'payment_failed' && $paymentState !== 'failed') return null;
+    if ($event === 'payment_failed' && !in_array($paymentState, ['failed','cancelled'], true)) return null;
     // Legacy expiry stores Cancelled; the expiry event carries the more precise reason.
     if (in_array($event, ['expired','admin_booking_expired'], true)
         && !in_array($status, ['expired','cancelled','canceled'], true)) return null;
@@ -148,7 +149,7 @@ function tulip_booking_email_for_queue(PDO $pdo, ?string $relatedType, ?int $boo
 
     if ($isAdmin) {
         if ($event === 'admin_payment_received' && strtolower($booking['payment_status']) !== 'paid') return null;
-        if ($event === 'admin_payment_failed' && strtolower($booking['payment_status']) !== 'failed') return null;
+        if ($event === 'admin_payment_failed' && !in_array($paymentState, ['failed','cancelled'], true)) return null;
     }
     if (str_starts_with($emailType, 'staying_guest_') && !empty($booking['is_booking_for_other'])) {
         $guestEmail = trim((string) ($booking['staying_guest_email'] ?? ''));
@@ -156,7 +157,7 @@ function tulip_booking_email_for_queue(PDO $pdo, ?string $relatedType, ?int $boo
         $booking['booked_by'] = ['name' => $booking['full_name'] ?? '', 'email' => $booking['email'] ?? '', 'phone' => $booking['phone'] ?? ''];
         $booking['full_name'] = trim((string) ($booking['staying_guest_name'] ?? '')) ?: 'Guest';
     }
-    if ($status === 'pending' && str_contains(strtolower($booking['payment_method']), 'payhere') && $paymentState === 'payment pending') {
+    if ($status === 'pending' && str_contains(strtolower($booking['payment_method']), 'payhere') && in_array($paymentState, ['payment pending','failed','cancelled'], true) && booking_can_retry_payment($booking)) {
         $expiresAt = booking_expires_at($booking);
         $deadline = $expiresAt !== null
             ? (new DateTimeImmutable($expiresAt))->setTimezone(new DateTimeZone('Asia/Colombo'))->format('d M Y, h:i A') . ' (Sri Lanka time)' : '';
@@ -165,6 +166,9 @@ function tulip_booking_email_for_queue(PDO $pdo, ?string $relatedType, ?int $boo
             : 'Your booking is registered, but online payment has not been completed and your reservation is not yet confirmed.'
                 . ($deadline !== '' ? ' Your rooms are held until ' . $deadline . '.' : '')
                 . ' Open your booking to retry payment before the hold expires, or contact the hotel for assistance.';
+    }
+    if (in_array($event, ['payment_failed','admin_payment_failed'], true) && !booking_can_retry_payment($booking)) {
+        $booking['payment_notice'] = 'This payment attempt was not completed. The reservation is no longer held. Contact the hotel or make a new booking; do not retry this expired reservation.';
     }
     if (!$isAdmin && in_array(strtolower($booking['payment_method']), ['cash','cash on arrival','pay on arrival'], true)
         && in_array($paymentState, ['pending','payment pending'], true)) {

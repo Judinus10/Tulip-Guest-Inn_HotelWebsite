@@ -149,17 +149,33 @@ try {
         json_response(false, 'This booking has already been paid.', 409);
     }
 
-    if (booking_hold_is_expired($booking)) {
+    $methodStmt = $pdo->prepare('SELECT method FROM payments WHERE booking_id = ? ORDER BY id DESC LIMIT 1');
+    $methodStmt->execute([$bookingId]);
+    $booking['payment_method'] = (string) ($methodStmt->fetchColumn() ?: 'PayHere');
+    if (!booking_can_retry_payment($booking)) {
         $pdo->rollBack();
-        json_response(false, 'This payment hold has expired. Please retry payment to create a fresh checkout.', 409, [
+        json_response(false, 'This reservation is no longer eligible for online payment. Please make a new booking or contact the hotel.', 409, [
             'expired' => true,
-            'can_retry_payment' => true,
+            'can_retry_payment' => false,
         ]);
     }
 
     $groupId = multi_room_group_id($booking);
     $groupRows = $groupId > 0 ? multi_room_group_rows($pdo, $groupId) : [];
     $paymentBookings = $groupRows !== [] ? $groupRows : [$booking];
+    foreach ($paymentBookings as $row) {
+        if (!booking_can_retry_payment($row)) {
+            $pdo->rollBack();
+            json_response(false, 'A room in this reservation is no longer held. Please contact the hotel or make a new booking.', 409, ['can_retry_payment' => false]);
+        }
+    }
+    $scopeIds = array_map(static fn(array $row): int => (int) $row['id'], $paymentBookings);
+    $scopeSqlIds = implode(',', $scopeIds);
+    $paidCheck = $pdo->query("SELECT id FROM payments WHERE booking_id IN ({$scopeSqlIds}) AND status = 'Paid' LIMIT 1");
+    if ($paidCheck->fetchColumn()) {
+        $pdo->rollBack();
+        json_response(false, 'A payment has already been received for this reservation. Please contact the hotel.', 409, ['can_retry_payment' => false]);
+    }
     $roomName = implode(', ', array_map(static fn(array $row): string => (string) ($row['room_name'] ?? ''), $paymentBookings));
     $checkInDate = (string) ($booking['check_in_date'] ?? '');
     $checkOutDate = (string) ($booking['check_out_date'] ?? '');
@@ -241,7 +257,7 @@ try {
 
     $checkoutToken = create_checkout_token($orderId, $bookingId, $amountFormatted);
     $returnUrl = build_booking_bill_url($bookingId, $orderId, $checkoutToken);
-    $cancelUrl = build_room_details_url($pdo, (int) ($booking['room_id'] ?? 0), $bookingId, $orderId, 'failed');
+    $cancelUrl = $returnUrl . '&gateway_return=cancelled'; // Display-only return; only verified callbacks change payment state.
     $notifyUrl = (API_BASE_URL !== '' ? API_BASE_URL : '') . '/payments/payhere-notify.php';
 
     $checkoutPayload = [

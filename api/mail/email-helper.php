@@ -1792,7 +1792,7 @@ function queue_payment_success_emails(PDO $pdo, array $booking, array $payment):
     return $queued;
 }
 
-function queue_payment_failed_email(PDO $pdo, array $booking): int
+function queue_payment_failed_email(PDO $pdo, array $booking, string $orderId = ''): int
 {
     $booking = booking_with_guest_details($pdo, $booking);
     $queued = 0;
@@ -1802,7 +1802,10 @@ function queue_payment_failed_email(PDO $pdo, array $booking): int
         return 0;
     }
 
-    if (!booking_email_sent($pdo, $bookingId, ['payment_failed'])) {
+    $suffix = $orderId !== '' ? '_' . substr(hash('sha256', $orderId), 0, 24) : '';
+    $customerType = ($orderId !== '' ? 'payment_failed_attempt' : 'payment_failed') . $suffix;
+    $adminType = ($orderId !== '' ? 'admin_payment_failed_attempt' : 'admin_payment_failed') . $suffix;
+    if (!booking_email_sent($pdo, $bookingId, [$customerType])) {
         $body = booking_email_html('failed', $booking, [], false, email_button('Retry Payment', latest_booking_bill_url($pdo, $bookingId)));
 
         if (enqueue_email(
@@ -1812,7 +1815,7 @@ function queue_payment_failed_email(PDO $pdo, array $booking): int
             (string) ($booking['email'] ?? ''),
             'Payment failed - Tulip Guest Inn #' . $bookingId,
             $body,
-            'payment_failed',
+            $customerType,
             null,
             3,
             booking_from_email(),
@@ -1823,7 +1826,7 @@ function queue_payment_failed_email(PDO $pdo, array $booking): int
     }
 
     $adminEmail = booking_admin_email();
-    if (!booking_email_sent($pdo, $bookingId, ['admin_payment_failed'])) {
+    if (!booking_email_sent($pdo, $bookingId, [$adminType])) {
         $adminBody = admin_booking_email_html('failed', $booking);
 
         if (enqueue_email(
@@ -1833,7 +1836,7 @@ function queue_payment_failed_email(PDO $pdo, array $booking): int
             $adminEmail,
             'Payment failed - Tulip Guest Inn #' . $bookingId,
             $adminBody,
-            'admin_payment_failed',
+            $adminType,
             $booking['email'] ?? null,
             3,
             booking_from_email(),
@@ -2230,9 +2233,9 @@ function enqueue_email(
             reply_to_email = VALUES(reply_to_email),
             from_email = VALUES(from_email),
             from_name = VALUES(from_name),
-            status = IF(LOWER(status) IN ('sent', 'cancelled', 'skipped'), status, 'pending'),
-            last_error = IF(LOWER(status) IN ('sent', 'cancelled', 'skipped'), last_error, NULL),
-            available_at = IF(LOWER(status) IN ('sent', 'cancelled', 'skipped'), available_at, LEAST(available_at, VALUES(available_at))),
+            status = IF(LOWER(status) IN ('sent', 'cancelled', 'skipped', 'processing'), status, 'pending'),
+            last_error = IF(LOWER(status) IN ('sent', 'cancelled', 'skipped', 'processing'), last_error, NULL),
+            available_at = IF(LOWER(status) IN ('sent', 'cancelled', 'skipped', 'processing'), available_at, LEAST(available_at, VALUES(available_at))),
             updated_at = NOW()"
     );
 
@@ -2399,8 +2402,10 @@ function process_email_queue(PDO $pdo, int $limit = 10): array
             [$fromEmail, $fromName] = email_sender_for_type($emailType, $relatedType);
         }
 
-        if ($relatedType === 'booking' && $relatedId !== null && is_booking_pending_queue_email($emailType)) {
-            $latest = $pdo->prepare('SELECT status, payment_status FROM bookings WHERE id = :id LIMIT 1');
+        $baseType = tulip_booking_email_event_base($emailType);
+        $isFailureNotice = in_array($emailType, ['payment_failed', 'admin_payment_failed'], true) || str_contains($emailType, '_failed_attempt_');
+        if ($relatedType === 'booking' && $relatedId !== null && (is_booking_pending_queue_email($emailType) || $isFailureNotice)) {
+            $latest = $pdo->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1');
             $latest->execute([':id' => $relatedId]);
             $latestBooking = $latest->fetch(PDO::FETCH_ASSOC);
 
@@ -2408,6 +2413,17 @@ function process_email_queue(PDO $pdo, int $limit = 10): array
                 && (string) ($latestBooking['status'] ?? '') === 'Pending'
                 && (string) ($latestBooking['payment_status'] ?? '') === 'Payment Pending';
 
+            if ($stillPending) $stillPending = booking_can_retry_payment($latestBooking);
+            if ($isFailureNotice) {
+                $attempt = $pdo->prepare("SELECT order_id, status FROM payments WHERE booking_id = ? ORDER BY (status = 'Paid') DESC, id DESC LIMIT 1");
+                $attempt->execute([$relatedId]);
+                $latestAttempt = $attempt->fetch(PDO::FETCH_ASSOC) ?: [];
+                $expectedKey = $baseType . '_attempt_' . substr(hash('sha256', (string) ($latestAttempt['order_id'] ?? '')), 0, 24);
+                $stillPending = is_array($latestBooking)
+                    && in_array((string) ($latestAttempt['status'] ?? ''), ['Failed','Cancelled'], true)
+                    && booking_can_retry_payment($latestBooking)
+                    && (!str_contains($emailType, '_failed_attempt_') || hash_equals($expectedKey, $emailType));
+            }
             if (!$stillPending) {
                 $skipUpdate = $pdo->prepare(
                     "UPDATE email_queue
@@ -2420,7 +2436,7 @@ function process_email_queue(PDO $pdo, int $limit = 10): array
                 ]);
 
                 if ($skipUpdate->rowCount() > 0) {
-                    booking_audit_log($pdo, $relatedId, 'pending_email_skipped', 'Pending Email Skipped', 'Scheduled pending email was skipped because the booking or payment was no longer pending.', [
+                    booking_audit_log($pdo, $relatedId, 'payment_email_skipped', 'Obsolete Payment Email Skipped', 'Payment notification no longer matches the current booking/payment attempt.', [
                         'email_type' => $emailType,
                         'queue_id' => $jobId,
                     ]);

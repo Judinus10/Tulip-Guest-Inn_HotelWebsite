@@ -59,8 +59,13 @@ function booking_seconds_remaining(array $booking): int
 function booking_is_unpaid_pending(array $booking): bool
 {
     return (string) ($booking['status'] ?? '') === 'Pending'
-        && (string) ($booking['payment_status'] ?? '') === 'Payment Pending'
+        && in_array((string) ($booking['payment_status'] ?? ''), ['Payment Pending', 'Failed', 'Cancelled'], true)
         && strcasecmp((string) ($booking['payment_method'] ?? ''), 'Cash') !== 0;
+}
+
+function booking_can_retry_payment(array $booking): bool
+{
+    return booking_is_unpaid_pending($booking) && booking_seconds_remaining($booking) > 0;
 }
 
 function booking_hold_is_expired(array $booking): bool
@@ -84,7 +89,7 @@ function expire_pending_bookings(PDO $pdo, ?int $bookingId = null, bool $sendEma
         "SELECT *
          FROM bookings
          WHERE status = 'Pending'
-           AND payment_status = 'Payment Pending'
+           AND payment_status IN ('Payment Pending', 'Failed', 'Cancelled')
            AND created_at < :cutoff
            AND NOT EXISTS (
                SELECT 1 FROM payments p
@@ -92,7 +97,7 @@ function expire_pending_bookings(PDO $pdo, ?int $bookingId = null, bool $sendEma
                WHERE (payment_booking.id = bookings.id
                       OR (bookings.booking_group_id > 0
                           AND payment_booking.booking_group_id = bookings.booking_group_id))
-                 AND LOWER(COALESCE(p.method, '')) = 'cash'
+                 AND (LOWER(COALESCE(p.method, '')) = 'cash' OR p.status = 'Paid')
            )
            {$whereId}"
     );
@@ -113,7 +118,7 @@ function expire_pending_bookings(PDO $pdo, ?int $bookingId = null, bool $sendEma
              updated_at = NOW()
          WHERE id IN ({$placeholders})
            AND status = 'Pending'
-           AND payment_status = 'Payment Pending'"
+           AND payment_status IN ('Payment Pending', 'Failed', 'Cancelled')"
     );
     $update->execute($ids);
 
@@ -153,7 +158,7 @@ function active_booking_conflict_sql(): string
                 OR
                 (
                     status = 'Pending'
-                    AND COALESCE(payment_status, '') = 'Payment Pending'
+                    AND COALESCE(payment_status, '') IN ('Payment Pending', 'Failed', 'Cancelled')
                     AND (
                         created_at >= :hold_cutoff
                         OR EXISTS (

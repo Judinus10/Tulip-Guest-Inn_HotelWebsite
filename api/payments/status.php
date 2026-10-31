@@ -150,6 +150,17 @@ try {
     $stmt->execute([':booking_id' => $bookingId, ':order_id' => $orderId]);
     $record = $stmt->fetch() ?: $record;
 
+    // Authorize against the original signed order above, then show the current
+    // attempt. Old email bill links remain useful after a successful retry.
+    $current = $pdo->prepare("SELECT order_id, payment_id, status AS gateway_payment_status,
+        method AS payment_method, amount AS paid_amount, currency AS paid_currency,
+        updated_at AS payment_updated_at, invoice_id AS payment_invoice_id,
+        invoice_number AS payment_invoice_number
+        FROM payments WHERE booking_id = ? ORDER BY (status = 'Paid') DESC, id DESC LIMIT 1");
+    $current->execute([$bookingId]);
+    $currentPayment = $current->fetch(PDO::FETCH_ASSOC);
+    if ($currentPayment) $record = array_merge($record, $currentPayment);
+
     $paymentStatus = (string) ($record['gateway_payment_status'] ?: $record['payment_status'] ?: 'Payment Pending');
 
     // Do not trigger booking emails from the public bill/status polling endpoint.
@@ -190,12 +201,12 @@ try {
     $party = booking_guest_totals($assignments);
 
     $expiresAt = booking_expires_at($record);
-    $secondsRemaining = $paymentStatus === 'Payment Pending' ? booking_seconds_remaining($record) : 0;
+    $secondsRemaining = booking_is_unpaid_pending($record) ? booking_seconds_remaining($record) : 0;
     $paymentMethod = strtolower((string) ($record['payment_method'] ?? ''));
     $isOnlinePayment = str_contains($paymentMethod, 'payhere');
     $canRetryPayment = $isOnlinePayment
         && in_array($paymentStatus, ['Payment Pending', 'Failed', 'Cancelled'], true)
-        && (string) ($record['status'] ?? '') !== 'Confirmed';
+        && booking_can_retry_payment($record);
 
     // Every valid booking can download its current booking confirmation/bill.
     // The PDF clearly shows the live booking and payment statuses, so pending,
@@ -232,7 +243,7 @@ try {
             'applied_offer_title' => $priceSummary['applied_offer_title'],
             'currency' => (string) ($record['paid_currency'] ?? $record['currency'] ?? PAYMENT_CURRENCY),
             'invoice_number' => (string) ($record['invoice_number'] ?? $record['payment_invoice_number'] ?? ''),
-            'order_id' => $orderId,
+            'order_id' => (string) $record['order_id'],
             'payment_id' => (string) ($record['payment_id'] ?? ''),
             'payment_method' => (string) ($record['payment_method'] ?? 'PayHere'),
             'room_url' => public_room_url($pdo, (int) ($record['room_id'] ?? 0)),
