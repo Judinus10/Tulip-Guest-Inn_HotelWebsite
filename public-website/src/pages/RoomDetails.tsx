@@ -3,7 +3,7 @@ import GuestPartyFields from '../components/ui/GuestPartyFields';
 import { readParty, writeParty, partyError, partyTotal, occupancy, roomOccupancyLabel, roomGuestLabel } from '../services/guestOccupancy';
 import { useEffect, useRef, useState } from 'react';
 import { useParams, Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Users, BedDouble, Maximize, Bath, Check, X, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 import RoomCard from '../components/ui/RoomCard';
 import AnimatedSection from '../components/ui/AnimatedSection';
@@ -55,7 +55,29 @@ export default function RoomDetails() {
   });
 
   const [activeImg, setActiveImg] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const touchStartX = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const imageCount = room?.images.length ?? 0;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setLightboxOpen(false);
+      if (event.key === 'ArrowLeft' && imageCount > 1) {
+        setActiveImg((index) => (index - 1 + imageCount) % imageCount);
+      }
+      if (event.key === 'ArrowRight' && imageCount > 1) {
+        setActiveImg((index) => (index + 1) % imageCount);
+      }
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [lightboxOpen, room?.images.length]);
 
   useEffect(() => {
     let mounted = true;
@@ -310,32 +332,41 @@ export default function RoomDetails() {
           <motion.div
             key={src}
             className="absolute inset-0"
+            style={{ pointerEvents: i === activeImg ? 'auto' : 'none' }}
             animate={{ opacity: i === activeImg ? 1 : 0 }}
             transition={{ duration: 0.6 }}
           >
-            <img src={src} alt={`${room.name} ${i + 1}`} className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-linear-to-t from-black/50 to-transparent" />
+            <button
+              type="button"
+              onClick={() => setLightboxOpen(true)}
+              aria-label={`Open room gallery, image ${i + 1} of ${room.images.length}`}
+              tabIndex={i === activeImg ? 0 : -1}
+              className="absolute inset-0 h-full w-full cursor-zoom-in text-left"
+            >
+              <img src={src} alt={`${room.name} ${i + 1}`} className="h-full w-full object-cover" />
+              <span className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/50 to-transparent" />
+            </button>
           </motion.div>
         ))}
 
         {/* Navigation */}
         <button
           onClick={prevImg}
-          className="absolute left-6 top-1/2 -translate-y-1/2 w-11 h-11 bg-white/20 hover:bg-gold flex items-center justify-center text-white transition-colors duration-300"
+          className="absolute left-6 top-1/2 z-10 -translate-y-1/2 w-11 h-11 bg-white/20 hover:bg-gold flex items-center justify-center text-white transition-colors duration-300"
           aria-label="Previous image"
         >
           <ChevronLeft size={22} />
         </button>
         <button
           onClick={nextImg}
-          className="absolute right-6 top-1/2 -translate-y-1/2 w-11 h-11 bg-white/20 hover:bg-gold flex items-center justify-center text-white transition-colors duration-300"
+          className="absolute right-6 top-1/2 z-10 -translate-y-1/2 w-11 h-11 bg-white/20 hover:bg-gold flex items-center justify-center text-white transition-colors duration-300"
           aria-label="Next image"
         >
           <ChevronRight size={22} />
         </button>
 
         {/* Dots */}
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
+        <div className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2 flex gap-2">
           {room.images.map((_, i) => (
             <button
               key={i}
@@ -349,18 +380,18 @@ export default function RoomDetails() {
         </div>
 
         {/* Room Badge */}
-        <div className="absolute bottom-8 left-8">
+        <div className="absolute bottom-8 left-8 z-10">
           <span className="bg-gold text-white text-[9px] tracking-[0.2em] uppercase px-4 py-2">
             {room.category}
           </span>
         </div>
 
         {/* Thumbs */}
-        <div className="absolute bottom-6 right-6 hidden md:flex gap-2">
+        <div className="absolute bottom-6 right-6 z-10 hidden md:flex gap-2">
           {room.images.map((src, i) => (
             <button
               key={i}
-              onClick={() => setActiveImg(i)}
+              onClick={() => { setActiveImg(i); setLightboxOpen(true); }}
               className={`w-16 h-12 overflow-hidden border-2 transition-colors duration-200 ${
                 i === activeImg ? 'border-gold' : 'border-transparent opacity-60 hover:opacity-100'
               }`}
@@ -370,6 +401,64 @@ export default function RoomDetails() {
           ))}
         </div>
       </section>
+
+      <AnimatePresence>
+        {lightboxOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95"
+            onClick={() => setLightboxOpen(false)}
+            onTouchStart={(event) => { touchStartX.current = event.touches[0]?.clientX ?? null; }}
+            onTouchEnd={(event) => {
+              if (touchStartX.current === null) return;
+              const distance = (event.changedTouches[0]?.clientX ?? touchStartX.current) - touchStartX.current;
+              touchStartX.current = null;
+              if (Math.abs(distance) < 45 || room.images.length < 2) return;
+              if (distance > 0) prevImg(); else nextImg();
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setLightboxOpen(false)}
+              className="absolute right-5 top-5 z-10 flex h-11 w-11 items-center justify-center border border-white/40 text-white transition-colors hover:border-gold hover:text-gold sm:right-8 sm:top-8"
+              aria-label="Close room gallery"
+            >
+              <X size={22} />
+            </button>
+            {room.images.length > 1 && <>
+              <button
+                type="button"
+                onClick={(event) => { event.stopPropagation(); prevImg(); }}
+                className="absolute left-4 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center border border-white/40 text-white transition-colors hover:border-gold hover:text-gold sm:left-8"
+                aria-label="Previous room image"
+              ><ChevronLeft size={22} /></button>
+              <button
+                type="button"
+                onClick={(event) => { event.stopPropagation(); nextImg(); }}
+                className="absolute right-4 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center border border-white/40 text-white transition-colors hover:border-gold hover:text-gold sm:right-8"
+                aria-label="Next room image"
+              ><ChevronRight size={22} /></button>
+            </>}
+            <motion.img
+              key={room.images[activeImg]}
+              initial={{ opacity: 0, scale: 0.97 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              src={room.images[activeImg]}
+              alt={`${room.name} ${activeImg + 1}`}
+              className="max-h-[82vh] max-w-[88vw] object-contain"
+              onClick={(event) => event.stopPropagation()}
+            />
+            <div className="absolute bottom-5 left-1/2 -translate-x-1/2 text-center text-white">
+              <p className="text-sm">{room.name}</p>
+              <p className="mt-1 text-xs text-white/60">{activeImg + 1} / {room.images.length}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {room.videoUrl && (
         <section className="mx-auto max-w-6xl px-6 py-10" aria-label="Room video tour">

@@ -750,7 +750,11 @@ function RoomFormModal({ mode, room, amenities, occupancySettings, onClose, onSu
                 onChange={(e) => updateField('bed_type', e.target.value)}
                 className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm text-text-primary shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
-                {bedTypes.map((bedType) => <option key={bedType}>{bedType}</option>)}
+                {bedTypes.map((bedType) => (
+                  <option key={bedType} value={bedType}>
+                    {bedType.replace(/\b[a-z]/g, (letter) => letter.toUpperCase())}
+                  </option>
+                ))}
               </select>
             </div>
 
