@@ -296,7 +296,9 @@ function normalize_room(array $room, array $images = [], array $amenityRecords =
         'status' => (string) ($room['status'] ?? 'Available'),
         'sort_order' => (int) ($room['sort_order'] ?? 0),
         ...($includePrivate ? ['booking_ical_url' => (string) ($room['booking_ical_url'] ?? '')] : []),
-        'video_url' => !empty($room['video_path']) ? rooms_upload_url($room['video_path']) : null,
+        'video_url' => !empty($room['video_path'])
+            ? public_api_base_url() . '/rooms/video.php?file=' . rawurlencode(basename((string) $room['video_path']))
+            : null,
         'images' => $imageUrls,
         'main_image' => $imageUrls[0] ?? $fallbackImage,
         'image' => $images[0] ?? null,

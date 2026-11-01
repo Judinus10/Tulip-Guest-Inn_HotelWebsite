@@ -461,7 +461,7 @@ export default function RoomDetails() {
       </AnimatePresence>
 
       {room.videoUrl && (
-        <section className="mx-auto max-w-6xl px-6 py-10" aria-label="Room video tour">
+        <section className="mx-auto max-w-6xl px-6 pt-10 pb-2" aria-label="Room video tour">
           <h2 className="mb-5 text-2xl font-semibold">Room video tour</h2>
           <video key={room.videoUrl} src={room.videoUrl} controls preload="metadata" playsInline
             poster={room.images[0]} className="aspect-video w-full rounded-lg bg-black object-contain">
@@ -471,7 +471,7 @@ export default function RoomDetails() {
       )}
 
       {/* Room Info */}
-      <section className="section-padding bg-background">
+      <section className={`section-padding bg-background ${room.videoUrl ? 'pt-10' : ''}`}>
         <div className="container-custom">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
             {/* Main Info */}
