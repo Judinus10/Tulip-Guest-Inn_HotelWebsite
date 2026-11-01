@@ -7,6 +7,8 @@ import { getPublicContactSettings, submitContactMessage, type ContactSettings } 
 import { getSocialLinks } from '../services/socialLinks';
 import bannerContact from '../assets/images/banners/banner-contact.jpg';
 import { useToast } from '../components/ui/ToastProvider';
+import CountryPhoneInput from '../components/ui/CountryPhoneInput';
+import { toInternationalPhone } from '../services/phoneNumbers';
 
 const contactCards = [
   {
@@ -133,6 +135,7 @@ export default function Contact() {
     subject: '',
     message: '',
   });
+  const [phoneCountryCode, setPhoneCountryCode] = useState('94');
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -189,7 +192,7 @@ export default function Contact() {
     const { name } = e.target;
     let { value } = e.target;
 
-    if (name === 'phone') value = value.replace(/\D/g, '').slice(0, 15);
+    if (name === 'phone') value = value.replace(/\D/g, '').slice(0, Math.max(4, 15 - phoneCountryCode.length));
     if (name === 'name') value = value.replace(/[^\p{L}\s]/gu, '');
 
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -200,7 +203,7 @@ export default function Contact() {
     const errors: Record<string, string> = {};
     const name = form.name.trim();
     const email = form.email.trim();
-    const phone = form.phone.trim();
+    const phone = toInternationalPhone(phoneCountryCode, form.phone).replace(/\D/g, '');
 
     if (!name) errors.name = 'Full name is required.';
     else if (!/^[\p{L}]+(?:\s+[\p{L}]+)*$/u.test(name)) errors.name = 'Name can contain letters and spaces only.';
@@ -222,10 +225,11 @@ export default function Contact() {
     setIsSubmitting(true);
 
     try {
-      await submitContactMessage(form);
+      await submitContactMessage({ ...form, phone: toInternationalPhone(phoneCountryCode, form.phone) });
       setSubmitted(true);
       toast.success('Your message has been sent. Our team will respond shortly.');
       setForm({ name: '', email: '', phone: '', subject: '', message: '' });
+      setPhoneCountryCode('94');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not send your message. Please try again.');
     } finally {
@@ -347,19 +351,16 @@ export default function Contact() {
                         <label className="block text-[9px] tracking-[0.2em] uppercase text-muted font-medium mb-2">
                           Phone Number
                         </label>
-                        <input
-                          type="tel"
+                        <CountryPhoneInput
                           name="phone"
                           value={form.phone}
-                          onChange={handleChange}
-                          inputMode="numeric"
-                          pattern="[0-9]{7,15}"
-                          maxLength={15}
-                          autoComplete="tel"
+                          countryCode={phoneCountryCode}
+                          onChange={(phone) => { setForm((current) => ({ ...current, phone })); setFieldErrors((current) => ({ ...current, phone: '' })); }}
+                          onCountryCodeChange={(code) => { setPhoneCountryCode(code); setFieldErrors((current) => ({ ...current, phone: '' })); }}
+                          autoComplete="tel-national"
                           aria-invalid={Boolean(fieldErrors.phone)}
                           aria-describedby={fieldErrors.phone ? 'contact-phone-error' : undefined}
-                          placeholder="94771234567"
-                          className={`w-full border px-5 py-3.5 text-sm text-dark outline-hidden focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400 ${fieldErrors.phone ? 'border-red-500' : 'border-border'}`}
+                          placeholder="Phone number (optional)"
                         />
                         {fieldErrors.phone && <p id="contact-phone-error" className="mt-1.5 text-xs text-red-600">{fieldErrors.phone}</p>}
                       </div>

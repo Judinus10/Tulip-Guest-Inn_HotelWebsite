@@ -33,8 +33,8 @@ if (!preg_match('/^\p{L}+(?:\s+\p{L}+)*$/u', $name)) {
     json_response(false, 'Name can contain letters and spaces only.', 422);
 }
 
-if ($phone !== '' && !preg_match('/^\d{7,15}$/', $phone)) {
-    json_response(false, 'Phone number must contain 7 to 15 digits only.', 422);
+if ($phone !== '' && !preg_match('/^\+?[1-9]\d{6,14}$/D', $phone)) {
+    json_response(false, 'Enter a valid phone number with its country code.', 422);
 }
 
 try {

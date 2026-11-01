@@ -1,5 +1,7 @@
 import { useGuestAgePolicy } from '../services/guestAgePolicy';
 import GuestPartyFields from '../components/ui/GuestPartyFields';
+import CountryPhoneInput from '../components/ui/CountryPhoneInput';
+import { toInternationalPhone } from '../services/phoneNumbers';
 import { readParty, writeParty, partyError, partyTotal, partyRequest, bookingRoomOptions, roomGuestLabel } from '../services/guestOccupancy';
 import { useContactPhones } from '../hooks/useContactPhones';
 import { useEffect, useState } from 'react';
@@ -34,12 +36,14 @@ interface BookingForm {
   lastName: string;
   email: string;
   phone: string;
+  phoneCountryCode: string;
   nationality: string;
   specialRequests: string;
   isBookingForOther: boolean;
   stayingGuestName: string;
   stayingGuestEmail: string;
   stayingGuestPhone: string;
+  stayingGuestCountryCode: string;
   stayingGuestNote: string;
   paymentMethod: 'Cash' | 'PayHere';
 }
@@ -65,12 +69,14 @@ export default function Booking() {
     lastName: '',
     email: '',
     phone: '',
+    phoneCountryCode: '94',
     nationality: '',
     specialRequests: '',
     isBookingForOther: false,
     stayingGuestName: '',
     stayingGuestEmail: '',
     stayingGuestPhone: '',
+    stayingGuestCountryCode: '94',
     stayingGuestNote: '',
     paymentMethod: 'Cash',
   });
@@ -218,7 +224,7 @@ export default function Booking() {
       return;
     }
     const emailIsValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
-    const phoneDigits = form.phone.replace(/\D/g, '');
+    const phoneDigits = toInternationalPhone(form.phoneCountryCode, form.phone).replace(/\D/g, '');
     const validationMessage = !form.firstName.trim() || !form.lastName.trim()
       ? 'Please enter both your first name and last name.'
       : !emailIsValid
@@ -258,7 +264,7 @@ export default function Booking() {
       const booking = await submitBookingRequest({
         full_name: `${form.firstName} ${form.lastName}`.trim(),
         email: form.email,
-        phone: form.phone,
+        phone: toInternationalPhone(form.phoneCountryCode, form.phone),
         room_id: selectedRoom.id,
         room_name: selectedRoom.name,
         check_in_date: form.checkIn,
@@ -267,7 +273,7 @@ export default function Booking() {
         is_booking_for_other: form.isBookingForOther,
         staying_guest_name: form.isBookingForOther ? form.stayingGuestName : '',
         staying_guest_email: form.isBookingForOther ? form.stayingGuestEmail : '',
-        staying_guest_phone: form.isBookingForOther ? form.stayingGuestPhone : '',
+        staying_guest_phone: form.isBookingForOther ? toInternationalPhone(form.stayingGuestCountryCode, form.stayingGuestPhone) : '',
         staying_guest_note: form.isBookingForOther ? form.stayingGuestNote : '',
         payment_method: form.paymentMethod,
         message: [
@@ -523,14 +529,14 @@ export default function Booking() {
                       </div>
                       <div>
                         <label className="block text-[9px] tracking-[0.2em] uppercase text-muted mb-2">Phone Number *</label>
-                        <input
-                          type="tel"
+                        <CountryPhoneInput
                           name="phone"
                           value={form.phone}
-                          onChange={handleChange}
+                          countryCode={form.phoneCountryCode}
+                          onChange={(phone) => setForm((current) => ({ ...current, phone }))}
+                          onCountryCodeChange={(phoneCountryCode) => setForm((current) => ({ ...current, phoneCountryCode }))}
                           required
-                          placeholder="+xx xxx xxx xxxx"
-                          className="w-full border border-border px-5 py-3.5 text-sm outline-hidden focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
+                          placeholder="Phone number"
                         />
                       </div>
                       <div className="md:col-span-2">
@@ -562,13 +568,13 @@ export default function Booking() {
                           </div>
                           <div>
                             <label className="block text-[9px] tracking-[0.2em] uppercase text-muted mb-2">Staying Guest Phone (Optional)</label>
-                            <input
-                              type="tel"
+                            <CountryPhoneInput
                               name="stayingGuestPhone"
                               value={form.stayingGuestPhone}
-                              onChange={handleChange}
+                              countryCode={form.stayingGuestCountryCode}
+                              onChange={(stayingGuestPhone) => setForm((current) => ({ ...current, stayingGuestPhone }))}
+                              onCountryCodeChange={(stayingGuestCountryCode) => setForm((current) => ({ ...current, stayingGuestCountryCode }))}
                               placeholder="Guest phone number"
-                              className="w-full border border-border px-5 py-3.5 text-sm outline-hidden focus:border-gold transition-colors duration-200 bg-background placeholder-gray-400"
                             />
                           </div>
                           <div className="md:col-span-2">
