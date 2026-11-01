@@ -2,12 +2,44 @@ import './WebsiteBookingEmails.css'
 import { notifyError, notifyInfo, notifySuccess } from '@/utils/notifications'
 import BookingEmailPreview from '@/components/ui/BookingEmailPreview'
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, Info, Loader2, RotateCcw, Save } from 'lucide-react'
+import { ChevronDown, ImagePlus, Info, Loader2, RotateCcw, Save } from 'lucide-react'
 import { SectionCard } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Input, Label, Textarea } from '@/components/ui/input'
 import BookingEmailTextEditor from '@/components/ui/BookingEmailTextEditor'
 import { fetchBookingEmailSettings, saveBookingEmailSettings } from '@/services/bookingEmailSettings'
+import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
+
+const emailBrandingEndpoint = buildApiUrl('/settings/email-branding.php')
+
+async function convertLogoToPng(file) {
+  if (!file.type.startsWith('image/') || file.size > 20 * 1024 * 1024) throw new Error('Choose an image file under 20 MB.')
+  const objectUrl = URL.createObjectURL(file)
+  try {
+    const image = new Image()
+    await new Promise((resolve, reject) => {
+      image.onload = resolve
+      image.onerror = () => reject(new Error('This image format cannot be opened by your browser.'))
+      image.src = objectUrl
+    })
+    const ratio = image.naturalWidth / image.naturalHeight
+    if (!image.naturalWidth || !image.naturalHeight || ratio < 0.25 || ratio > 8) throw new Error('Choose a logo with a suitable shape (width between ¼ and 8 times its height).')
+    let scale = Math.min(1, 2000 / image.naturalWidth, 2000 / image.naturalHeight)
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale))
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale))
+      const context = canvas.getContext('2d')
+      if (!context) throw new Error('Could not prepare this image. Choose another file.')
+      context.drawImage(image, 0, 0, canvas.width, canvas.height)
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
+      if (!blob) throw new Error('Could not prepare this image. Choose another file.')
+      if (blob.size <= 2 * 1024 * 1024) return blob
+      scale *= 0.75
+    }
+    throw new Error('This logo is too large to use. Choose a smaller image.')
+  } finally { URL.revokeObjectURL(objectUrl) }
+}
 
 const types = { admin_daily_summary: { title: 'Daily stay summary', description: 'One scheduled email for the hotel, containing today’s arrivals and departures. Booking details are filled automatically. The existing cron schedule controls delivery.' }, received: { title: 'Booking Received', description: 'Sent when a booking request is submitted. This does not confirm the reservation.' },
   payment_pending: { title: 'Payment pending', description: 'Sent to the guest. Your online payment has not been completed. Your reservation is not confirmed by this message. Please review your booking before the hold expires.' },
@@ -35,6 +67,7 @@ export default function WebsiteBookingEmails() {
   const [type, setType] = useState('received')
   const [brandingRevision, setBrandingRevision] = useState(0)
   const [brandingSaved, setBrandingSaved] = useState(null)
+  const [localLogo, setLocalLogo] = useState('')
   const [logoWidth, setLogoWidth] = useState(76)
   const [settings, setSettings] = useState(null)
   const [drafts, setDrafts] = useState({})
@@ -54,7 +87,7 @@ export default function WebsiteBookingEmails() {
   const category = categoryOf(type)
   const placeholders = settings?.placeholders_by_type?.[type] || settings?.placeholders || {}
   const logoDirty = Boolean(brandingSaved && logoWidth !== brandingSaved.width)
-  const brandingDraft = brandingSaved ? { logo: brandingSaved.logo, width: logoWidth, dirty: logoDirty } : null
+  const brandingDraft = brandingSaved ? { logo: localLogo || brandingSaved.logo, width: logoWidth, dirty: logoDirty } : null
   const dirty = settings && draft && (!same(draft, settings.templates[type].content) || logoDirty)
   const anyDirty = logoDirty || (settings && Object.keys(types).some(key => !same(drafts[key], settings.templates[key].content)))
   useEffect(() => {
@@ -75,6 +108,52 @@ export default function WebsiteBookingEmails() {
     return () => { active = false; requestId.current++ }
   }, [])
   const change = (field, value) => { setDrafts(current => ({ ...current, [type]: { ...current[type], [field]: value } })); }
+  async function changeLogo(file) {
+    if (!file || busy) return
+    setBusy(true)
+    try {
+      const png = await convertLogoToPng(file)
+      const localPreview = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result || ''))
+        reader.onerror = () => reject(new Error('Could not prepare the logo preview.'))
+        reader.readAsDataURL(png)
+      })
+      setLocalLogo(localPreview)
+      const form = new FormData()
+      form.set('logo', png, 'email-logo.png')
+      form.set('width', String(brandingSaved.width))
+      form.set('version', String(brandingSaved.version))
+      form.set('reset', '0')
+      const response = await apiFetch(emailBrandingEndpoint, { method: 'POST', body: form })
+      const result = await readJsonResponse(response)
+      setBrandingSaved(result.data)
+      setLocalLogo('')
+      setBrandingRevision(value => value + 1)
+      notifySuccess('Email logo updated.', { duration: 4000 })
+    } catch (error) {
+      setLocalLogo('')
+      notifyError(error, { duration: 6000 })
+    } finally { setBusy(false) }
+  }
+  async function resetLogoAndSize() {
+    if (busy || !brandingSaved) return
+    setBusy(true)
+    try {
+      const form = new FormData()
+      form.set('width', String(brandingSaved.default_width))
+      form.set('version', String(brandingSaved.version))
+      form.set('reset', '1')
+      const response = await apiFetch(emailBrandingEndpoint, { method: 'POST', body: form })
+      const result = await readJsonResponse(response)
+      setBrandingSaved(result.data)
+      setLogoWidth(result.data.width)
+      setLocalLogo('')
+      setBrandingRevision(value => value + 1)
+      notifySuccess('Original Tulip logo and default size restored.', { duration: 4000 })
+    } catch (error) { notifyError(error, { duration: 6000 }) }
+    finally { setBusy(false) }
+  }
   const remember = (field, node) => { setTarget(field); positions.current[field] = [node.selectionStart ?? node.value.length, node.selectionEnd ?? node.value.length] }
   const insert = token => {
     if (!token || busy) return
@@ -145,9 +224,14 @@ export default function WebsiteBookingEmails() {
           <div className="mb-2 flex items-center justify-between gap-3"><label htmlFor="email-logo-width" className="text-xs font-semibold text-text-primary">Logo size</label><span className="text-xs text-text-secondary">{logoWidth} px</span></div>
           <div className="flex items-center gap-3"><input id="email-logo-width" type="range" min="40" max="240" step="1" value={logoWidth} disabled={busy}
             onChange={e => { setLogoWidth(Number(e.target.value)); }} className="min-w-0 flex-1 accent-blue-600" />
-            <button type="button" disabled={busy} onClick={() => { setLogoWidth(brandingSaved.default_width); }}
-              className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border bg-white px-2.5 py-1.5 text-xs font-semibold text-text-secondary disabled:opacity-50" title="Reset logo size"><RotateCcw className="h-3.5 w-3.5" />Reset</button>
+            <button type="button" disabled={busy} onClick={resetLogoAndSize}
+              className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border bg-white px-2.5 py-1.5 text-xs font-semibold text-text-secondary disabled:opacity-50" title="Restore the original logo and default size"><RotateCcw className="h-3.5 w-3.5" />Reset</button>
+            <label className={`inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-blue-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-blue-700 ${busy ? 'pointer-events-none opacity-50' : ''}`}>
+              <ImagePlus className="h-3.5 w-3.5" />Change Logo
+              <input className="sr-only" type="file" accept="image/*" disabled={busy} aria-label="Choose an email logo image" onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; changeLogo(file) }} />
+            </label>
           </div>
+          <p className="mt-2 text-xs text-text-secondary">Choose an image in any format your browser can open. It will be converted for email use and updated immediately. Reset restores the original logo and its default size.</p>
         </div>
         <div className="booking-email-fields" key={type}>
           {Object.entries(fieldLabels).map(([field, label]) => <div key={field} className={`booking-email-field ${field === 'closing_html' ? 'booking-email-field--closing' : ''}`}>
