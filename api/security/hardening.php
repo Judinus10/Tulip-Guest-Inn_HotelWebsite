@@ -67,12 +67,12 @@ function protect_public_booking(array $data, string $email, string $phone, strin
 /** Server error-log diagnostics only. Never log tokens, secrets, request bodies or IPs. */
 function turnstile_diagnostic_log(string $reason, array $details = []): void {
     $allowed = ['expected_action', 'actual_action', 'expected_hostname', 'actual_hostname',
-        'http_status', 'curl_errno', 'curl_error', 'error_codes', 'response_is_json'];
+        'allowed_hostnames', 'http_status', 'curl_errno', 'curl_error', 'error_codes', 'response_is_json'];
     $safe = array_intersect_key($details, array_flip($allowed));
-    foreach (['expected_action', 'actual_action', 'expected_hostname', 'actual_hostname'] as $field) {
+    foreach (['expected_action', 'actual_action', 'expected_hostname', 'actual_hostname', 'allowed_hostnames'] as $field) {
         if (array_key_exists($field, $safe)) {
             $value = is_string($safe[$field]) ? $safe[$field] : '';
-            $safe[$field] = substr(preg_replace('/[^a-zA-Z0-9._:-]/', '', $value) ?? '', 0, 253);
+            $safe[$field] = substr(preg_replace('/[^a-zA-Z0-9._,:-]/', '', $value) ?? '', 0, 1000);
         }
     }
     $entry = ['request_id' => security_request_id(), 'reason' => $reason] + $safe;
@@ -83,8 +83,24 @@ function verify_bot_challenge(array $data, string $action): void {
     $secret = security_env('TURNSTILE_SECRET_KEY');
     if (APP_ENV === 'local' && $secret === '') return;
     $token = $data['bot_token'] ?? '';
+    // Turnstile returns the hostname of the page that minted the token. The
+    // public site can be reached on more than one explicitly allowed origin
+    // (for example, www and apex). Validate against the public origin allowlist
+    // instead of only FRONTEND_URL, which represents just one of those hosts.
+    $allowedHosts = [];
+    $publicOrigins = array_merge(
+        defined('ALLOWED_ORIGINS') && is_array(ALLOWED_ORIGINS) ? ALLOWED_ORIGINS : [],
+        [FRONTEND_URL, defined('PUBLIC_APP_URL') ? PUBLIC_APP_URL : '', defined('APP_BASE_URL') ? APP_BASE_URL : '']
+    );
+    foreach ($publicOrigins as $origin) {
+        $originHost = parse_url(trim((string) $origin), PHP_URL_HOST);
+        if (is_string($originHost) && $originHost !== '') $allowedHosts[strtolower($originHost)] = true;
+    }
     $host = strtolower((string) parse_url(FRONTEND_URL, PHP_URL_HOST));
-    $context = ['expected_action' => $action, 'expected_hostname' => $host];
+    if ($host !== '') $allowedHosts[$host] = true;
+    $allowedHosts = array_keys($allowedHosts);
+    $context = ['expected_action' => $action, 'expected_hostname' => $host,
+        'allowed_hostnames' => implode(',', $allowedHosts)];
     if ($secret === '' || !function_exists('curl_init')) {
         turnstile_diagnostic_log($secret === '' ? 'missing_secret' : 'curl_unavailable', $context);
         json_response(false, 'Form verification is unavailable. Please contact the property.', 503);
@@ -141,7 +157,7 @@ function verify_bot_challenge(array $data, string $action): void {
     $localTestToken = APP_ENV === 'local'
         && hash_equals('1x0000000000000000000000000000000AA', $secret)
         && hash_equals('XXXX.DUMMY.TOKEN.XXXX', $token);
-    if (!$localTestToken && ($actualAction !== $action || $actualHost !== $host)) {
+    if (!$localTestToken && ($actualAction !== $action || !in_array($actualHost, $allowedHosts, true))) {
         turnstile_diagnostic_log($actualAction !== $action ? 'action_mismatch' : 'hostname_mismatch', $context);
         json_response(false, 'Security check failed or expired. Please try again.', 422);
     }
