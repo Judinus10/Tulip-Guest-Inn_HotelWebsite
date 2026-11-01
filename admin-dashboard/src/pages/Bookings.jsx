@@ -1262,10 +1262,25 @@ function EditBookingModal({ booking, rooms, bookings, onClose, onSave }) {
   )
 }
 
-function BookingDetailsModal({ booking, rooms, onClose }) {
+function BookingDetailsModal({ booking, rooms, onClose, onConfirm }) {
+  const [isConfirming, setIsConfirming] = useState(false)
   const room = getRoom(booking.room_id, rooms)
   const groupRooms = Array.isArray(booking.group_rooms) ? booking.group_rooms : []
   const isGroupBooking = Boolean(booking.booking_group_id && groupRooms.length > 0)
+  const canConfirm = !booking.is_external && booking.booking_status === 'pending'
+
+  const handleConfirm = async () => {
+    if (!canConfirm || isConfirming) return
+    const approved = window.confirm(`Confirm booking ${booking.booking_no}? The customer will receive a confirmation email.`)
+    if (!approved) return
+
+    setIsConfirming(true)
+    try {
+      await onConfirm(booking)
+    } finally {
+      setIsConfirming(false)
+    }
+  }
 
   return (
     <Modal title="Booking details" description={booking.booking_no} onClose={onClose}>
@@ -1353,6 +1368,11 @@ function BookingDetailsModal({ booking, rooms, onClose }) {
               <Badge variant={bookingStatusVariant[booking.booking_status]}>{humanizeBookingStatus(booking.booking_status)}</Badge>
               <Badge variant={paymentStatusVariant[booking.payment_status]}>{humanizePaymentStatus(booking.payment_status)}</Badge>
             </div>
+            {canConfirm ? (
+              <Button type="button" className="mt-4 w-full" onClick={handleConfirm} disabled={isConfirming}>
+                {isConfirming ? 'Confirming...' : 'Confirm Booking'}
+              </Button>
+            ) : null}
           </section>
 
           <section className="rounded-2xl border border-border bg-white p-5">
@@ -1597,6 +1617,27 @@ export default function Bookings() {
 
   const handleStatusSave = async (bookingId, bookingStatus) => {
     return handleCombinedStatusSave(bookingId, { booking_status: bookingStatus, payment_status: statusBooking?.payment_status || 'pending', payment_method: statusBooking?.payment_method || 'Manual', send_email: true })
+  }
+
+  const handleQuickConfirmBooking = async (booking) => {
+    try {
+      const updatedBooking = await updateBookingStatus(booking.id, 'confirmed')
+      setBookings((current) => current.map((item) => {
+        const sameBooking = item.id === booking.id
+        const sameGroup = booking.booking_group_id && item.booking_group_id === booking.booking_group_id
+        return sameBooking || sameGroup
+          ? { ...item, booking_status: 'confirmed' }
+          : item
+      }))
+      setSelectedBooking((current) => current && current.id === booking.id
+        ? { ...current, booking_status: updatedBooking.booking_status || 'confirmed' }
+        : current)
+      showToast(updatedBooking.message || 'Booking confirmed. Confirmation email handled by the server.')
+      return true
+    } catch (error) {
+      showToast(error.message || 'Unable to confirm booking.', error.severity === 'warning' ? 'warning' : 'error')
+      return false
+    }
   }
 
   const handlePaymentSave = async (bookingId, paymentStatus, paymentMethod) => {
@@ -1866,7 +1907,7 @@ export default function Bookings() {
       </div>
 
       {isAddBookingOpen ? <AddBookingModal rooms={rooms} bookings={bookings} onClose={() => setIsAddBookingOpen(false)} onSave={handleAddBooking} /> : null}
-      {selectedBooking ? <BookingDetailsModal booking={selectedBooking} rooms={rooms} onClose={() => setSelectedBooking(null)} /> : null}
+      {selectedBooking ? <BookingDetailsModal booking={selectedBooking} rooms={rooms} onClose={() => setSelectedBooking(null)} onConfirm={handleQuickConfirmBooking} /> : null}
       {editBooking ? (
         editBooking.booking_group_id
           ? <EditGroupBookingModal booking={editBooking} rooms={rooms} onClose={() => setEditBooking(null)} onSave={handleEditBooking} />
