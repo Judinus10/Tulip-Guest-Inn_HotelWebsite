@@ -14,6 +14,7 @@ import {
   LogIn,
   LogOut,
   Download,
+  RotateCcw,
 } from 'lucide-react'
 import {
   Area,
@@ -35,6 +36,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown'
 import { fetchDashboardStats } from '@/services/dashboardApi'
+import { fetchBookings } from '@/services/bookingsApi'
+import { fetchPayments } from '@/services/paymentsApi'
 import { exportCsv, exportExcel, exportPdf } from '@/utils/exportData'
 
 const TABLE_LIMIT = 5
@@ -181,6 +184,57 @@ function getPercentage(value, total) {
   return Math.round((Number(value || 0) / Number(total || 0)) * 100)
 }
 
+function localDateString(date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function getDateFilterRange(preset, fromDate, toDate) {
+  const todayParts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Colombo', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date()).reduce((parts, item) => ({ ...parts, [item.type]: item.value }), {})
+  const todayString = `${todayParts.year}-${todayParts.month}-${todayParts.day}`
+  const today = new Date(`${todayString}T12:00:00`)
+  if (preset === 'today') return { from: todayString, to: todayString }
+  if (preset === 'week') {
+    const start = new Date(today)
+    const weekday = (start.getDay() + 6) % 7
+    start.setDate(start.getDate() - weekday)
+    const end = new Date(start)
+    end.setDate(end.getDate() + 6)
+    return { from: localDateString(start), to: localDateString(end) }
+  }
+  if (preset === 'month') return { from: `${todayParts.year}-${todayParts.month}-01`, to: todayString }
+  if (preset === 'year') return { from: `${todayParts.year}-01-01`, to: todayString }
+  if (preset === 'custom') return { from: fromDate, to: toDate }
+  return { from: '', to: '' }
+}
+
+function matchesDateRange(value, range) {
+  const date = String(value || '').slice(0, 10)
+  if (!date) return false
+  return (!range.from || date >= range.from) && (!range.to || date <= range.to)
+}
+
+function distributionFrom(items, getStatus, labels) {
+  const counts = new Map(labels.map((label) => [label, 0]))
+  items.forEach((item) => {
+    const status = getStatus(item)
+    if (counts.has(status)) counts.set(status, counts.get(status) + 1)
+  })
+  return labels.map((name) => ({ name, value: counts.get(name) || 0 }))
+}
+
+function sumPaidPayments(payments, within = null) {
+  return payments.reduce((sum, payment) => {
+    if (payment.payment_status !== 'paid') return sum
+    if (within && !matchesDateRange(payment.created_at, within)) return sum
+    return sum + Number(payment.amount || 0)
+  }, 0)
+}
+
 function normalizeDistribution(items = []) {
   const total = items.reduce((sum, item) => sum + Number(item.value || 0), 0)
 
@@ -200,6 +254,7 @@ function fillLastSixMonths(data = [], valueKey) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
 
     months.push({
+      monthKey: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
       month: d.toLocaleString('en-US', { month: 'short' }),
       [valueKey]: 0,
       websiteBookings: 0,
@@ -208,7 +263,7 @@ function fillLastSixMonths(data = [], valueKey) {
   }
 
   data.forEach((item) => {
-    const existing = months.find((m) => m.month === item.month)
+    const existing = months.find((m) => item.monthKey ? m.monthKey === item.monthKey : m.month === item.month)
 
     if (existing) {
       existing[valueKey] = Number(item[valueKey] || 0)
@@ -434,6 +489,12 @@ function PaymentListRow({ payment }) {
 
 export default function Dashboard() {
   const [dashboardData, setDashboardData] = useState(defaultDashboardData)
+  const [bookingRecords, setBookingRecords] = useState([])
+  const [paymentRecords, setPaymentRecords] = useState([])
+  const [detailedRecordsLoaded, setDetailedRecordsLoaded] = useState(false)
+  const [datePreset, setDatePreset] = useState('all')
+  const [customFromDate, setCustomFromDate] = useState('')
+  const [customToDate, setCustomToDate] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -444,9 +505,15 @@ export default function Dashboard() {
       try {
         setIsLoading(true)
         setError('')
-        const data = await fetchDashboardStats()
+        const [statsResult, bookingsResult, paymentsResult] = await Promise.allSettled([
+          fetchDashboardStats(),
+          fetchBookings(),
+          fetchPayments(),
+        ])
 
         if (isMounted) {
+          if (statsResult.status === 'rejected') throw statsResult.reason
+          const data = statsResult.value
           setDashboardData({
             ...defaultDashboardData,
             ...data,
@@ -458,6 +525,12 @@ export default function Dashboard() {
             payments: { ...defaultDashboardData.payments, ...(data?.payments || {}) },
             lists: { ...defaultDashboardData.lists, ...(data?.lists || {}) },
           })
+          if (bookingsResult.status === 'fulfilled') setBookingRecords(bookingsResult.value)
+          if (paymentsResult.status === 'fulfilled') setPaymentRecords(paymentsResult.value)
+          setDetailedRecordsLoaded(bookingsResult.status === 'fulfilled' && paymentsResult.status === 'fulfilled')
+          if (bookingsResult.status === 'rejected' || paymentsResult.status === 'rejected') {
+            setError('Some dashboard filters may be unavailable because booking or payment records could not be loaded.')
+          }
         }
       } catch (loadError) {
         if (isMounted) {
@@ -478,43 +551,192 @@ export default function Dashboard() {
     }
   }, [])
 
+  const dateRange = useMemo(
+    () => getDateFilterRange(datePreset, customFromDate, customToDate),
+    [datePreset, customFromDate, customToDate]
+  )
+
+  const filteredBookings = useMemo(() => bookingRecords.filter((booking) => {
+    if (!matchesDateRange(booking.check_in, dateRange)) return false
+    return true
+  }), [bookingRecords, dateRange])
+
+  const filteredBookingIds = useMemo(() => new Set(filteredBookings.filter((booking) => !booking.is_external).map((booking) => booking.id)), [filteredBookings])
+  const filteredGroupIds = useMemo(() => new Set(filteredBookings.filter((booking) => !booking.is_external && booking.booking_group_id).map((booking) => booking.booking_group_id)), [filteredBookings])
+  const filteredPayments = useMemo(() => paymentRecords.filter((payment) => {
+    const belongsToFilteredBooking = filteredBookingIds.has(payment.booking_id)
+      || (payment.booking_group_id && filteredGroupIds.has(payment.booking_group_id))
+    return Boolean(belongsToFilteredBooking)
+  }), [paymentRecords, filteredBookingIds, filteredGroupIds])
+
+  const filteredDashboardData = useMemo(() => {
+    if (!detailedRecordsLoaded) return dashboardData
+
+    const bookingStatusNames = {
+      pending: 'Pending', confirmed: 'Confirmed', checked_in: 'Checked In', checked_out: 'Checked Out',
+      cancelled: 'Cancelled', no_show: 'No Show', external: 'Booking.com',
+    }
+    const paymentStatusNames = {
+      paid: 'Paid', pending: 'Payment Pending', failed: 'Failed', cancelled: 'Cancelled',
+      refunded: 'Refunded', no_pay: 'No Pay', external: 'No Pay',
+    }
+    const statusLabel = (booking) => booking.is_external
+      ? (booking.booking_status === 'cancelled' ? 'Cancelled' : 'Booking.com')
+      : (bookingStatusNames[booking.booking_status] || 'Pending')
+    const paymentLabel = (booking) => booking.is_external
+      ? 'No Pay'
+      : (paymentStatusNames[booking.payment_status] || 'Payment Pending')
+    const bookingStatuses = ['Pending', 'Confirmed', 'Checked In', 'Checked Out', 'Cancelled', 'No Show', 'Booking.com']
+    const paymentStatuses = ['Paid', 'Payment Pending', 'No Pay', 'Failed', 'Cancelled', 'Refunded']
+    const bookingCounts = filteredBookings.reduce((counts, booking) => {
+      const status = booking.booking_status
+      counts.total += 1
+      if (booking.is_external) counts.bookingCom += 1
+      else counts.website += 1
+      if (status === 'pending') counts.pending += 1
+      if (status === 'confirmed') counts.confirmed += 1
+      if (status === 'cancelled') counts.cancelled += 1
+      if (booking.payment_status === 'paid') counts.paid += 1
+      if (booking.payment_status === 'pending') counts.paymentPending += 1
+      return counts
+    }, { total: 0, website: 0, bookingCom: 0, pending: 0, confirmed: 0, cancelled: 0, paid: 0, paymentPending: 0 })
+
+    const monthlyBookings = new Map()
+    filteredBookings.forEach((booking) => {
+      const monthKey = String(booking.check_in || '').slice(0, 7)
+      if (!monthKey) return
+      const current = monthlyBookings.get(monthKey) || { bookings: 0, websiteBookings: 0, bookingComBookings: 0 }
+      current.bookings += 1
+      if (booking.is_external) current.bookingComBookings += 1
+      else current.websiteBookings += 1
+      monthlyBookings.set(monthKey, current)
+    })
+    const monthlyBookingTrend = Array.from(monthlyBookings, ([monthKey, values]) => ({ monthKey, ...values }))
+      .sort((left, right) => left.monthKey.localeCompare(right.monthKey))
+      .map(({ monthKey, ...values }) => ({
+        monthKey,
+        month: new Date(`${monthKey}-01T12:00:00`).toLocaleString('en-US', { month: 'short', year: '2-digit' }),
+        ...values,
+      }))
+
+    const revenueByMonth = new Map()
+    filteredPayments.forEach((payment) => {
+      if (payment.payment_status !== 'paid') return
+      const monthKey = String(payment.created_at || '').slice(0, 7)
+      if (!monthKey) return
+      revenueByMonth.set(monthKey, (revenueByMonth.get(monthKey) || 0) + Number(payment.amount || 0))
+    })
+    const revenueTrend = Array.from(revenueByMonth, ([monthKey, revenue]) => ({ monthKey, revenue }))
+      .sort((left, right) => left.monthKey.localeCompare(right.monthKey))
+      .map(({ monthKey, revenue }) => ({
+        monthKey,
+        month: new Date(`${monthKey}-01T12:00:00`).toLocaleString('en-US', { month: 'short', year: '2-digit' }),
+        revenue,
+      }))
+
+    const recentBookings = [...filteredBookings]
+      .sort((left, right) => String(right.created_at || '').localeCompare(String(left.created_at || '')))
+      .slice(0, 5)
+      .map((booking) => ({
+        bookingNo: booking.booking_no,
+        guest: booking.guest_name,
+        room: booking.room_name,
+        checkIn: booking.check_in,
+        nights: booking.total_nights,
+        amount: booking.total_amount,
+        status: statusLabel(booking),
+        createdAt: booking.created_at,
+      }))
+    const recentPayments = [...filteredPayments]
+      .sort((left, right) => String(right.created_at || '').localeCompare(String(left.created_at || '')))
+      .slice(0, 5)
+      .map((payment) => ({
+        transaction: payment.transaction_id,
+        guest: payment.guest_name,
+        amount: payment.amount,
+        status: paymentStatusNames[payment.payment_status] || 'Payment Pending',
+        createdAt: payment.created_at,
+      }))
+
+    const todayRange = getDateFilterRange('today', '', '')
+    const monthRange = getDateFilterRange('month', '', '')
+    const yearRange = getDateFilterRange('year', '', '')
+    const revenueForRange = (range) => sumPaidPayments(filteredPayments, range)
+
+    return {
+      ...dashboardData,
+      cards: {
+        ...dashboardData.cards,
+        totalBookings: bookingCounts.total,
+        websiteBookings: bookingCounts.website,
+        bookingComBookings: bookingCounts.bookingCom,
+        pendingBookings: bookingCounts.pending,
+        confirmedBookings: bookingCounts.confirmed,
+        cancelledBookings: bookingCounts.cancelled,
+        paidBookings: bookingCounts.paid,
+        paymentPendingBookings: bookingCounts.paymentPending,
+        totalRevenue: sumPaidPayments(filteredPayments),
+      },
+      revenue: {
+        ...dashboardData.revenue,
+        today: revenueForRange(todayRange),
+        currentMonth: revenueForRange(monthRange),
+        currentYear: revenueForRange(yearRange),
+      },
+      charts: {
+        ...dashboardData.charts,
+        monthlyBookingTrend,
+        revenueTrend,
+        bookingStatusDistribution: distributionFrom(filteredBookings, statusLabel, bookingStatuses),
+        paymentStatusDistribution: distributionFrom(filteredBookings, paymentLabel, paymentStatuses),
+      },
+      lists: {
+        ...dashboardData.lists,
+        recentBookings,
+        recentPayments,
+      },
+    }
+  }, [dashboardData, detailedRecordsLoaded, filteredBookings, filteredPayments])
+
   const bookingStatusData = useMemo(
-    () => normalizeDistribution(dashboardData.charts.bookingStatusDistribution),
-    [dashboardData.charts.bookingStatusDistribution]
+    () => normalizeDistribution(filteredDashboardData.charts.bookingStatusDistribution),
+    [filteredDashboardData.charts.bookingStatusDistribution]
   )
 
   const paymentStatusData = useMemo(
-    () => normalizeDistribution(dashboardData.charts.paymentStatusDistribution),
-    [dashboardData.charts.paymentStatusDistribution]
+    () => normalizeDistribution(filteredDashboardData.charts.paymentStatusDistribution),
+    [filteredDashboardData.charts.paymentStatusDistribution]
   )
 
   const monthlyBookingTrend = useMemo(
-    () =>
-      fillLastSixMonths(
-        dashboardData.charts.monthlyBookingTrend,
+    () => datePreset === 'all'
+      ? fillLastSixMonths(
+        filteredDashboardData.charts.monthlyBookingTrend,
         'bookings'
-      ),
-    [dashboardData.charts.monthlyBookingTrend]
+      )
+      : filteredDashboardData.charts.monthlyBookingTrend,
+    [datePreset, filteredDashboardData.charts.monthlyBookingTrend]
   )
 
   const revenueTrend = useMemo(
-    () =>
-      fillLastSixMonths(
-        dashboardData.charts.revenueTrend,
+    () => datePreset === 'all'
+      ? fillLastSixMonths(
+        filteredDashboardData.charts.revenueTrend,
         'revenue'
-      ),
-    [dashboardData.charts.revenueTrend]
+      )
+      : filteredDashboardData.charts.revenueTrend,
+    [datePreset, filteredDashboardData.charts.revenueTrend]
   )
 
   const kpis = [
-    { title: 'Total Bookings', value: dashboardData.cards.totalBookings, helper: 'All booking requests', icon: CalendarCheck, to: '/bookings' },
-    { title: 'Booking.com Bookings', value: dashboardData.cards.bookingComBookings, helper: 'Includes pending imports', icon: TrendingUp, to: '/bookings' },
-    { title: 'Website Bookings', value: dashboardData.cards.websiteBookings, helper: 'Direct website bookings', icon: CalendarCheck, to: '/bookings' },
-    { title: 'Cancelled Bookings', value: dashboardData.cards.cancelledBookings, helper: 'Cancelled requests', icon: BedDouble, to: '/bookings' },
-    { title: 'Total Enquiries', value: dashboardData.cards.totalEnquiries, helper: 'Guest messages', icon: Mail, to: '/messages' },
-    { title: 'Total Revenue', value: currencyFormatter.format(dashboardData.cards.totalRevenue), helper: 'Paid bookings only', icon: DollarSign, to: '/payments' },
-    { title: 'Paid Bookings', value: dashboardData.cards.paidBookings, helper: 'Payment completed', icon: CreditCard, to: '/payments' },
-    { title: 'Payment Pending', value: dashboardData.cards.paymentPendingBookings, helper: 'Awaiting payment', icon: CreditCard, to: '/payments' },
+    { title: 'Total Bookings', value: filteredDashboardData.cards.totalBookings, helper: 'Matching bookings', icon: CalendarCheck, to: '/bookings' },
+    { title: 'Booking.com Bookings', value: filteredDashboardData.cards.bookingComBookings, helper: 'Matching imports', icon: TrendingUp, to: '/bookings' },
+    { title: 'Website Bookings', value: filteredDashboardData.cards.websiteBookings, helper: 'Direct website bookings', icon: CalendarCheck, to: '/bookings' },
+    { title: 'Cancelled Bookings', value: filteredDashboardData.cards.cancelledBookings, helper: 'Matching cancelled requests', icon: BedDouble, to: '/bookings' },
+    { title: 'Total Enquiries', value: filteredDashboardData.cards.totalEnquiries, helper: 'Guest messages · not filtered', icon: Mail, to: '/messages' },
+    { title: 'Total Revenue', value: currencyFormatter.format(filteredDashboardData.cards.totalRevenue), helper: 'Paid matching bookings', icon: DollarSign, to: '/payments' },
+    { title: 'Paid Bookings', value: filteredDashboardData.cards.paidBookings, helper: 'Matching paid bookings', icon: CreditCard, to: '/payments' },
+    { title: 'Payment Pending', value: filteredDashboardData.cards.paymentPendingBookings, helper: 'Matching unpaid bookings', icon: CreditCard, to: '/payments' },
   ]
 
   const dailyBookingsLink = (kind, references) => `/bookings?${new URLSearchParams({
@@ -534,7 +756,7 @@ export default function Dashboard() {
     const payload = {
       fileName: 'tulip-guest-inn-dashboard-report',
       title: 'Tulip Guest Inn Dashboard Report',
-      rows: buildDashboardReportRows(dashboardData, monthlyBookingTrend, revenueTrend),
+      rows: buildDashboardReportRows(filteredDashboardData, monthlyBookingTrend, revenueTrend),
     }
 
     if (format === 'csv') exportCsv(payload)
@@ -548,22 +770,64 @@ export default function Dashboard() {
         title="Dashboard"
         description="Tulip Guest Inn overview for rooms, reservations, payments, messages, packages, and website content."
       >
-        <Dropdown
-          trigger={
-            <Button type="button" variant="outline">
-              <Download className="h-4 w-4" />
-              Download
-            </Button>
-          }
-        >
-          {(close) => (
-            <>
-              <DropdownItem onClick={() => { close(); handleDownloadReport('excel') }}>Excel</DropdownItem>
-              <DropdownItem onClick={() => { close(); handleDownloadReport('csv') }}>CSV</DropdownItem>
-              <DropdownItem onClick={() => { close(); handleDownloadReport('pdf') }}>PDF</DropdownItem>
-            </>
-          )}
-        </Dropdown>
+        <div className="flex flex-wrap items-center justify-end gap-1.5 lg:flex-nowrap">
+          <select
+            aria-label="Dashboard date range"
+            value={datePreset}
+            onChange={(event) => setDatePreset(event.target.value)}
+            className="h-10 w-[130px] shrink-0 rounded-lg border border-border bg-white px-2 text-sm text-text-primary shadow-sm"
+          >
+            <option value="all">All Dates</option>
+            <option value="today">Today</option>
+            <option value="week">This Week</option>
+            <option value="month">This Month</option>
+            <option value="year">This Year</option>
+            <option value="custom">Custom Range</option>
+          </select>
+          {datePreset === 'custom' ? (
+            <div className="flex shrink-0 items-center gap-1.5">
+              <input
+                aria-label="Start date"
+                type="date"
+                value={customFromDate}
+                onChange={(event) => setCustomFromDate(event.target.value)}
+                className="h-10 w-[108px] rounded-lg border border-border bg-white px-1 text-sm text-text-primary shadow-sm"
+              />
+              <span className="text-sm text-muted">to</span>
+              <input
+                aria-label="End date"
+                type="date"
+                value={customToDate}
+                min={customFromDate || undefined}
+                onChange={(event) => setCustomToDate(event.target.value)}
+                className="h-10 w-[108px] rounded-lg border border-border bg-white px-1 text-sm text-text-primary shadow-sm"
+              />
+            </div>
+          ) : null}
+          <Button type="button" variant="outline" size="sm" className="shrink-0 px-2.5" onClick={() => {
+            setDatePreset('all')
+            setCustomFromDate('')
+            setCustomToDate('')
+          }}>
+            <RotateCcw className="h-4 w-4" /> Clear Filter
+          </Button>
+          <Dropdown
+            trigger={
+              <Button type="button" variant="outline" size="sm" className="shrink-0 px-2.5">
+                <Download className="h-4 w-4" />
+                Download
+              </Button>
+            }
+          >
+            {(close) => (
+              <>
+                <DropdownItem onClick={() => { close(); handleDownloadReport('excel') }}>Excel</DropdownItem>
+                <DropdownItem onClick={() => { close(); handleDownloadReport('csv') }}>CSV</DropdownItem>
+                <DropdownItem onClick={() => { close(); handleDownloadReport('pdf') }}>PDF</DropdownItem>
+              </>
+            )}
+          </Dropdown>
+        </div>
       </PageHeader>
 
       {error ? (
@@ -585,9 +849,9 @@ export default function Dashboard() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-3">
-        <MiniSummaryCard title="Today Revenue" value={currencyFormatter.format(dashboardData.revenue.today)} helper="Paid today" icon={DollarSign} to="/payments" />
-        <MiniSummaryCard title="Month Revenue" value={currencyFormatter.format(dashboardData.revenue.currentMonth)} helper="Paid this month" icon={TrendingUp} to="/payments" />
-        <MiniSummaryCard title="Year Revenue" value={currencyFormatter.format(dashboardData.revenue.currentYear)} helper="Paid this year" icon={CreditCard} to="/payments" />
+        <MiniSummaryCard title="Today Revenue" value={currencyFormatter.format(filteredDashboardData.revenue.today)} helper="Paid today · matching bookings" icon={DollarSign} to="/payments" />
+        <MiniSummaryCard title="Month Revenue" value={currencyFormatter.format(filteredDashboardData.revenue.currentMonth)} helper="Paid this month · matching bookings" icon={TrendingUp} to="/payments" />
+        <MiniSummaryCard title="Year Revenue" value={currencyFormatter.format(filteredDashboardData.revenue.currentYear)} helper="Paid this year · matching bookings" icon={CreditCard} to="/payments" />
 
         <MiniSummaryCard title="Today’s Check-ins" value={dashboardData.rooms.todayCheckIns} helper="Scheduled arrivals · includes Booking.com" icon={LogIn} to={dailyBookingsLink('checkins', dashboardData.rooms.checkInReferences)} />
         <MiniSummaryCard title="Today’s Check-outs" value={dashboardData.rooms.todayCheckOuts} helper="Scheduled departures · includes Booking.com" icon={LogOut} tone="amber" to={dailyBookingsLink('checkouts', dashboardData.rooms.checkOutReferences)} />
@@ -683,7 +947,7 @@ export default function Dashboard() {
           title="Recent Bookings"
           description="Latest 5 reservations only. Click to view all bookings."
           emptyText="No recent bookings found."
-          items={dashboardData.lists.recentBookings}
+          items={filteredDashboardData.lists.recentBookings}
           to="/bookings"
           renderItem={(booking) => (
             <ListRow
@@ -720,7 +984,7 @@ export default function Dashboard() {
           title="Recent Payments"
           description="Latest 5 payment records only. Click to view payments."
           emptyText="No payment records found."
-          items={dashboardData.lists.recentPayments}
+          items={filteredDashboardData.lists.recentPayments}
           to="/payments"
           renderItem={(payment) => <PaymentListRow key={payment.transaction} payment={payment} />}
         />
