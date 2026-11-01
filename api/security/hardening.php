@@ -64,18 +64,75 @@ function protect_public_booking(array $data, string $email, string $phone, strin
     rate_limit_subject('booking_phone', preg_replace('/\D/', '', $phone), 4, 60);
     rate_limit_subject('booking_global', 'all', max(10, (int) security_env('MAX_PUBLIC_BOOKINGS_PER_HOUR', '40')), 60);
 }
+/** Server error-log diagnostics only. Never log tokens, secrets, request bodies or IPs. */
+function turnstile_diagnostic_log(string $reason, array $details = []): void {
+    $allowed = ['expected_action', 'actual_action', 'expected_hostname', 'actual_hostname',
+        'http_status', 'curl_errno', 'curl_error', 'error_codes', 'response_is_json'];
+    $safe = array_intersect_key($details, array_flip($allowed));
+    foreach (['expected_action', 'actual_action', 'expected_hostname', 'actual_hostname'] as $field) {
+        if (array_key_exists($field, $safe)) {
+            $value = is_string($safe[$field]) ? $safe[$field] : '';
+            $safe[$field] = substr(preg_replace('/[^a-zA-Z0-9._:-]/', '', $value) ?? '', 0, 253);
+        }
+    }
+    $entry = ['request_id' => security_request_id(), 'reason' => $reason] + $safe;
+    error_log('[Tulip Turnstile] ' . json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE));
+}
+
 function verify_bot_challenge(array $data, string $action): void {
     $secret = security_env('TURNSTILE_SECRET_KEY');
     if (APP_ENV === 'local' && $secret === '') return;
     $token = $data['bot_token'] ?? '';
-    if ($secret === '' || !function_exists('curl_init')) json_response(false, 'Form verification is unavailable. Please contact the property.', 503);
-    if (!is_string($token) || $token === '' || strlen($token) > 2048) json_response(false, 'Complete the security check and try again.', 422);
-    $curl = curl_init('https://challenges.cloudflare.com/turnstile/v0/siteverify');
-    curl_setopt_array($curl, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => http_build_query(['secret' => $secret, 'response' => $token, 'remoteip' => get_client_ip()]), CURLOPT_RETURNTRANSFER => true, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 12, CURLOPT_FOLLOWLOCATION => false, CURLOPT_PROTOCOLS => CURLPROTO_HTTPS]);
-    $raw = curl_exec($curl); $status = curl_getinfo($curl, CURLINFO_HTTP_CODE); curl_close($curl);
-    $result = is_string($raw) ? json_decode($raw, true) : null;
     $host = strtolower((string) parse_url(FRONTEND_URL, PHP_URL_HOST));
+    $context = ['expected_action' => $action, 'expected_hostname' => $host];
+    if ($secret === '' || !function_exists('curl_init')) {
+        turnstile_diagnostic_log($secret === '' ? 'missing_secret' : 'curl_unavailable', $context);
+        json_response(false, 'Form verification is unavailable. Please contact the property.', 503);
+    }
+    if (!is_string($token) || $token === '' || strlen($token) > 2048) {
+        turnstile_diagnostic_log('missing_or_invalid_token', $context);
+        json_response(false, 'Complete the security check and try again.', 422);
+    }
+    $curl = curl_init('https://challenges.cloudflare.com/turnstile/v0/siteverify');
+    if ($curl === false) {
+        turnstile_diagnostic_log('curl_initialization_failed', $context);
+        json_response(false, 'Form verification is unavailable. Please contact the property.', 503);
+    }
+    try {
+        curl_setopt_array($curl, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => http_build_query([
+            'secret' => $secret, 'response' => $token, 'remoteip' => get_client_ip()
+        ]), CURLOPT_RETURNTRANSFER => true, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 12,
+            CURLOPT_FOLLOWLOCATION => false, CURLOPT_PROTOCOLS => CURLPROTO_HTTPS]);
+        $raw = curl_exec($curl);
+        $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $curlErrno = curl_errno($curl);
+    } catch (Throwable $e) {
+        curl_close($curl);
+        // Do not log exception messages; third-party messages can contain request data.
+        turnstile_diagnostic_log('verification_transport_exception', $context);
+        json_response(false, 'Security check failed or expired. Please try again.', 422);
+        return;
+    }
+    curl_close($curl);
+    $result = is_string($raw) ? json_decode($raw, true) : null;
+    $errorCodes = [];
+    if (is_array($result) && is_array($result['error-codes'] ?? null)) {
+        foreach ($result['error-codes'] as $code) {
+            if (is_string($code) && preg_match('/^[a-z0-9-]{1,64}$/D', $code)) $errorCodes[] = $code;
+            if (count($errorCodes) >= 10) break;
+        }
+    }
+    $actualHost = is_array($result) && is_string($result['hostname'] ?? null) ? strtolower($result['hostname']) : '';
+    $actualAction = is_array($result) && is_string($result['action'] ?? null) ? $result['action'] : '';
+    $context += ['http_status' => $status, 'curl_errno' => $curlErrno,
+        // Generic cURL description avoids exposing raw connection/proxy details.
+        'curl_error' => $curlErrno !== 0 ? curl_strerror($curlErrno) : '',
+        'error_codes' => $errorCodes, 'response_is_json' => is_array($result),
+        'actual_hostname' => $actualHost, 'actual_action' => $actualAction];
     if ($status !== 200 || !is_array($result) || ($result['success'] ?? false) !== true) {
+        $reason = $raw === false || $curlErrno !== 0 ? 'verification_connection_failed'
+            : ($status !== 200 ? 'verification_http_error' : (!is_array($result) ? 'verification_invalid_response' : 'cloudflare_rejected'));
+        turnstile_diagnostic_log($reason, $context);
         json_response(false, 'Security check failed or expired. Please try again.', 422);
     }
     // Cloudflare test tokens return synthetic action/hostname metadata. Accept
@@ -84,7 +141,8 @@ function verify_bot_challenge(array $data, string $action): void {
     $localTestToken = APP_ENV === 'local'
         && hash_equals('1x0000000000000000000000000000000AA', $secret)
         && hash_equals('XXXX.DUMMY.TOKEN.XXXX', $token);
-    if (!$localTestToken && (($result['action'] ?? '') !== $action || strtolower((string) ($result['hostname'] ?? '')) !== $host)) {
+    if (!$localTestToken && ($actualAction !== $action || $actualHost !== $host)) {
+        turnstile_diagnostic_log($actualAction !== $action ? 'action_mismatch' : 'hostname_mismatch', $context);
         json_response(false, 'Security check failed or expired. Please try again.', 422);
     }
 }
