@@ -49,9 +49,12 @@ $statusMap = [
     'nopay' => 'No Pay',
     'no_payment' => 'No Pay',
 ];
+$isAdvance = $statusKey === 'advance';
+$advanceAmount = $isAdvance ? (float) ($data['advance_payment'] ?? 0) : 0.0;
 $paymentStatus = $statusMap[$statusKey] ?? 'Payment Pending';
-if (!isset($statusMap[$statusKey]) || !in_array($paymentMethod, ['Cash','Manual','Bank Transfer','Card','No Pay','Other'], true)) json_response(false, 'Invalid manual payment status or method.', 422);
-if (!isset($statusMap[$statusKey])) json_response(false, 'Invalid payment status.', 422);
+if ($isAdvance) $paymentStatus = 'Payment Pending';
+if ((!isset($statusMap[$statusKey]) && !$isAdvance) || !in_array($paymentMethod, ['Cash','Manual','Bank Transfer','Card','No Pay','Other'], true)) json_response(false, 'Invalid manual payment status or method.', 422);
+if (!isset($statusMap[$statusKey]) && !$isAdvance) json_response(false, 'Invalid payment status.', 422);
 if (!in_array($paymentMethod, ['Cash', 'Manual', 'Bank Transfer', 'Card', 'No Pay', 'Other'], true)) json_response(false, 'Manual bookings require an offline payment method. PayHere results must come from verified checkout notifications.', 422);
 
 if ($fullName === '' || $email === '' || $phone === '' || $roomId < 1 || $checkInDate === '' || $checkOutDate === '' || $guests < 1) {
@@ -148,6 +151,11 @@ try {
         json_response(false, 'Unable to calculate booking amount for the selected room.', 422);
     }
 
+    if ($isAdvance && (!is_finite($advanceAmount) || $advanceAmount <= 0 || $advanceAmount >= $amount)) {
+        $pdo->rollBack();
+        json_response(false, 'Advance amount must be greater than zero and less than booking total.', 422);
+    }
+
     // An admin-created reservation is confirmed even when payment is still due.
     $bookingStatus = 'Confirmed';
 
@@ -196,6 +204,8 @@ try {
         ':method' => $paymentMethod === '' ? 'Cash' : $paymentMethod,
         ':gateway_response' => json_encode([
             'source' => 'admin_manual_booking',
+            'advance_payment' => $isAdvance ? round($advanceAmount, 2) : 0,
+            'balance_due' => $isAdvance ? round($amount - $advanceAmount, 2) : ($paymentStatus === 'Paid' ? 0 : $amount),
             'created_at' => date('Y-m-d H:i:s'),
         ], JSON_UNESCAPED_SLASHES),
     ]);

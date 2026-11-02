@@ -97,6 +97,7 @@ const emptyManualBooking = {
   guests: 1,
   payment_status: 'pending',
   payment_method: 'Cash',
+  advance_payment: '',
   message: '',
 }
 
@@ -653,6 +654,8 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
   const selectedRoom = rooms.find((room) => Number(room.id) === Number(form.room_id))
   const nights = getNights(form.check_in_date, form.check_out_date)
   const estimatedAmount = nights * Number(selectedRoom?.price_per_night || 0)
+  const advanceAmount = Number(form.advance_payment || 0)
+  const remainingBalance = Math.max(0, estimatedAmount - (Number.isFinite(advanceAmount) ? advanceAmount : 0))
   const selectedRoomAvailable = availableRooms.some((room) => Number(room.id) === Number(form.room_id))
   const canCheckAvailability = form.check_in_date && form.check_out_date && form.check_out_date > form.check_in_date
 
@@ -728,6 +731,11 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
 
     if (canCheckAvailability && availableRooms.length === 0) {
       nextErrors.room_name = 'No rooms are available for the selected dates.'
+    }
+
+    if (form.payment_status === 'advance') {
+      if (!Number.isFinite(advanceAmount) || advanceAmount <= 0) nextErrors.advance_payment = 'Enter an advance payment greater than zero.'
+      else if (advanceAmount >= estimatedAmount) nextErrors.advance_payment = 'Advance must be less than the total; select Paid for full payment.'
     }
 
     setErrors(nextErrors)
@@ -882,6 +890,7 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
               {paymentStatuses.map((status) => (
                 <option key={status} value={status}>{humanizePaymentStatus(status)}</option>
               ))}
+              <option value="advance">Advance Paid</option>
             </select>
           </div>
           <div className="space-y-2">
@@ -893,6 +902,14 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
             </select>
           </div>
         </div>
+
+        {form.payment_status === 'advance' ? (
+          <div className="space-y-2">
+            <Label>Advance paid amount (LKR)</Label>
+            <input type="number" min="0.01" step="0.01" max={estimatedAmount} value={form.advance_payment} onChange={(event) => updateField('advance_payment', event.target.value)} className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm text-text-primary" placeholder="Enter advance amount" />
+            {errors.advance_payment ? <p className="text-sm text-red-600">{errors.advance_payment}</p> : null}
+          </div>
+        ) : null}
 
         <div className="rounded-xl border border-border bg-slate-50 p-4">
           <div className="grid gap-3 text-sm sm:grid-cols-3">
@@ -908,6 +925,12 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
               <p className="font-semibold text-text-secondary">Estimated total</p>
               <p className="mt-1 font-bold text-text-primary">{formatMoney(estimatedAmount)}</p>
             </div>
+            {form.payment_status === 'advance' ? (
+              <>
+                <div><p className="font-semibold text-text-secondary">Advance paid</p><p className="mt-1 font-bold text-text-primary">{formatMoney(advanceAmount)}</p></div>
+                <div><p className="font-semibold text-text-secondary">Balance due</p><p className="mt-1 font-bold text-text-primary">{formatMoney(remainingBalance)}</p></div>
+              </>
+            ) : null}
           </div>
         </div>
 
@@ -1317,7 +1340,7 @@ function BookingDetailsModal({ booking, rooms, onClose, onConfirm }) {
 
           <section className="rounded-2xl border border-border bg-white p-5">
             <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-text-secondary">Special request</h3>
-            <p className="text-sm leading-6 text-text-secondary">{String(booking.special_request || '').replace(/\s*Rooms requested:\s*\d+\s*$/i, '').trim() || 'No special request added.'}</p>
+            <p className="text-sm leading-6 text-text-secondary">{booking.special_request || 'No special request added.'}</p>
           </section>
         </div>
 
@@ -1357,6 +1380,12 @@ function BookingDetailsModal({ booking, rooms, onClose, onConfirm }) {
                   <div className="flex justify-between gap-3 rounded-lg bg-blue-50 p-3"><span className="font-semibold text-text-secondary">Assigned room number</span><span className="font-bold text-blue-700">{booking.room_number || 'Not available'}</span></div>
                   <div className="flex justify-between border-t border-border pt-4"><span className="text-text-secondary">Price per night</span><span className="font-semibold text-text-primary">{formatMoney(room?.price_per_night)}</span></div>
                   <div className="flex justify-between"><span className="text-text-secondary">Total amount</span><span className="text-lg font-bold text-text-primary">{formatMoney(booking.total_amount)}</span></div>
+              {booking.advance_payment != null && Number(booking.advance_payment) > 0 ? (
+                <>
+                  <div className="flex justify-between"><span className="text-text-secondary">Advance paid</span><span className="font-semibold">{formatMoney(booking.advance_payment)}</span></div>
+                  <div className="flex justify-between"><span className="text-text-secondary">Balance due</span><span className="font-bold">{formatMoney(Math.max(0, Number(booking.total_amount || 0) - Number(booking.advance_payment)))}</span></div>
+                </>
+              ) : null}
                 </div>
               </>
             )}

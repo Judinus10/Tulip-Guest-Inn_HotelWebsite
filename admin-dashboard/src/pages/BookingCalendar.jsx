@@ -344,6 +344,12 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, onMarkPaid, upd
               <p><span className="font-semibold text-slate-500">Amount:</span> {isBookingCom ? 'Managed in Booking.com' : currencyFormatter.format(booking.total_amount)}</p>
               <div className="flex items-center gap-2"><span className="font-semibold text-slate-500">Booking status:</span> <Badge variant={statusVariant[getBookingStatusKey(booking.booking_status)] || 'secondary'}>{normalizeStatus(booking.booking_status)}</Badge></div>
               <div className="flex items-center gap-2"><span className="font-semibold text-slate-500">Payment status:</span> <Badge variant={statusVariant[getBookingStatusKey(booking.payment_status)] || 'secondary'}>{normalizeStatus(booking.payment_status)}</Badge></div>
+              {Number(booking.advance_payment) > 0 && !isBookingCom && (
+                <>
+                  <p><span className="font-semibold text-slate-500">Advance paid:</span> {currencyFormatter.format(Number(booking.advance_payment))}</p>
+                  <p><span className="font-semibold text-slate-500">Remaining balance:</span> {currencyFormatter.format(Math.max(0, Number(booking.total_amount || 0) - Number(booking.advance_payment)))}</p>
+                </>
+              )}
             </div>
           </div>
 

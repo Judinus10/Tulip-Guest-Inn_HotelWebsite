@@ -75,6 +75,11 @@ try {
                 ORDER BY p.id DESC
                 LIMIT 1
             ), '') AS payment_method,
+            (SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(p.gateway_response, '$.advance_payment')) AS DECIMAL(10,2))
+             FROM payments p WHERE p.booking_id = b.id
+               AND JSON_VALID(p.gateway_response)
+               AND JSON_EXTRACT(p.gateway_response, '$.advance_payment') IS NOT NULL
+             ORDER BY p.id DESC LIMIT 1) AS advance_payment,
             b.amount AS total_amount,
             b.currency AS payment_currency,
             b.invoice_number,
