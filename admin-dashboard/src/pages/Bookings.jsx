@@ -150,6 +150,7 @@ function humanizePaymentStatus(value) {
   const normalized = String(value || 'pending').trim().toLowerCase().replace(/^payment\s+/, '').replace(/\s+/g, '_')
 
   if (normalized === 'paid') return 'Paid'
+  if (normalized === 'partially_paid' || normalized === 'partial') return 'Partially Paid'
   if (normalized === 'failed') return 'Failed'
   if (normalized === 'cancelled' || normalized === 'canceled') return 'Cancelled'
   if (normalized === 'refunded') return 'Refunded'
@@ -516,7 +517,6 @@ function RecordPaymentModal({ booking, onClose, onSaved }) {
         <div className="space-y-2"><Label>Reference / note (optional)</Label><textarea value={note} onChange={e=>setNote(e.target.value)} rows={2} className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm" /></div>
         <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={onClose}>Close</Button><Button type="submit" disabled={saving}>{saving?'Saving…':'Save Payment'}</Button></div>
       </form> : null}
-      {details?.payment_history?.length ? <div><p className="mb-2 text-sm font-bold">Payment history</p><div className="space-y-2">{details.payment_history.map(item=><div key={item.id} className="flex justify-between rounded-lg border border-border p-3 text-sm"><div><p className="font-semibold">{item.method}</p><p className="text-xs text-text-secondary">{item.created_at}{item.note?` · ${item.note}`:''}</p></div><p className="font-bold">{formatMoney(item.amount)}</p></div>)}</div></div> : null}
     </div>
   </Modal>
 }
@@ -1332,36 +1332,12 @@ function EditBookingModal({ booking, rooms, bookings, onClose, onSave }) {
 
 function BookingDetailsModal({ booking, rooms, onClose, onConfirm, onRecordPayment }) {
   const [isConfirming, setIsConfirming] = useState(false)
-  const [paymentDetails, setPaymentDetails] = useState(null)
-  const [paymentDetailsLoading, setPaymentDetailsLoading] = useState(false)
-  const [paymentDetailsError, setPaymentDetailsError] = useState('')
   const room = getRoom(booking.room_id, rooms)
   const groupRooms = Array.isArray(booking.group_rooms) ? booking.group_rooms : []
   const isGroupBooking = Boolean(booking.booking_group_id && groupRooms.length > 0)
   const canConfirm = !booking.is_external && booking.booking_status === 'pending'
-
-  useEffect(() => {
-    if (!booking.payment_tracking_eligible) {
-      setPaymentDetails(null)
-      setPaymentDetailsError('')
-      setPaymentDetailsLoading(false)
-      return undefined
-    }
-
-    let active = true
-    setPaymentDetailsLoading(true)
-    setPaymentDetailsError('')
-    fetchBookingPayments(booking.id)
-      .then((details) => { if (active) setPaymentDetails(details) })
-      .catch((error) => { if (active) setPaymentDetailsError(error.message || 'Unable to load payment history.') })
-      .finally(() => { if (active) setPaymentDetailsLoading(false) })
-
-    return () => { active = false }
-  }, [booking.id, booking.payment_tracking_eligible, booking.total_received, booking.balance_due])
-
-  const paymentSummary = paymentDetails?.payment_summary
-  const totalReceived = paymentSummary?.total_received ?? booking.total_received ?? 0
-  const balanceDue = paymentSummary?.balance_due ?? booking.balance_due ?? booking.total_amount
+  const totalReceived = booking.total_received ?? 0
+  const balanceDue = booking.balance_due ?? booking.total_amount
 
   const handleConfirm = async () => {
     if (!canConfirm || isConfirming) return
@@ -1467,25 +1443,6 @@ function BookingDetailsModal({ booking, rooms, onClose, onConfirm, onRecordPayme
               </>
             )}
           </section>
-
-          {booking.payment_tracking_eligible ? (
-            <section className="rounded-2xl border border-border bg-white p-5">
-              <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-text-secondary">Payment history</h3>
-              {paymentDetailsLoading ? <p className="text-sm text-text-secondary">Loading payment history…</p> : null}
-              {paymentDetailsError ? <p className="text-sm text-red-700">{paymentDetailsError}</p> : null}
-              {!paymentDetailsLoading && !paymentDetailsError && paymentDetails?.payment_history?.length ? (
-                <div className="space-y-2">
-                  {paymentDetails.payment_history.map((item) => (
-                    <div key={item.id} className="flex justify-between gap-3 rounded-lg border border-border p-3 text-sm">
-                      <div><p className="font-semibold text-text-primary">{item.method}</p><p className="text-xs text-text-secondary">{item.created_at}{item.note ? ` · ${item.note}` : ''}</p></div>
-                      <p className="shrink-0 font-bold text-text-primary">{formatMoney(item.amount)}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-              {!paymentDetailsLoading && !paymentDetailsError && paymentDetails && !paymentDetails.payment_history?.length ? <p className="text-sm text-text-secondary">No payments recorded yet.</p> : null}
-            </section>
-          ) : null}
 
           <section className="rounded-2xl border border-border bg-white p-5">
             <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-text-secondary">Current status</h3>
@@ -1890,7 +1847,7 @@ export default function Bookings() {
 
             <select value={paymentStatusFilter} onChange={(event) => setPaymentStatusFilter(event.target.value)} className="h-10 min-w-0 rounded-lg border border-border bg-white px-3 text-sm text-text-primary shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 sm:col-span-2 md:col-span-1">
               <option value="all">All payment statuses</option>
-              {paymentStatuses.map((status) => <option key={status} value={status}>{humanizePaymentStatus(status)}</option>)}
+              {[...paymentStatuses, 'partially_paid'].map((status) => <option key={status} value={status}>{humanizePaymentStatus(status)}</option>)}
             </select>
 
             <div className="grid min-w-0 grid-cols-2 gap-3 sm:col-span-2 md:contents">

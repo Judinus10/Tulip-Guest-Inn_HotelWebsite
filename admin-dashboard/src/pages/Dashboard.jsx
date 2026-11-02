@@ -577,7 +577,7 @@ export default function Dashboard() {
       cancelled: 'Cancelled', no_show: 'No Show', external: 'Booking.com',
     }
     const paymentStatusNames = {
-      paid: 'Paid', pending: 'Payment Pending', failed: 'Failed', cancelled: 'Cancelled',
+      paid: 'Paid', partially_paid: 'Partially Paid', pending: 'Payment Pending', failed: 'Failed', cancelled: 'Cancelled',
       refunded: 'Refunded', no_pay: 'No Pay', external: 'No Pay',
     }
     const statusLabel = (booking) => booking.is_external
@@ -587,7 +587,7 @@ export default function Dashboard() {
       ? 'No Pay'
       : (paymentStatusNames[booking.payment_status] || 'Payment Pending')
     const bookingStatuses = ['Pending', 'Confirmed', 'Checked In', 'Checked Out', 'Cancelled', 'No Show', 'Booking.com']
-    const paymentStatuses = ['Paid', 'Payment Pending', 'No Pay', 'Failed', 'Cancelled', 'Refunded']
+    const paymentStatuses = ['Paid', 'Partially Paid', 'Payment Pending', 'No Pay', 'Failed', 'Cancelled', 'Refunded']
     const bookingCounts = filteredBookings.reduce((counts, booking) => {
       const status = booking.booking_status
       counts.total += 1
