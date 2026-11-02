@@ -1308,7 +1308,7 @@ function queue_booking_received_emails(PDO $pdo, array $booking): int
 }
 
 /** Queue a guest receipt and hotel notification for one admin-recorded payment entry. */
-function queue_manual_payment_receipt_emails(PDO $pdo, int $bookingId, int $paymentEntryId): int
+function queue_manual_payment_receipt_emails(PDO $pdo, int $bookingId, int $paymentEntryId, bool $sendCustomerEmail = true): int
 {
     if ($bookingId < 1 || $paymentEntryId < 1) return 0;
 
@@ -1351,7 +1351,7 @@ function queue_manual_payment_receipt_emails(PDO $pdo, int $bookingId, int $paym
         . '<p>Total paid to date: ' . $format($totalPaid) . '<br>Balance due at check-in: ' . $format($balanceDue) . '</p>';
 
     $entrySuffix = '_entry_' . $paymentEntryId;
-    $customerQueued = enqueue_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''),
+    $customerQueued = $sendCustomerEmail && enqueue_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''),
         'Payment received - Tulip Guest Inn ' . $reference, $fallbackBody,
         'manual_payment_received' . $entrySuffix, null, 3, booking_from_email(), booking_from_name());
     $hotelQueued = enqueue_email($pdo, 'booking', $bookingId, booking_admin_email(),

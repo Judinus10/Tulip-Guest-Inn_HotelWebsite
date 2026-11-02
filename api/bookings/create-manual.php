@@ -259,7 +259,9 @@ try {
     }
     if ($initialPaymentEntryId > 0) {
         try {
-            queue_manual_payment_receipt_emails($pdo, $bookingId, $initialPaymentEntryId);
+            // The initial manual-booking email already includes the upfront payment and balance.
+            // Keep the hotel payment notification, but avoid sending the customer a duplicate receipt.
+            queue_manual_payment_receipt_emails($pdo, $bookingId, $initialPaymentEntryId, false);
         } catch (Throwable $emailError) {
             error_log('Initial manual payment receipt email queue error: ' . $emailError->getMessage());
         }

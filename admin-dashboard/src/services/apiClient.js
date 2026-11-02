@@ -2,7 +2,13 @@ import { clearLegacyAuthStorage, getCookie } from '@/utils/auth'
 
 const localApiBaseUrl = import.meta.env.DEV ? 'http://localhost/project_Tulip%20-%20Copy/api' : ''
 
-export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || localApiBaseUrl || '/api').replace(/\/$/, '')
+// In production, keep admin requests on the dashboard's own origin. This lets
+// the browser read the CSRF cookie and send its matching header to the API.
+export const API_BASE_URL = (
+  import.meta.env.DEV
+    ? (import.meta.env.VITE_API_BASE_URL || localApiBaseUrl || '/api')
+    : '/api'
+).replace(/\/$/, '')
 
 export function buildApiUrl(path) {
   const normalizedPath = String(path || '').startsWith('/') ? path : `/${path}`
