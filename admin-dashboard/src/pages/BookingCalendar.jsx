@@ -6,6 +6,7 @@ import { PageHeader, SectionCard } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { fetchBookings, updateBookingStatus, updatePaymentStatus } from '@/services/bookingsApi'
+import { listRooms } from '@/services/roomsApi'
 import { notifyError, notifySuccess, notifyWarning } from '@/utils/notifications'
 
 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -188,14 +189,11 @@ function getTooltipPosition(rect) {
   return { left, top, width: tooltipWidth }
 }
 
-function StatusLegend() {
+function StatusLegend({ selectedRoomId, setSelectedRoomId, setTooltip, availableRooms }) {
   return (
     <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-        <h3 className="text-sm font-bold text-slate-950">Booking status colours</h3>
-        <p className="text-xs font-medium text-slate-500">Hover each colour to see what it means.</p>
-      </div>
-      <div className="flex flex-wrap gap-3">
+      <h3 className="mb-3 text-sm font-bold text-slate-950">Booking status colours</h3>
+      <div className="flex flex-wrap items-center gap-3">
         {statusLegendItems.map((item) => (
           <div key={item.key} className="group relative">
             <div
@@ -210,6 +208,18 @@ function StatusLegend() {
             </div>
           </div>
         ))}
+        <select
+          id="calendar-room-filter"
+          aria-label="Filter calendar by room"
+          value={selectedRoomId}
+          onChange={(event) => { setSelectedRoomId(event.target.value); setTooltip(null) }}
+          className="ml-auto min-w-[180px] max-w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800"
+        >
+          <option value="all">All rooms</option>
+          {availableRooms.map((room) => (
+            <option key={room.id} value={room.id}>{room.room_name || room.name || `Room ${room.id}`}{room.room_number ? ` · ${room.room_number}` : ''}</option>
+          ))}
+        </select>
       </div>
     </div>
   )
@@ -373,6 +383,8 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, onMarkPaid, upd
 export default function BookingCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [calendarBookings, setCalendarBookings] = useState([])
+  const [availableRooms, setAvailableRooms] = useState([])
+  const [selectedRoomId, setSelectedRoomId] = useState('all')
   const [selectedBooking, setSelectedBooking] = useState(null)
   const [tooltip, setTooltip] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -391,9 +403,10 @@ export default function BookingCalendar() {
       try {
         setIsLoading(true)
         setError('')
-        const data = await fetchBookings()
+        const [data, rooms] = await Promise.all([fetchBookings(), listRooms()])
         if (active) {
           setCalendarBookings(data)
+          setAvailableRooms(rooms)
         }
       } catch (err) {
         if (active) setError(err.message || 'Unable to load booking calendar.')
@@ -408,6 +421,12 @@ export default function BookingCalendar() {
       active = false
     }
   }, [])
+
+  const visibleBookings = useMemo(() => selectedRoomId === 'all'
+    ? calendarBookings
+    : calendarBookings.filter((booking) => Number(booking.room_id) === Number(selectedRoomId)
+      || booking.group_rooms?.some((room) => Number(room.room_id) === Number(selectedRoomId))),
+  [calendarBookings, selectedRoomId])
 
   const goToPreviousMonth = () => setCurrentDate(new Date(year, monthIndex - 1, 1))
   const goToNextMonth = () => setCurrentDate(new Date(year, monthIndex + 1, 1))
@@ -519,7 +538,7 @@ export default function BookingCalendar() {
         <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">Loading booking calendar...</div>
       ) : null}
 
-      <StatusLegend />
+      <StatusLegend selectedRoomId={selectedRoomId} setSelectedRoomId={setSelectedRoomId} setTooltip={setTooltip} availableRooms={availableRooms} />
 
       <SectionCard className="overflow-hidden p-0">
         <div className="hidden border-b border-slate-200 bg-slate-50 md:grid md:grid-cols-7">
@@ -532,7 +551,7 @@ export default function BookingCalendar() {
 
         <div className="hidden md:block">
           {weeks.map((week, weekIndex) => {
-            const segments = buildWeekSegments(calendarBookings, week)
+            const segments = buildWeekSegments(visibleBookings, week)
             const maxLane = segments.reduce((max, segment) => Math.max(max, segment.laneIndex), 0)
             const rowHeight = Math.max(132, 74 + (maxLane + 1) * 32)
 
@@ -614,10 +633,10 @@ export default function BookingCalendar() {
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700">
             Mobile agenda view · {monthTitle}
           </div>
-          {calendarBookings.length === 0 && !isLoading ? (
+          {visibleBookings.length === 0 && !isLoading ? (
             <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm font-medium text-slate-600">No bookings found for the calendar.</div>
           ) : null}
-          {calendarBookings.map((booking) => (
+          {visibleBookings.map((booking) => (
             <button
               key={booking.id}
               type="button"
