@@ -409,7 +409,6 @@ function ActionsDropdown({ booking, onView, onEdit, onUpdateStatus, onCancel }) 
               </button>
               <button
                 type="button"
-                disabled={booking.booking_status === 'cancelled'}
                 onClick={() => { onCancel?.(); close() }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
               >

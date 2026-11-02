@@ -22,7 +22,7 @@ try {
     $pdo = get_db_connection();
     lock_booking_inventory($pdo);
     $q = $pdo->prepare('SELECT * FROM bookings WHERE id = ?'); $q->execute([$id]); $booking = $q->fetch();
-    if ($booking && (booking_has_gateway_payment($pdo, $booking) || !empty($booking['booking_group_id']) || $booking['payment_status'] === 'Paid')) json_response(false, 'Retain financial/group records; cancel the booking instead.', 409);
+    if ($booking && strtolower(trim((string) ($booking['status'] ?? ''))) !== 'cancelled' && (booking_has_gateway_payment($pdo, $booking) || !empty($booking['booking_group_id']) || $booking['payment_status'] === 'Paid')) json_response(false, 'Retain financial/group records; cancel the booking instead.', 409);
     security_audit('booking_delete', 'requested', (int)$admin['id'], ['booking_id' => $id]);
     $stmt = $pdo->prepare('DELETE FROM bookings WHERE id = :id');
     $stmt->execute([':id' => $id]);
