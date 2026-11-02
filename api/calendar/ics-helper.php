@@ -4,6 +4,48 @@ declare(strict_types=1);
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../security/hardening.php';
 
+/** Store only a random nonce; public iCal tokens are derived from the server signing key. */
+function ensure_ics_export_schema(PDO $pdo): void
+{
+    static $done = false;
+    if ($done) return;
+    $pdo->exec("CREATE TABLE IF NOT EXISTS room_calendar_export_tokens (
+        room_id INT UNSIGNED NOT NULL PRIMARY KEY,
+        token_nonce CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_room_calendar_export_token_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $done = true;
+}
+
+function ics_export_token(PDO $pdo, int $roomId, bool $create = false): ?string
+{
+    if ($roomId < 1 || !defined('PUBLIC_TOKEN_SECRET') || strlen((string) PUBLIC_TOKEN_SECRET) < 32) return null;
+    ensure_ics_export_schema($pdo);
+    if ($create) {
+        $insert = $pdo->prepare('INSERT IGNORE INTO room_calendar_export_tokens (room_id, token_nonce) VALUES (?, ?)');
+        $insert->execute([$roomId, bin2hex(random_bytes(32))]);
+    }
+    $stmt = $pdo->prepare('SELECT token_nonce FROM room_calendar_export_tokens WHERE room_id = ? LIMIT 1');
+    $stmt->execute([$roomId]);
+    $nonce = $stmt->fetchColumn();
+    if (!is_string($nonce) || !preg_match('/^[a-f0-9]{64}$/D', $nonce)) return null;
+    return hash_hmac('sha256', 'tulip-room-ics-export:v1:' . $roomId . ':' . $nonce, (string) PUBLIC_TOKEN_SECRET);
+}
+
+function ics_export_url(int $roomId, string $token): string
+{
+    $base = defined('API_BASE_URL') ? rtrim((string) API_BASE_URL, '/') : '';
+    if ($base === '') {
+        $scheme = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') ? 'https' : 'http';
+        $host = preg_replace('/[^A-Za-z0-9.:-]/', '', (string) ($_SERVER['HTTP_HOST'] ?? 'localhost')) ?: 'localhost';
+        $apiPath = rtrim(dirname(dirname((string) ($_SERVER['SCRIPT_NAME'] ?? '/api/calendar/manage.php'))), '/\\');
+        $base = $scheme . '://' . $host . ($apiPath === '' ? '/api' : $apiPath);
+    }
+    return $base . '/calendar/room.php?room_id=' . $roomId . '&token=' . rawurlencode($token);
+}
+
 function ics_enabled(): bool
 {
     return filter_var(jebal_env_value('ICS_SYNC_ENABLED', false), FILTER_VALIDATE_BOOLEAN);

@@ -11,23 +11,28 @@ if (!$roomId || $token === '') {
     exit;
 }
 
-// Export links are separate from import URLs. Preserve existing legacy export
-// tokens until a dedicated database-backed export-token feature is introduced.
-$legacyRaw = jebal_env_value('ICS_ROOM_MAPPINGS_JSON', '[]');
-$legacyMappings = is_array($legacyRaw) ? $legacyRaw : json_decode((string)$legacyRaw, true);
-$mapping = null;
-foreach (is_array($legacyMappings) ? $legacyMappings : [] as $candidate) {
-    if (is_array($candidate) && (int)($candidate['room_id'] ?? 0) === (int)$roomId) {
-        $mapping = $candidate;
-        break;
+$pdo = get_db_connection();
+$expectedToken = ics_export_token($pdo, (int) $roomId);
+$validToken = $expectedToken !== null && hash_equals($expectedToken, $token);
+
+// Keep already-issued legacy links working during migration.
+if (!$validToken) {
+    $legacyRaw = jebal_env_value('ICS_ROOM_MAPPINGS_JSON', '[]');
+    $legacyMappings = is_array($legacyRaw) ? $legacyRaw : json_decode((string) $legacyRaw, true);
+    foreach (is_array($legacyMappings) ? $legacyMappings : [] as $candidate) {
+        if (is_array($candidate) && (int) ($candidate['room_id'] ?? 0) === (int) $roomId
+            && !empty($candidate['export_token'])
+            && hash_equals((string) $candidate['export_token'], $token)) {
+            $validToken = true;
+            break;
+        }
     }
 }
-if (!$mapping || empty($mapping['export_token']) || !hash_equals((string)$mapping['export_token'], $token)) {
+if (!$validToken) {
     http_response_code(404);
     exit;
 }
 
-$pdo = get_db_connection();
 $roomStmt = $pdo->prepare('SELECT id, room_name FROM rooms WHERE id = :id LIMIT 1');
 $roomStmt->execute([':id' => $roomId]);
 $room = $roomStmt->fetch();

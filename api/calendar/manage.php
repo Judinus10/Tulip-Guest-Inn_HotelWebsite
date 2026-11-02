@@ -16,19 +16,35 @@ try {
         $legacy = ics_enabled();
         $connections = ics_connections($pdo);
         ensure_ics_schema($pdo);
-        $rooms = $pdo->query("SELECT r.id, r.room_name, r.booking_ical_url, s.last_sync_completed_at, s.last_sync_status, s.last_sync_error FROM rooms r LEFT JOIN external_calendar_sync_status s ON s.room_id = r.id WHERE r.booking_ical_url IS NOT NULL AND TRIM(r.booking_ical_url) <> '' ORDER BY r.id");
-        $status = [];
-        ensure_ics_schema($pdo);
+        ensure_ics_export_schema($pdo);
+        $rooms = $pdo->query("SELECT r.id, r.room_name, r.booking_ical_url, s.last_sync_completed_at, s.last_sync_status, s.last_sync_error FROM rooms r LEFT JOIN external_calendar_sync_status s ON s.room_id = r.id ORDER BY r.id")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rooms as &$room) {
+            $roomId = (int) $room['id'];
+            $token = ics_export_token($pdo, $roomId, true);
+            $room['export_ical_url'] = $token === null ? null : ics_export_url($roomId, $token);
+        }
+        unset($room);
         $status = $pdo->query("SELECT COUNT(*) AS total, MAX(last_sync_completed_at) AS last_sync, SUM(CASE WHEN last_sync_status = 'failed' THEN 1 ELSE 0 END) AS failures FROM external_calendar_sync_status")->fetch(PDO::FETCH_ASSOC);
         json_response(true, 'Calendar settings loaded.', 200, ['data' => [
             'enabled' => $enabled, 'configured_rooms' => count($connections),
             'legacy_enabled' => $legacy, 'last_sync' => $status['last_sync'] ?? null,
             'failed_rooms' => (int)($status['failures'] ?? 0),
-            'rooms' => $rooms->fetchAll(PDO::FETCH_ASSOC),
+            'rooms' => $rooms,
         ]]);
     }
     $data = read_request_data();
     $action = (string)($data['action'] ?? '');
+    if ($action === 'rotate_export_token') {
+        $roomId = filter_var($data['room_id'] ?? null, FILTER_VALIDATE_INT);
+        if (!$roomId || $roomId < 1) json_response(false, 'Invalid room.', 422);
+        $exists = $pdo->prepare('SELECT id FROM rooms WHERE id = ? LIMIT 1');
+        $exists->execute([$roomId]);
+        if (!$exists->fetchColumn()) json_response(false, 'Room not found.', 404);
+        ensure_ics_export_schema($pdo);
+        $stmt = $pdo->prepare('INSERT INTO room_calendar_export_tokens (room_id, token_nonce) VALUES (?, ?) ON DUPLICATE KEY UPDATE token_nonce = VALUES(token_nonce)');
+        $stmt->execute([$roomId, bin2hex(random_bytes(32))]);
+        json_response(true, 'Website iCal link regenerated. Update the URL in Booking.com.', 200);
+    }
     if ($action === 'toggle') {
         if (!is_bool($data['enabled'] ?? null)) json_response(false, 'Invalid enabled value.', 422);
         if ($data['enabled'] && (!ics_enabled() || !ics_connections($pdo))) json_response(false, 'Enable ICS_SYNC_ENABLED and configure at least one Booking.com iCal URL under Rooms → Edit Room.', 422);
