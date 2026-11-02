@@ -409,6 +409,7 @@ function ActionsDropdown({ booking, onView, onEdit, onUpdateStatus, onCancel }) 
               </button>
               <button
                 type="button"
+                disabled={booking.booking_status === 'cancelled'}
                 onClick={() => { onCancel?.(); close() }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -1316,7 +1317,7 @@ function BookingDetailsModal({ booking, rooms, onClose, onConfirm }) {
 
           <section className="rounded-2xl border border-border bg-white p-5">
             <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-text-secondary">Special request</h3>
-            <p className="text-sm leading-6 text-text-secondary">{booking.special_request || 'No special request added.'}</p>
+            <p className="text-sm leading-6 text-text-secondary">{String(booking.special_request || '').replace(/\s*Rooms requested:\s*\d+\s*$/i, '').trim() || 'No special request added.'}</p>
           </section>
         </div>
 
