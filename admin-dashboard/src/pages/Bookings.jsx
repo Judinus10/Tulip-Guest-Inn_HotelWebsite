@@ -82,7 +82,7 @@ const bookingStatusVariant = {
 const paymentStatusVariant = {
   pending: 'warning',
   paid: 'success',
-  partially_paid: 'warning',
+  partially_paid: 'purple',
   failed: 'destructive',
   cancelled: 'secondary',
   refunded: 'secondary',
@@ -502,6 +502,14 @@ function RecordPaymentModal({ booking, onClose, onSaved }) {
     catch (e) { setError(e.message || 'Unable to record payment.') }
     finally { setSaving(false) }
   }
+  const handleMarkBalancePaid = async () => {
+    const balanceDue = Number(summary?.balance_due || 0)
+    if (saving || balanceDue <= 0) return
+    setSaving(true); setError('')
+    try { const updated = await recordBookingPayment(booking.id, balanceDue, method, note); setDetails(updated); setAmount(''); setNote(''); onSaved?.(updated) }
+    catch (e) { setError(e.message || 'Unable to record payment.') }
+    finally { setSaving(false) }
+  }
   return <Modal title="Record Payment" description={`${booking.booking_no} · ${booking.guest_name}`} onClose={onClose} size="max-w-xl">
     <div className="space-y-4">
       {loading ? <p className="text-sm text-text-secondary">Loading payment details…</p> : null}
@@ -515,7 +523,7 @@ function RecordPaymentModal({ booking, onClose, onSaved }) {
         <div className="space-y-2"><Label>Amount received (LKR)</Label><Input type="number" min="0.01" step="0.01" max={summary.balance_due} value={amount} onChange={e=>setAmount(e.target.value)} required /></div>
         <div className="space-y-2"><Label>Payment method</Label><select value={method} onChange={e=>setMethod(e.target.value)} className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm"><option>Cash</option><option>Bank Transfer</option><option>Card</option><option>Other</option></select></div>
         <div className="space-y-2"><Label>Reference / note (optional)</Label><textarea value={note} onChange={e=>setNote(e.target.value)} rows={2} className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm" /></div>
-        <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={onClose}>Close</Button><Button type="submit" disabled={saving}>{saving?'Saving…':'Save Payment'}</Button></div>
+        <div className="flex flex-wrap justify-end gap-3"><Button type="button" variant="outline" onClick={onClose}>Close</Button><Button type="button" variant="outline" onClick={handleMarkBalancePaid} disabled={saving || Number(summary.balance_due) <= 0}>{saving?'Saving…':`Mark Balance Paid (${formatMoney(summary.balance_due)})`}</Button><Button type="submit" disabled={saving}>{saving?'Saving…':'Save Payment'}</Button></div>
       </form> : null}
     </div>
   </Modal>

@@ -24,10 +24,14 @@ try {
         $raw=$input['amount']??null;
         if (!is_scalar($raw) || !preg_match('/^\d{1,10}(?:\.\d{1,2})?$/',(string)$raw)) { $pdo->rollBack(); json_response(false,'Enter a valid payment amount.',422); }
         $amount=round((float)$raw,2); $method=clean_string($input['method']??'',60); $note=clean_string($input['note']??'',1000);
+        $externalReference=clean_string($input['external_reference']??'',120);
         if (!in_array($method,['Cash','Bank Transfer','Card','Other'],true)) { $pdo->rollBack(); json_response(false,'Invalid payment method.',422); }
         $totals=booking_payment_totals($pdo,$bookingId,(float)$context['tracking_total']);
         if ($amount<=0 || $amount>$totals['balance_due']+0.005) { $pdo->rollBack(); json_response(false,'Payment amount cannot exceed the remaining balance.',422); }
-        $ref='ADMIN-'.date('YmdHis').'-'.$bookingId.'-'.bin2hex(random_bytes(3));
+        $ref=$externalReference!==''?$externalReference:'ADMIN-'.date('YmdHis').'-'.$bookingId.'-'.bin2hex(random_bytes(3));
+        $duplicate=$pdo->prepare("SELECT COUNT(*) FROM booking_payment_entries WHERE booking_id=? AND source='admin' AND external_reference=?");
+        $duplicate->execute([$bookingId,$ref]);
+        if ((int)$duplicate->fetchColumn()>0) { $pdo->rollBack(); json_response(false,'This receipt or transfer reference has already been recorded for this booking.',409); }
         $q=$pdo->prepare("INSERT INTO booking_payment_entries (booking_id,amount,currency,method,source,external_reference,note,recorded_by) VALUES (?,?,?,?,?,?,?,'admin')");
         $q->execute([$bookingId,$amount,$context['currency'] ?: 'LKR',$method,'admin',$ref,$note?:null]);
         $recordedPaymentEntryId=(int)$pdo->lastInsertId();

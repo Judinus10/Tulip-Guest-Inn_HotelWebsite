@@ -129,6 +129,28 @@ function tulip_booking_email_for_queue(PDO $pdo, ?string $relatedType, ?int $boo
     $booking['payment_amount'] = $payment['amount'] ?? null;
     $booking['payment_currency'] = $payment['currency'] ?? $booking['currency'] ?? 'LKR';
     $booking['transaction_id'] = trim((string) ($payment['payment_id'] ?? '')) ?: (string) ($payment['order_id'] ?? '');
+    if (in_array($emailType, ['booking_manual_received', 'admin_manual_booking', 'staying_guest_manual_booking'], true)
+        && trim((string) ($booking['user_agent'] ?? '')) === 'Admin manual reservation') {
+        $stmt = $pdo->prepare('SELECT id, amount, currency, method, external_reference FROM booking_payment_entries WHERE booking_id = ? AND reversed_at IS NULL ORDER BY id DESC LIMIT 1');
+        $stmt->execute([$primaryId]);
+        $initialPayment = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($initialPayment) {
+            $stmt = $pdo->prepare('SELECT COALESCE(SUM(amount), 0) FROM booking_payment_entries WHERE booking_id = ? AND reversed_at IS NULL');
+            $stmt->execute([$primaryId]);
+            $totalPaid = round((float) $stmt->fetchColumn(), 2);
+            $balanceDue = round(max(0, (float) $booking['amount'] - $totalPaid), 2);
+            $booking['payment_amount'] = (float) $initialPayment['amount'];
+            $booking['amount_received'] = (float) $initialPayment['amount'];
+            $booking['total_paid'] = $totalPaid;
+            $booking['balance_due'] = $balanceDue;
+            $booking['payment_currency'] = $initialPayment['currency'] ?: ($booking['currency'] ?? 'LKR');
+            $booking['payment_method'] = (string) $initialPayment['method'];
+            $booking['payment_status'] = $balanceDue <= 0.005 ? 'Paid' : 'Partially Paid';
+            $booking['initial_manual_payment'] = true;
+            $booking['transaction_id'] = (string) ($initialPayment['external_reference'] ?? '');
+            $paymentState = strtolower(trim($booking['payment_status']));
+        }
+    }
     if ($manualPaymentEntryId > 0) {
         $stmt = $pdo->prepare('SELECT id, amount, currency, method, external_reference, created_at FROM booking_payment_entries WHERE id = ? AND booking_id = ? AND reversed_at IS NULL LIMIT 1');
         $stmt->execute([$manualPaymentEntryId, $primaryId]);

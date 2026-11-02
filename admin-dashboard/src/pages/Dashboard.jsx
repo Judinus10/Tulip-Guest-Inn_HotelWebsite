@@ -112,6 +112,7 @@ const bookingStatusColors = {
 
 const paymentStatusColors = {
   Paid: '#10B981',
+  'Partially Paid': '#8B5CF6',
   'Payment Pending': '#F59E0B',
   'No Pay': '#0EA5E9',
   Cancelled: '#EF4444',
@@ -137,6 +138,7 @@ const statusVariant = {
   Cancelled: 'destructive',
   Completed: 'default',
   Paid: 'success',
+  'Partially Paid': 'purple',
   Failed: 'destructive',
   Refunded: 'secondary',
   'Payment Pending': 'warning',

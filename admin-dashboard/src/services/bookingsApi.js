@@ -183,7 +183,9 @@ export async function createManualBooking(formData) {
     staying_guest_email: formData.staying_guest_email || '',
     staying_guest_phone: formData.staying_guest_phone || '',
     staying_guest_note: formData.staying_guest_note || '',
-    payment_status: toApiPaymentStatus(formData.payment_status || 'pending'),
+    payment_status: formData.payment_status === 'advance'
+      ? 'advance'
+      : toApiPaymentStatus(formData.payment_status || 'pending'),
     payment_method: formData.payment_method || 'Cash',
     advance_payment: Number(formData.advance_payment || 0),
   }
@@ -393,10 +395,10 @@ export async function fetchBookingPayments(bookingId) {
   return payload
 }
 
-export async function recordBookingPayment(bookingId, amount, method, note = '') {
+export async function recordBookingPayment(bookingId, amount, method, note = '', externalReference = '') {
   const response = await apiFetch(buildApiUrl('/payments/booking-payments.php'), {
     method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ booking_id: Number(bookingId), amount: Number(amount), method, note }),
+    body: JSON.stringify({ booking_id: Number(bookingId), amount: Number(amount), method, note, external_reference: externalReference }),
   })
   return readJsonResponse(response)
 }

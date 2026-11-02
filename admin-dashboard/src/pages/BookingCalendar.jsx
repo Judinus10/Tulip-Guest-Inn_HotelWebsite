@@ -52,7 +52,7 @@ const statusVariant = {
   cancelled: 'destructive',
   no_show: 'default',
   paid: 'success',
-  partially_paid: 'warning',
+  partially_paid: 'purple',
   refunded: 'secondary',
   failed: 'destructive',
 }
@@ -275,11 +275,12 @@ function CalendarRecordPaymentModal({ booking, onClose, onSaved }) {
   useEffect(()=>{ fetchBookingPayments(booking.id).then(setDetails).catch(e=>setError(e.message||'Unable to load payment details.')) },[booking.id])
   const summary=details?.payment_summary
   const save=async(e)=>{ e.preventDefault(); setSaving(true); setError(''); try { const result=await recordBookingPayment(booking.id,amount,method,note); setDetails(result); setAmount(''); setNote(''); onSaved?.(result) } catch(err){setError(err.message||'Unable to record payment.')} finally{setSaving(false)} }
+  const payRemaining=async()=>{ const balance=Number(summary?.balance_due||0); if(saving||balance<=0)return; setSaving(true); setError(''); try { const result=await recordBookingPayment(booking.id,balance,method,note); setDetails(result); setAmount(''); setNote(''); onSaved?.(result) } catch(err){setError(err.message||'Unable to record payment.')} finally{setSaving(false)} }
   return <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}><div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl" onMouseDown={e=>e.stopPropagation()}>
     <div className="mb-4 flex justify-between"><div><p className="text-xs font-semibold uppercase text-blue-700">Record Payment</p><h3 className="text-lg font-bold">{booking.booking_no}</h3></div><Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5"/></Button></div>
     {error?<div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div>:null}
     {summary?<div className="mb-4 grid grid-cols-3 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm"><div>Total<br/><b>{currencyFormatter.format(summary.total_amount)}</b></div><div>Received<br/><b>{currencyFormatter.format(summary.total_received)}</b></div><div>Balance<br/><b>{currencyFormatter.format(summary.balance_due)}</b></div></div>:null}
-    {summary&&Number(summary.balance_due)>0?<form onSubmit={save} className="space-y-4"><div><label className="mb-1 block text-sm font-semibold">Amount received (LKR)</label><input required type="number" min="0.01" step="0.01" max={summary.balance_due} value={amount} onChange={e=>setAmount(e.target.value)} className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm"/></div><div><label className="mb-1 block text-sm font-semibold">Payment method</label><select value={method} onChange={e=>setMethod(e.target.value)} className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm"><option>Cash</option><option>Bank Transfer</option><option>Card</option><option>Other</option></select></div><div><label className="mb-1 block text-sm font-semibold">Reference / note (optional)</label><textarea rows={2} value={note} onChange={e=>setNote(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"/></div><div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Close</Button><Button type="submit" disabled={saving}>{saving?'Saving…':'Save Payment'}</Button></div></form>:null}
+    {summary&&Number(summary.balance_due)>0?<form onSubmit={save} className="space-y-4"><div><label className="mb-1 block text-sm font-semibold">Amount received (LKR)</label><input required type="number" min="0.01" step="0.01" max={summary.balance_due} value={amount} onChange={e=>setAmount(e.target.value)} className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm"/></div><div><label className="mb-1 block text-sm font-semibold">Payment method</label><select value={method} onChange={e=>setMethod(e.target.value)} className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm"><option>Cash</option><option>Bank Transfer</option><option>Card</option><option>Other</option></select></div><div><label className="mb-1 block text-sm font-semibold">Reference / note (optional)</label><textarea rows={2} value={note} onChange={e=>setNote(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"/></div><div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Close</Button><Button type="button" variant="outline" onClick={payRemaining} disabled={saving}>{saving?'Saving…':`Mark Balance Paid (${currencyFormatter.format(Number(summary.balance_due))})`}</Button><Button type="submit" disabled={saving}>{saving?'Saving…':'Save Payment'}</Button></div></form>:null}
   </div></div>
 }
 
@@ -434,9 +435,15 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, onMarkPaid, onR
               <Button size="sm" variant="outline" disabled={updatingStatus || !canCheckOut} title={!canCheckOut ? 'The booking must be checked in first.' : ''} onClick={() => onStatusChange(booking.id, 'checked_out')}>
                 Mark checked out
               </Button>
-              <Button size="sm" variant="outline" disabled={updatingStatus || !canMarkPaid} title={!canMarkPaid ? 'Only pending payments can be marked as paid.' : ''} onClick={() => onMarkPaid(booking)}>
-                Mark as paid
-              </Button>
+              {booking.payment_tracking_eligible ? (
+                <Button size="sm" variant="outline" disabled={updatingStatus || Number(balanceDue) <= 0} title={Number(balanceDue) <= 0 ? 'This booking has no balance due.' : 'Record the remaining balance and update payment status to Paid.'} onClick={() => onRecordPayment?.(booking)}>
+                  Mark Balance Paid
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" disabled={updatingStatus || !canMarkPaid} title={!canMarkPaid ? 'Only pending payments can be marked as paid.' : ''} onClick={() => onMarkPaid(booking)}>
+                  Mark as paid
+                </Button>
+              )}
               {booking.payment_tracking_eligible ? <Button size="sm" variant="outline" disabled={updatingStatus} onClick={() => onRecordPayment?.(booking)}>Record Payment</Button> : null}
             </div>
           </div> : <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm font-semibold text-blue-800 md:col-span-2">This reservation is managed in Booking.com and updated automatically by calendar sync.</div>}

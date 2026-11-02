@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input, Label } from '@/components/ui/input'
 import { fetchPayments, updateCombinedStatusByBooking } from '@/services/paymentsApi'
+import { recordBookingPayment } from '@/services/bookingsApi'
 import { buildApiUrl } from '@/services/apiClient'
 import { exportCsv, exportExcel, exportPdf } from '@/utils/exportData'
 
@@ -39,6 +40,7 @@ const defaultPaymentMethods = ['PayHere', 'Cash', 'Bank Transfer', 'Card', 'No P
 const statusVariant = {
   pending: 'warning',
   paid: 'success',
+  partially_paid: 'purple',
   failed: 'destructive',
   cancelled: 'secondary',
   refunded: 'purple',
@@ -47,6 +49,7 @@ const statusVariant = {
 const statusLabel = {
   pending: 'Payment Pending',
   paid: 'Paid',
+  partially_paid: 'Partially Paid',
   failed: 'Failed',
   cancelled: 'Cancelled',
   refunded: 'Refunded',
@@ -132,6 +135,12 @@ function buildPaymentExportRows(payments) {
 
 function PaymentStatusBadge({ status }) {
   return <Badge variant={statusVariant[status] || 'secondary'}>{statusLabel[status] || status || '-'}</Badge>
+}
+
+function paymentDisplayStatus(payment) {
+  return payment.payment_tracking_eligible && payment.booking_payment_status
+    ? payment.booking_payment_status
+    : payment.payment_status
 }
 
 function Toast({ message, type, onClose }) {
@@ -259,7 +268,7 @@ function PaymentDetailsModal({ payment, onClose }) {
                 <p className="text-sm font-medium text-blue-700">Payment Amount</p>
                 <p className="mt-1 text-3xl font-bold text-blue-950">{formatCurrency(payment.amount)}</p>
               </div>
-              <PaymentStatusBadge status={payment.payment_status} />
+              <PaymentStatusBadge status={paymentDisplayStatus(payment)} />
             </div>
           </div>
 
@@ -267,6 +276,8 @@ function PaymentDetailsModal({ payment, onClose }) {
             <DetailCard label="Booking ID" value={payment.booking_no} />
             <DetailCard label="Booking Type" value={isMultiRoom ? `${payment.total_rooms || groupRooms.length} rooms` : 'Single room'} />
             <DetailCard label="Booking Status" value={payment.booking_status || payment.status || '-'} />
+            {payment.payment_tracking_eligible ? <DetailCard label="Amount Received" value={formatCurrency(payment.booking_total_received)} /> : null}
+            {payment.payment_tracking_eligible ? <DetailCard label="Balance Due" value={formatCurrency(payment.booking_balance_due)} /> : null}
             {!isMultiRoom ? <DetailCard label="Room Name" value={payment.room_name} /> : null}
             <DetailCard label="Check-in" value={formatStayDate(payment.check_in || payment.checkin_date)} />
             <DetailCard label="Check-out" value={formatStayDate(payment.check_out || payment.checkout_date)} />
@@ -319,18 +330,27 @@ function PaymentDetailsModal({ payment, onClose }) {
 }
 
 function EditPaymentModal({ payment, methodOptions, onClose, onSave, saving }) {
+  const tracksBookingPayments = Boolean(payment.payment_tracking_eligible)
+  const trackedMethods = ['Cash', 'Bank Transfer', 'Card', 'Other']
+  const hasOutstandingBalance = Number(payment.booking_balance_due || 0) > 0
   const normalizedBookingStatus = String(payment.booking_status || 'pending').toLowerCase()
   const [bookingStatus, setBookingStatus] = useState(['pending', 'confirmed', 'cancelled'].includes(normalizedBookingStatus) ? normalizedBookingStatus : 'pending')
   const [paymentStatus, setPaymentStatus] = useState(payment.payment_status || 'pending')
-  const [paymentMethod, setPaymentMethod] = useState(payment.payment_method || 'PayHere')
-  const [reference, setReference] = useState(payment.payment_id || payment.transaction_id || '')
+  const [paymentMethod, setPaymentMethod] = useState(tracksBookingPayments && !trackedMethods.includes(payment.payment_method) ? 'Cash' : (payment.payment_method || 'PayHere'))
+  const [reference, setReference] = useState(tracksBookingPayments ? '' : (payment.payment_id || payment.transaction_id || ''))
   const [remarks, setRemarks] = useState('')
+  const [amountToRecord, setAmountToRecord] = useState('')
   const [sendEmail, setSendEmail] = useState(true)
   const [errors, setErrors] = useState({})
 
   const validate = () => {
     const nextErrors = {}
-    if (!paymentStatus) nextErrors.paymentStatus = 'Please select payment status.'
+    if (tracksBookingPayments) {
+      const amount = Number(amountToRecord)
+      if (!hasOutstandingBalance) nextErrors.amount = 'There is no balance due for this booking.'
+      else if (!amountToRecord || !Number.isFinite(amount) || amount <= 0) nextErrors.amount = 'Enter an amount greater than zero.'
+      else if (amount > Number(payment.booking_balance_due || 0) + 0.005) nextErrors.amount = 'Amount cannot exceed the remaining balance.'
+    } else if (!paymentStatus) nextErrors.paymentStatus = 'Please select payment status.'
     if (!paymentMethod) nextErrors.paymentMethod = 'Please select payment method.'
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
@@ -341,8 +361,22 @@ function EditPaymentModal({ payment, methodOptions, onClose, onSave, saving }) {
     if (!validate()) return
 
     onSave(payment, {
+      record_amount: tracksBookingPayments ? Number(amountToRecord) : null,
       booking_status: bookingStatus,
       payment_status: paymentStatus,
+      payment_method: paymentMethod,
+      transaction_reference: reference.trim(),
+      remarks: remarks.trim(),
+      send_email: sendEmail,
+    })
+  }
+
+  const handleMarkBalancePaid = () => {
+    if (!hasOutstandingBalance || !paymentMethod) return
+    onSave(payment, {
+      record_amount: Number(payment.booking_balance_due || 0),
+      booking_status: bookingStatus,
+      payment_status: 'paid',
       payment_method: paymentMethod,
       transaction_reference: reference.trim(),
       remarks: remarks.trim(),
@@ -371,10 +405,20 @@ function EditPaymentModal({ payment, methodOptions, onClose, onSave, saving }) {
         <form onSubmit={handleSubmit} className="space-y-4 p-5">
           <div className="rounded-xl border border-border bg-slate-50 p-3">
             <p className="text-sm font-semibold text-text-primary">{formatCurrency(payment.amount)}</p>
-            <p className="mt-1 text-sm text-text-secondary">Current status: {statusLabel[payment.payment_status] || payment.payment_status}</p>
+            <p className="mt-1 text-sm text-text-secondary">Current status: {statusLabel[paymentDisplayStatus(payment)] || paymentDisplayStatus(payment)}</p>
+            {tracksBookingPayments ? <p className="mt-1 text-sm text-text-secondary">Received {formatCurrency(payment.booking_total_received)} · Balance due {formatCurrency(payment.booking_balance_due)}</p> : null}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          {tracksBookingPayments ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-record-payment-amount">Amount received *</Label>
+              <Input id="edit-record-payment-amount" type="number" min="0.01" max={Number(payment.booking_balance_due || 0)} step="0.01" value={amountToRecord} onChange={(event) => setAmountToRecord(event.target.value)} placeholder={`Up to ${formatCurrency(payment.booking_balance_due)}`} disabled={!hasOutstandingBalance} />
+              {errors.amount ? <p className="text-xs font-medium text-red-600">{errors.amount}</p> : null}
+              {!hasOutstandingBalance ? <p className="text-xs text-text-secondary">No balance remains to record.</p> : null}
+            </div>
+          ) : null}
+
+          {!tracksBookingPayments ? <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="edit-booking-status">Booking Status *</Label>
               <select
@@ -418,15 +462,22 @@ function EditPaymentModal({ payment, methodOptions, onClose, onSave, saving }) {
               </select>
               {errors.paymentMethod ? <p className="text-xs font-medium text-red-600">{errors.paymentMethod}</p> : null}
             </div>
-          </div>
+          </div> : null}
+
+          {tracksBookingPayments ? <div className="space-y-1.5">
+            <Label htmlFor="edit-payment-method">Payment Method *</Label>
+            <select id="edit-payment-method" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-medium text-text-primary shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
+              {trackedMethods.map((method) => <option key={method} value={method}>{method}</option>)}
+            </select>
+          </div> : null}
 
           <div className="space-y-1.5">
-            <Label htmlFor="payment-reference">Reference / Transaction No.</Label>
+            <Label htmlFor="payment-reference">{tracksBookingPayments ? 'Receipt / Transfer Reference (optional)' : 'Reference / Transaction No.'}</Label>
             <Input
               id="payment-reference"
               value={reference}
               onChange={(event) => setReference(event.target.value)}
-              placeholder="PayHere ID, bank slip no, cash receipt no..."
+              placeholder={tracksBookingPayments ? 'Bank slip or receipt number' : 'PayHere ID, bank slip no, cash receipt no...'}
             />
           </div>
 
@@ -442,14 +493,15 @@ function EditPaymentModal({ payment, methodOptions, onClose, onSave, saving }) {
             />
           </div>
 
-          <label className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs font-medium leading-5 text-blue-900">
+          {tracksBookingPayments ? <p className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs font-medium leading-5 text-blue-900">The payment will be added to the booking history and the guest and hotel will receive a payment receipt email.</p> : <label className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs font-medium leading-5 text-blue-900">
             <input type="checkbox" checked={sendEmail} onChange={(event) => setSendEmail(event.target.checked)} className="mt-1" />
             <span>Send one customer email for the final status update. If booking and payment both change, only one combined email will be sent.</span>
-          </label>
+          </label>}
 
-          <div className="flex justify-end gap-3 pt-1">
+          <div className="flex flex-wrap justify-end gap-3 pt-1">
             <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-            <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</Button>
+            {tracksBookingPayments ? <Button type="button" variant="outline" onClick={handleMarkBalancePaid} disabled={saving || !hasOutstandingBalance}>{saving ? 'Saving...' : `Mark Balance Paid (${formatCurrency(payment.booking_balance_due)})`}</Button> : null}
+            <Button type="submit" disabled={saving || (tracksBookingPayments && !hasOutstandingBalance)}>{saving ? 'Saving...' : 'Save Changes'}</Button>
           </div>
         </form>
       </div>
@@ -621,6 +673,14 @@ export default function Payments() {
   const handleSavePayment = async (payment, payload) => {
     try {
       setSavingPayment(true)
+      if (payment.payment_tracking_eligible) {
+        await recordBookingPayment(payment.booking_id, payload.record_amount, payload.payment_method, payload.remarks, payload.transaction_reference)
+        const refreshedPayments = await fetchPayments()
+        setPayments(refreshedPayments)
+        setEditingPayment(null)
+        showToast('Payment recorded successfully. Receipt emails have been queued.')
+        return
+      }
       const refreshedPayments = await updateCombinedStatusByBooking(payment.booking_id, payload)
       setPayments(refreshedPayments)
       setEditingPayment(null)
@@ -800,7 +860,7 @@ export default function Payments() {
                       <td className="px-3 py-4 text-text-secondary">{payment.booking_no}</td>
                       <td className="px-3 py-4 font-semibold text-text-primary">{formatCurrency(payment.amount)}</td>
                       <td className="px-3 py-4 text-text-secondary">{payment.payment_method || '-'}</td>
-                      <td className="px-3 py-4"><PaymentStatusBadge status={payment.payment_status} /></td>
+                      <td className="px-3 py-4"><PaymentStatusBadge status={paymentDisplayStatus(payment)} /></td>
                       <td className="px-3 py-4 text-text-secondary">{formatDate(payment.paid_at || payment.created_at)}</td>
                       <td className="px-3 py-4 text-right">
                         <ActionsDropdown

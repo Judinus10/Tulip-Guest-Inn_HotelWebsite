@@ -18,6 +18,14 @@ function normalizePaymentStatus(status) {
   return 'pending'
 }
 
+function normalizeBookingPaymentStatus(status) {
+  const value = String(status || '').trim().toLowerCase().replace(/[\s-]+/g, '_')
+  if (value === 'partially_paid' || value === 'partial') return 'partially_paid'
+  if (value === 'paid') return 'paid'
+  if (value === 'payment_pending' || value === 'pending') return 'pending'
+  return ''
+}
+
 function normalizePaymentMethod(method) {
   const value = String(method || 'PayHere').trim()
   if (!value) return 'PayHere'
@@ -86,6 +94,10 @@ function normalizePayment(payment) {
     amount: Number(payment.amount || 0),
     currency: payment.currency || 'LKR',
     payment_status: paymentStatus,
+    payment_tracking_eligible: Boolean(Number(payment.payment_tracking_eligible || 0)) || payment.payment_tracking_eligible === true,
+    booking_payment_status: normalizeBookingPaymentStatus(payment.booking_payment_status),
+    booking_total_received: Number(payment.booking_total_received || 0),
+    booking_balance_due: Number(payment.booking_balance_due || 0),
     payment_method: normalizePaymentMethod(payment.payment_method || payment.method),
     payment_gateway: payment.payment_gateway || normalizePaymentMethod(payment.payment_method || payment.method),
     transaction_id: payment.transaction_id || payment.payment_id || payment.order_id || `PAY-${String(payment.id || 0).padStart(4, '0')}`,

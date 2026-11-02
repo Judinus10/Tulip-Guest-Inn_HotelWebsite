@@ -219,6 +219,11 @@ function tulip_render_booking_email(string $type, array $content, array $booking
         $paymentExtra .= '<tr><td style="padding:8px 0;border-top:1px solid #e8e3da;">Total paid to date</td><td align="right" style="padding:8px 0;border-top:1px solid #e8e3da;font-weight:bold;">'.$e($tokens['total_paid']).'</td></tr>';
         $paymentExtra .= '<tr><td style="padding:8px 0;">Balance due at check-in</td><td align="right" style="padding:8px 0;font-weight:bold;">'.$e($tokens['balance_due']).'</td></tr>';
     }
+    if (!empty($booking['initial_manual_payment'])) {
+        $paymentExtra .= '<tr><td style="padding:8px 0;">Amount received now</td><td align="right" style="padding:8px 0;font-weight:bold;">'.$e($tokens['amount_received']).'</td></tr>';
+        $paymentExtra .= '<tr><td style="padding:8px 0;">Total paid to date</td><td align="right" style="padding:8px 0;font-weight:bold;">'.$e($tokens['total_paid']).'</td></tr>';
+        $paymentExtra .= '<tr><td style="padding:8px 0;">Balance due at check-in</td><td align="right" style="padding:8px 0;font-weight:bold;">'.$e($tokens['balance_due']).'</td></tr>';
+    }
     $actionLabel = $isAdmin ? 'Open booking in admin' : 'View booking & bill';
     $action = '';
     if ($isTest) {

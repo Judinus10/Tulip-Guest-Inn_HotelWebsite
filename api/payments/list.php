@@ -6,6 +6,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/booking-payment-ledger.php';
 
 apply_cors_headers();
 
@@ -22,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 try {
     $pdo = get_db_connection();
+    ensure_booking_payment_ledger($pdo);
 
     $stmt = $pdo->query(
         "SELECT
@@ -113,6 +115,23 @@ try {
     foreach ($payments as &$payment) {
         $groupId = (int) ($payment['booking_group_id'] ?? 0);
         $payment['group_rooms'] = $groupId > 0 ? ($roomsByGroup[$groupId] ?? []) : [];
+        $bookingId = (int) ($payment['booking_id'] ?? 0);
+        if ($bookingId > 0) {
+            $context = booking_payment_context($pdo, $bookingId);
+            if ($context && !empty($context['payment_tracking_eligible'])) {
+                booking_payment_seed_legacy($pdo, $context);
+                $summary = booking_payment_totals($pdo, (int) $context['id'], (float) $context['tracking_total']);
+                $payment['payment_tracking_eligible'] = 1;
+                $payment['booking_payment_status'] = $summary['payment_state'];
+                $payment['booking_total_received'] = $summary['total_received'];
+                $payment['booking_balance_due'] = $summary['balance_due'];
+            } else {
+                $payment['payment_tracking_eligible'] = 0;
+                $payment['booking_payment_status'] = '';
+                $payment['booking_total_received'] = 0;
+                $payment['booking_balance_due'] = 0;
+            }
+        }
     }
     unset($payment);
 
