@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { PageHeader, SectionCard } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { fetchBookings, updateBookingStatus, updatePaymentStatus } from '@/services/bookingsApi'
+import { fetchBookings, updateBookingStatus, updatePaymentStatus, fetchBookingPayments, recordBookingPayment } from '@/services/bookingsApi'
 import { listRooms } from '@/services/roomsApi'
 import { notifyError, notifySuccess, notifyWarning } from '@/utils/notifications'
 
@@ -52,6 +52,7 @@ const statusVariant = {
   cancelled: 'destructive',
   no_show: 'default',
   paid: 'success',
+  partially_paid: 'warning',
   refunded: 'secondary',
   failed: 'destructive',
 }
@@ -269,7 +270,21 @@ function FloatingBookingTooltip({ tooltip }) {
   )
 }
 
-function BookingDetailsModal({ booking, onClose, onStatusChange, onMarkPaid, updatingStatus }) {
+function CalendarRecordPaymentModal({ booking, onClose, onSaved }) {
+  const [amount,setAmount]=useState(''); const [method,setMethod]=useState('Cash'); const [note,setNote]=useState(''); const [details,setDetails]=useState(null); const [saving,setSaving]=useState(false); const [error,setError]=useState('')
+  useEffect(()=>{ fetchBookingPayments(booking.id).then(setDetails).catch(e=>setError(e.message||'Unable to load payment details.')) },[booking.id])
+  const summary=details?.payment_summary
+  const save=async(e)=>{ e.preventDefault(); setSaving(true); setError(''); try { const result=await recordBookingPayment(booking.id,amount,method,note); setDetails(result); setAmount(''); setNote(''); onSaved?.(result) } catch(err){setError(err.message||'Unable to record payment.')} finally{setSaving(false)} }
+  return <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}><div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl" onMouseDown={e=>e.stopPropagation()}>
+    <div className="mb-4 flex justify-between"><div><p className="text-xs font-semibold uppercase text-blue-700">Record Payment</p><h3 className="text-lg font-bold">{booking.booking_no}</h3></div><Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5"/></Button></div>
+    {error?<div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div>:null}
+    {summary?<div className="mb-4 grid grid-cols-3 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm"><div>Total<br/><b>{currencyFormatter.format(summary.total_amount)}</b></div><div>Received<br/><b>{currencyFormatter.format(summary.total_received)}</b></div><div>Balance<br/><b>{currencyFormatter.format(summary.balance_due)}</b></div></div>:null}
+    {summary&&Number(summary.balance_due)>0?<form onSubmit={save} className="space-y-4"><div><label className="mb-1 block text-sm font-semibold">Amount received (LKR)</label><input required type="number" min="0.01" step="0.01" max={summary.balance_due} value={amount} onChange={e=>setAmount(e.target.value)} className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm"/></div><div><label className="mb-1 block text-sm font-semibold">Payment method</label><select value={method} onChange={e=>setMethod(e.target.value)} className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm"><option>Cash</option><option>Bank Transfer</option><option>Card</option><option>Other</option></select></div><div><label className="mb-1 block text-sm font-semibold">Reference / note (optional)</label><textarea rows={2} value={note} onChange={e=>setNote(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"/></div><div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Close</Button><Button type="submit" disabled={saving}>{saving?'Saving…':'Save Payment'}</Button></div></form>:null}
+    {details?.payment_history?.length?<div className="mt-5"><p className="mb-2 text-sm font-bold">Payment history</p>{details.payment_history.map(item=><div key={item.id} className="mb-2 flex justify-between rounded-lg border border-slate-200 p-3 text-sm"><span>{item.method}<span className="block text-xs text-slate-500">{item.created_at}{item.note?` · ${item.note}`:''}</span></span><b>{currencyFormatter.format(item.amount)}</b></div>)}</div>:null}
+  </div></div>
+}
+
+function BookingDetailsModal({ booking, onClose, onStatusChange, onMarkPaid, onRecordPayment, updatingStatus }) {
   useEffect(() => {
     if (!booking) return undefined
 
@@ -344,10 +359,10 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, onMarkPaid, upd
               <p><span className="font-semibold text-slate-500">Amount:</span> {isBookingCom ? 'Managed in Booking.com' : currencyFormatter.format(booking.total_amount)}</p>
               <div className="flex items-center gap-2"><span className="font-semibold text-slate-500">Booking status:</span> <Badge variant={statusVariant[getBookingStatusKey(booking.booking_status)] || 'secondary'}>{normalizeStatus(booking.booking_status)}</Badge></div>
               <div className="flex items-center gap-2"><span className="font-semibold text-slate-500">Payment status:</span> <Badge variant={statusVariant[getBookingStatusKey(booking.payment_status)] || 'secondary'}>{normalizeStatus(booking.payment_status)}</Badge></div>
-              {Number(booking.advance_payment) > 0 && !isBookingCom && (
+              {booking.payment_tracking_eligible && !isBookingCom && (
                 <>
-                  <p><span className="font-semibold text-slate-500">Advance paid:</span> {currencyFormatter.format(Number(booking.advance_payment))}</p>
-                  <p><span className="font-semibold text-slate-500">Remaining balance:</span> {currencyFormatter.format(Math.max(0, Number(booking.total_amount || 0) - Number(booking.advance_payment)))}</p>
+                  <p><span className="font-semibold text-slate-500">Amount received:</span> {currencyFormatter.format(Number(booking.total_received || 0))}</p>
+                  <p><span className="font-semibold text-slate-500">Remaining balance:</span> {currencyFormatter.format(Number(booking.balance_due || 0))}</p>
                 </>
               )}
             </div>
@@ -378,6 +393,7 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, onMarkPaid, upd
               <Button size="sm" variant="outline" disabled={updatingStatus || !canMarkPaid} title={!canMarkPaid ? 'Only pending payments can be marked as paid.' : ''} onClick={() => onMarkPaid(booking)}>
                 Mark as paid
               </Button>
+              {booking.payment_tracking_eligible ? <Button size="sm" variant="outline" disabled={updatingStatus} onClick={() => onRecordPayment?.(booking)}>Record Payment</Button> : null}
             </div>
           </div> : <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm font-semibold text-blue-800 md:col-span-2">This reservation is managed in Booking.com and updated automatically by calendar sync.</div>}
         </div>
@@ -392,6 +408,7 @@ export default function BookingCalendar() {
   const [availableRooms, setAvailableRooms] = useState([])
   const [selectedRoomId, setSelectedRoomId] = useState('all')
   const [selectedBooking, setSelectedBooking] = useState(null)
+  const [recordPaymentBooking, setRecordPaymentBooking] = useState(null)
   const [tooltip, setTooltip] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -670,9 +687,11 @@ export default function BookingCalendar() {
           onClose={() => setSelectedBooking(null)}
           onStatusChange={handleStatusChange}
           onMarkPaid={handleMarkPaid}
+          onRecordPayment={setRecordPaymentBooking}
           updatingStatus={updatingStatus}
         />
       )}
+      {recordPaymentBooking ? <CalendarRecordPaymentModal booking={recordPaymentBooking} onClose={() => setRecordPaymentBooking(null)} onSaved={async () => { const fresh = await fetchBookings(); setCalendarBookings(fresh); const updated = fresh.find(item => item.id === recordPaymentBooking.id); if (updated) setSelectedBooking(updated) }} /> : null}
     </div>
   )
 }

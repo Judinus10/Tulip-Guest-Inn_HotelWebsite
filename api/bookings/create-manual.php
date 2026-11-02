@@ -5,6 +5,7 @@ require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../mail/email-helper.php';
 require_once __DIR__ . '/../calendar/ics-helper.php';
 require_once __DIR__ . '/booking-expiry-helper.php';
+require_once __DIR__ . '/../payments/booking-payment-ledger.php';
 
 apply_cors_headers();
 require_admin_auth();
@@ -106,6 +107,7 @@ if ($guests > 20) {
 
 try {
     $pdo = get_db_connection();
+    ensure_booking_payment_ledger($pdo);
     lock_booking_inventory($pdo);
     if (ics_enabled()) ensure_ics_schema($pdo);
     $pdo->beginTransaction();
@@ -209,6 +211,12 @@ try {
             'created_at' => date('Y-m-d H:i:s'),
         ], JSON_UNESCAPED_SLASHES),
     ]);
+
+    if ($isAdvance || $paymentStatus === 'Paid') {
+        $receivedAmount = $isAdvance ? round($advanceAmount, 2) : round($amount, 2);
+        $ledger = $pdo->prepare('INSERT INTO booking_payment_entries (booking_id, amount, currency, method, source, external_reference, note, recorded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+        $ledger->execute([$bookingId, $receivedAmount, PAYMENT_CURRENCY, $paymentMethod === '' ? 'Cash' : $paymentMethod, 'initial_manual', 'manual-booking-' . $bookingId, $isAdvance ? 'Advance recorded when manual reservation was created' : 'Full payment recorded when manual reservation was created', 'admin']);
+    }
 
     $pdo->commit();
 

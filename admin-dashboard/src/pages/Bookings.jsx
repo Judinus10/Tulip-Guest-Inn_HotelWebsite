@@ -46,6 +46,8 @@ import {
   updateGroupBookingDetails,
   updateBookingStatus,
   updatePaymentStatus,
+  fetchBookingPayments,
+  recordBookingPayment,
 } from '@/services/bookingsApi'
 
 const BOOKINGS_PER_PAGE = 6
@@ -80,6 +82,7 @@ const bookingStatusVariant = {
 const paymentStatusVariant = {
   pending: 'warning',
   paid: 'success',
+  partially_paid: 'warning',
   failed: 'destructive',
   cancelled: 'secondary',
   refunded: 'secondary',
@@ -474,6 +477,48 @@ function StatusSelectModal({ booking, onClose, onSave }) {
       </form>
     </Modal>
   )
+}
+
+function RecordPaymentModal({ booking, onClose, onSaved }) {
+  const [amount, setAmount] = useState('')
+  const [method, setMethod] = useState('Cash')
+  const [note, setNote] = useState('')
+  const [details, setDetails] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const load = async () => {
+    try { setLoading(true); setError(''); setDetails(await fetchBookingPayments(booking.id)) }
+    catch (e) { setError(e.message || 'Unable to load payment details.') }
+    finally { setLoading(false) }
+  }
+  useEffect(() => { load() }, [booking.id])
+  const summary = details?.payment_summary
+  const handleSubmit = async (event) => {
+    event.preventDefault(); setSaving(true); setError('')
+    try { const updated = await recordBookingPayment(booking.id, amount, method, note); setDetails(updated); setAmount(''); setNote(''); onSaved?.(updated) }
+    catch (e) { setError(e.message || 'Unable to record payment.') }
+    finally { setSaving(false) }
+  }
+  return <Modal title="Record Payment" description={`${booking.booking_no} · ${booking.guest_name}`} onClose={onClose} size="max-w-xl">
+    <div className="space-y-4">
+      {loading ? <p className="text-sm text-text-secondary">Loading payment details…</p> : null}
+      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div> : null}
+      {summary ? <div className="grid gap-3 rounded-xl border border-border bg-slate-50 p-4 text-sm sm:grid-cols-3">
+        <div><p className="text-text-secondary">Total</p><p className="font-bold">{formatMoney(summary.total_amount)}</p></div>
+        <div><p className="text-text-secondary">Received</p><p className="font-bold">{formatMoney(summary.total_received)}</p></div>
+        <div><p className="text-text-secondary">Balance</p><p className="font-bold">{formatMoney(summary.balance_due)}</p></div>
+      </div> : null}
+      {summary && Number(summary.balance_due) > 0 ? <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2"><Label>Amount received (LKR)</Label><Input type="number" min="0.01" step="0.01" max={summary.balance_due} value={amount} onChange={e=>setAmount(e.target.value)} required /></div>
+        <div className="space-y-2"><Label>Payment method</Label><select value={method} onChange={e=>setMethod(e.target.value)} className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm"><option>Cash</option><option>Bank Transfer</option><option>Card</option><option>Other</option></select></div>
+        <div className="space-y-2"><Label>Reference / note (optional)</Label><textarea value={note} onChange={e=>setNote(e.target.value)} rows={2} className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm" /></div>
+        <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={onClose}>Close</Button><Button type="submit" disabled={saving}>{saving?'Saving…':'Save Payment'}</Button></div>
+      </form> : null}
+      {details?.payment_history?.length ? <div><p className="mb-2 text-sm font-bold">Payment history</p><div className="space-y-2">{details.payment_history.map(item=><div key={item.id} className="flex justify-between rounded-lg border border-border p-3 text-sm"><div><p className="font-semibold">{item.method}</p><p className="text-xs text-text-secondary">{item.created_at}{item.note?` · ${item.note}`:''}</p></div><p className="font-bold">{formatMoney(item.amount)}</p></div>)}</div></div> : null}
+    </div>
+  </Modal>
 }
 
 function PaymentStatusModal({ booking, onClose, onSave }) {
@@ -1285,7 +1330,7 @@ function EditBookingModal({ booking, rooms, bookings, onClose, onSave }) {
   )
 }
 
-function BookingDetailsModal({ booking, rooms, onClose, onConfirm }) {
+function BookingDetailsModal({ booking, rooms, onClose, onConfirm, onRecordPayment }) {
   const [isConfirming, setIsConfirming] = useState(false)
   const room = getRoom(booking.room_id, rooms)
   const groupRooms = Array.isArray(booking.group_rooms) ? booking.group_rooms : []
@@ -1380,10 +1425,10 @@ function BookingDetailsModal({ booking, rooms, onClose, onConfirm }) {
                   <div className="flex justify-between gap-3 rounded-lg bg-blue-50 p-3"><span className="font-semibold text-text-secondary">Assigned room number</span><span className="font-bold text-blue-700">{booking.room_number || 'Not available'}</span></div>
                   <div className="flex justify-between border-t border-border pt-4"><span className="text-text-secondary">Price per night</span><span className="font-semibold text-text-primary">{formatMoney(room?.price_per_night)}</span></div>
                   <div className="flex justify-between"><span className="text-text-secondary">Total amount</span><span className="text-lg font-bold text-text-primary">{formatMoney(booking.total_amount)}</span></div>
-              {booking.advance_payment != null && Number(booking.advance_payment) > 0 ? (
+              {booking.payment_tracking_eligible ? (
                 <>
-                  <div className="flex justify-between"><span className="text-text-secondary">Advance paid</span><span className="font-semibold">{formatMoney(booking.advance_payment)}</span></div>
-                  <div className="flex justify-between"><span className="text-text-secondary">Balance due</span><span className="font-bold">{formatMoney(Math.max(0, Number(booking.total_amount || 0) - Number(booking.advance_payment)))}</span></div>
+                  <div className="flex justify-between"><span className="text-text-secondary">Amount received</span><span className="font-semibold">{formatMoney(booking.total_received)}</span></div>
+                  <div className="flex justify-between"><span className="text-text-secondary">Balance due</span><span className="font-bold">{formatMoney(booking.balance_due)}</span></div>
                 </>
               ) : null}
                 </div>
@@ -1402,6 +1447,7 @@ function BookingDetailsModal({ booking, rooms, onClose, onConfirm }) {
                 {isConfirming ? 'Confirming...' : 'Confirm Booking'}
               </Button>
             ) : null}
+            {booking.payment_tracking_eligible ? <Button type="button" variant="outline" className="mt-3 w-full" onClick={() => onRecordPayment?.(booking)}>Record Payment</Button> : null}
           </section>
 
           <section className="rounded-2xl border border-border bg-white p-5">
@@ -1475,6 +1521,7 @@ export default function Bookings() {
   const [statusBooking, setStatusBooking] = useState(null)
   const [statusFocus, setStatusFocus] = useState('booking')
   const [paymentBooking, setPaymentBooking] = useState(null)
+  const [recordPaymentBooking, setRecordPaymentBooking] = useState(null)
   const [deleteTargetBooking, setDeleteTargetBooking] = useState(null)
   const [isAddBookingOpen, setIsAddBookingOpen] = useState(false)
   const [toast, setToast] = useState(null)
@@ -1936,7 +1983,7 @@ export default function Bookings() {
       </div>
 
       {isAddBookingOpen ? <AddBookingModal rooms={rooms} bookings={bookings} onClose={() => setIsAddBookingOpen(false)} onSave={handleAddBooking} /> : null}
-      {selectedBooking ? <BookingDetailsModal booking={selectedBooking} rooms={rooms} onClose={() => setSelectedBooking(null)} onConfirm={handleQuickConfirmBooking} /> : null}
+      {selectedBooking ? <BookingDetailsModal booking={selectedBooking} rooms={rooms} onClose={() => setSelectedBooking(null)} onConfirm={handleQuickConfirmBooking} onRecordPayment={setRecordPaymentBooking} /> : null}
       {editBooking ? (
         editBooking.booking_group_id
           ? <EditGroupBookingModal booking={editBooking} rooms={rooms} onClose={() => setEditBooking(null)} onSave={handleEditBooking} />
@@ -1944,6 +1991,7 @@ export default function Bookings() {
       ) : null}
       {statusBooking ? <CombinedStatusModal booking={statusBooking} focus={statusFocus} onClose={() => setStatusBooking(null)} onSave={handleCombinedStatusSave} /> : null}
       {paymentBooking ? <PaymentStatusModal booking={paymentBooking} onClose={() => setPaymentBooking(null)} onSave={handlePaymentSave} /> : null}
+      {recordPaymentBooking ? <RecordPaymentModal booking={recordPaymentBooking} onClose={() => setRecordPaymentBooking(null)} onSaved={async () => { const fresh = await fetchBookings(); setBookings(fresh); const updated = fresh.find(item => item.id === recordPaymentBooking.id); if (updated) setSelectedBooking(updated) }} /> : null}
       {deleteTargetBooking ? <DeleteBookingModal booking={deleteTargetBooking} onClose={() => setDeleteTargetBooking(null)} onConfirm={handleDeleteBooking} /> : null}
     </div>
   )

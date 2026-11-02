@@ -55,6 +55,7 @@ export function normalizePaymentStatus(status, isExternal = false) {
     .replace(/\s+/g, '_')
 
   if (value === 'paid') return 'paid'
+  if (value === 'partially_paid' || value === 'partial') return 'partially_paid'
   if (value === 'failed') return 'failed'
   if (value === 'cancelled' || value === 'canceled') return 'cancelled'
   if (value === 'refunded') return 'refunded'
@@ -133,9 +134,14 @@ export function normalizeBooking(booking) {
     children: groupRooms.length ? groupRooms.reduce((n,r)=>n+r.children,0) : Number(booking.children || 0),
     total_nights: totalNights,
     booking_status: normalizeBookingStatus(booking.booking_status || booking.status || booking.bookingState, isExternal),
-    payment_status: normalizePaymentStatus(booking.payment_status || booking.paymentStatus, isExternal),
+    payment_status: normalizePaymentStatus((booking.payment_tracking_eligible ? booking.payment_tracking_status : '') || booking.payment_status || booking.paymentStatus, isExternal),
     payment_method: booking.payment_method || booking.method || booking.paymentMethod || '',
     total_amount: amount,
+    payment_tracking_eligible: Boolean(Number(booking.payment_tracking_eligible || 0)) || booking.payment_tracking_eligible === true,
+    payment_tracking_type: booking.payment_tracking_type || '',
+    total_received: Number(booking.total_received || 0),
+    balance_due: Number(booking.balance_due ?? amount),
+    payment_tracking_status: booking.payment_tracking_status ? normalizePaymentStatus(booking.payment_tracking_status) : '',
     payment_currency: booking.payment_currency || booking.currency || 'LKR',
     special_requests: booking.special_requests || booking.special_request || booking.message || booking.note || '',
     special_request: booking.special_request || booking.special_requests || booking.message || booking.note || '',
@@ -179,6 +185,7 @@ export async function createManualBooking(formData) {
     staying_guest_note: formData.staying_guest_note || '',
     payment_status: toApiPaymentStatus(formData.payment_status || 'pending'),
     payment_method: formData.payment_method || 'Cash',
+    advance_payment: Number(formData.advance_payment || 0),
   }
 
   const response = await apiFetch(`${BOOKINGS_API_BASE_URL}/create-manual.php`, {
@@ -375,4 +382,21 @@ export async function deleteBooking(bookingId) {
 
   const payload = await readJsonResponse(response)
   return payload.data
+}
+
+
+export async function fetchBookingPayments(bookingId) {
+  const response = await apiFetch(`${buildApiUrl('/payments/booking-payments.php')}?booking_id=${encodeURIComponent(bookingId)}`, {
+    method: 'GET', headers: { Accept: 'application/json' },
+  })
+  const payload = await readJsonResponse(response)
+  return payload
+}
+
+export async function recordBookingPayment(bookingId, amount, method, note = '') {
+  const response = await apiFetch(buildApiUrl('/payments/booking-payments.php'), {
+    method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ booking_id: Number(bookingId), amount: Number(amount), method, note }),
+  })
+  return readJsonResponse(response)
 }

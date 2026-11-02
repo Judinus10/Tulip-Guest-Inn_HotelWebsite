@@ -5,6 +5,7 @@ require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../calendar/ics-helper.php';
 require_once __DIR__ . '/multi-room-helper.php';
 require_once __DIR__ . '/../rooms/_room_helpers.php';
+require_once __DIR__ . '/../payments/booking-payment-ledger.php';
 
 apply_cors_headers();
 
@@ -18,6 +19,7 @@ require_admin_auth();
 try {
     $pdo = get_db_connection();
     ensure_rooms_schema($pdo);
+    ensure_booking_payment_ledger($pdo);
     $roomNumbers = $pdo->query('SELECT id, room_number FROM rooms')->fetchAll(PDO::FETCH_KEY_PAIR);
     $stmt = $pdo->query(
         "SELECT
@@ -85,6 +87,7 @@ try {
             b.invoice_number,
             b.invoice_file_path,
             b.email_status,
+            b.user_agent,
             b.created_at,
             b.updated_at
          FROM bookings b
@@ -124,6 +127,26 @@ try {
         $bookingRow['children'] = array_sum(array_column($groupRows, 'children'));
         $bookingRow['children_ages'] = array_merge(...array_column($groupRows, 'children_ages'));
         $bookingRow['total_amount'] = array_sum(array_map(static fn(array $row): float => (float) ($row['amount'] ?? 0), $groupRows));
+    }
+    unset($bookingRow);
+
+    foreach ($data as &$bookingRow) {
+        $context = booking_payment_context($pdo, (int)$bookingRow['id'], false);
+        if ($context && !empty($context['payment_tracking_eligible'])) {
+            booking_payment_seed_legacy($pdo, $context);
+            $summary = booking_payment_totals($pdo, (int)$context['id'], (float)($bookingRow['total_amount'] ?? $context['tracking_total']));
+            $bookingRow['payment_tracking_eligible'] = 1;
+            $bookingRow['payment_tracking_type'] = $context['payment_tracking_type'];
+            $bookingRow['total_received'] = $summary['total_received'];
+            $bookingRow['balance_due'] = $summary['balance_due'];
+            $bookingRow['payment_tracking_status'] = $summary['payment_state'];
+        } else {
+            $bookingRow['payment_tracking_eligible'] = 0;
+            $bookingRow['payment_tracking_type'] = '';
+            $bookingRow['total_received'] = 0;
+            $bookingRow['balance_due'] = (float)($bookingRow['total_amount'] ?? 0);
+            $bookingRow['payment_tracking_status'] = '';
+        }
     }
     unset($bookingRow);
     $external = [];
