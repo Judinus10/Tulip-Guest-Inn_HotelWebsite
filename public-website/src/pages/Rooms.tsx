@@ -33,10 +33,20 @@ export default function Rooms() {
   const [form, setForm] = useState(urlFilters);
   const [active, setActive] = useState<Category>('all');
   const [roomList, setRoomList] = useState<Room[]>([]);
+  const [configuredCategories, setConfiguredCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => setForm(urlFilters), [urlFilters]);
+
+  // Room-type tabs reflect configured backend rooms, not date availability.
+  useEffect(() => {
+    let mounted = true;
+    fetchPublicRooms().then((rooms) => {
+      if (mounted) setConfiguredCategories(Array.from(new Set(rooms.map((room) => room.category))));
+    }).catch(() => { if (mounted) setConfiguredCategories([]); });
+    return () => { mounted = false; };
+  }, []);
 
   // Keep the guest filter live even when dates have not been selected. Dates
   // are added only as a valid pair, so partial date input never triggers an
@@ -68,6 +78,10 @@ export default function Rooms() {
     return () => { mounted = false; };
   }, [urlFilters.checkIn, urlFilters.checkOut]);
 
+  useEffect(() => {
+    if (active !== 'all' && !configuredCategories.includes(active)) setActive('all');
+  }, [active, configuredCategories]);
+
   const guests = partyTotal(form);
   const hasSearched = Boolean(urlFilters.checkIn && urlFilters.checkOut && urlFilters.checkOut > urlFilters.checkIn);
   const datesPending = Boolean((form.checkIn || form.checkOut) && (!form.checkIn || !form.checkOut || form.checkOut <= form.checkIn || form.checkIn !== urlFilters.checkIn || form.checkOut !== urlFilters.checkOut));
@@ -98,7 +112,7 @@ export default function Rooms() {
   return <main>
     <PageHero title="Rooms in Point Pedro" subtitle="Clean, comfortable accommodation for individuals, couples and families in Northern Province, Sri Lanka." image={bannerRooms} breadcrumb="Accommodation" />
     <section className="bg-surface border-b border-border"><div className="container-custom"><div className="flex flex-wrap">
-      {categories.map((cat) => <button key={cat.value} onClick={() => setActive(cat.value)} className={`px-7 py-5 text-[10px] tracking-[0.2em] uppercase font-medium border-b-2 ${active === cat.value ? 'border-gold text-gold' : 'border-transparent text-muted'}`}>{cat.label}</button>)}
+      {categories.filter((cat) => cat.value === 'all' || configuredCategories.includes(cat.value)).map((cat) => <button key={cat.value} onClick={() => setActive(cat.value)} className={`px-7 py-5 text-[10px] tracking-[0.2em] uppercase font-medium border-b-2 ${active === cat.value ? 'border-gold text-gold' : 'border-transparent text-muted'}`}>{cat.label}</button>)}
     </div></div></section>
 
     <section className="bg-background pt-10"><div className="container-custom">
