@@ -285,6 +285,10 @@ function CalendarRecordPaymentModal({ booking, onClose, onSaved }) {
 }
 
 function BookingDetailsModal({ booking, onClose, onStatusChange, onMarkPaid, onRecordPayment, updatingStatus }) {
+  const [paymentDetails, setPaymentDetails] = useState(null)
+  const [paymentDetailsLoading, setPaymentDetailsLoading] = useState(false)
+  const [paymentDetailsError, setPaymentDetailsError] = useState('')
+
   useEffect(() => {
     if (!booking) return undefined
 
@@ -298,6 +302,25 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, onMarkPaid, onR
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [booking, onClose])
 
+  useEffect(() => {
+    if (!booking?.payment_tracking_eligible) {
+      setPaymentDetails(null)
+      setPaymentDetailsError('')
+      setPaymentDetailsLoading(false)
+      return undefined
+    }
+
+    let active = true
+    setPaymentDetailsLoading(true)
+    setPaymentDetailsError('')
+    fetchBookingPayments(booking.id)
+      .then((details) => { if (active) setPaymentDetails(details) })
+      .catch((error) => { if (active) setPaymentDetailsError(error.message || 'Unable to load payment history.') })
+      .finally(() => { if (active) setPaymentDetailsLoading(false) })
+
+    return () => { active = false }
+  }, [booking?.id, booking?.payment_tracking_eligible, booking?.total_received, booking?.balance_due])
+
   if (!booking) return null
 
   const isBookingCom = isBookingComBooking(booking)
@@ -308,6 +331,9 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, onMarkPaid, onR
   const canCancel = ['pending', 'confirmed', 'checked_in'].includes(bookingStatus)
   const paymentStatus = getBookingStatusKey(booking.payment_status)
   const canMarkPaid = ['pending', 'payment_pending'].includes(paymentStatus)
+  const paymentSummary = paymentDetails?.payment_summary
+  const totalReceived = paymentSummary?.total_received ?? booking.total_received ?? 0
+  const balanceDue = paymentSummary?.balance_due ?? booking.balance_due ?? booking.total_amount
 
   const handleBackdropClick = (event) => {
     if (event.target === event.currentTarget) {
@@ -361,12 +387,31 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, onMarkPaid, onR
               <div className="flex items-center gap-2"><span className="font-semibold text-slate-500">Payment status:</span> <Badge variant={statusVariant[getBookingStatusKey(booking.payment_status)] || 'secondary'}>{normalizeStatus(booking.payment_status)}</Badge></div>
               {booking.payment_tracking_eligible && !isBookingCom && (
                 <>
-                  <p><span className="font-semibold text-slate-500">Amount received:</span> {currencyFormatter.format(Number(booking.total_received || 0))}</p>
-                  <p><span className="font-semibold text-slate-500">Remaining balance:</span> {currencyFormatter.format(Number(booking.balance_due || 0))}</p>
+                  <p><span className="font-semibold text-slate-500">Amount received:</span> {currencyFormatter.format(Number(totalReceived || 0))}</p>
+                  <p><span className="font-semibold text-slate-500">Remaining balance:</span> {currencyFormatter.format(Number(balanceDue || 0))}</p>
                 </>
               )}
             </div>
           </div>
+
+          {booking.payment_tracking_eligible && !isBookingCom ? (
+            <div className="rounded-xl border border-slate-200 p-4 md:col-span-2">
+              <h3 className="text-sm font-bold text-slate-950">Payment history</h3>
+              {paymentDetailsLoading ? <p className="mt-3 text-sm text-slate-500">Loading payment history…</p> : null}
+              {paymentDetailsError ? <p className="mt-3 text-sm text-red-700">{paymentDetailsError}</p> : null}
+              {!paymentDetailsLoading && !paymentDetailsError && paymentDetails?.payment_history?.length ? (
+                <div className="mt-3 space-y-2">
+                  {paymentDetails.payment_history.map((item) => (
+                    <div key={item.id} className="flex justify-between gap-3 rounded-lg border border-slate-200 p-3 text-sm">
+                      <div><p className="font-semibold text-slate-800">{item.method}</p><p className="text-xs text-slate-500">{item.created_at}{item.note ? ` · ${item.note}` : ''}</p></div>
+                      <p className="shrink-0 font-bold text-slate-900">{currencyFormatter.format(Number(item.amount || 0))}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {!paymentDetailsLoading && !paymentDetailsError && paymentDetails && !paymentDetails.payment_history?.length ? <p className="mt-3 text-sm text-slate-500">No payments recorded yet.</p> : null}
+            </div>
+          ) : null}
 
           {booking.special_request && (
             <div className="rounded-xl border border-slate-200 p-4 md:col-span-2">

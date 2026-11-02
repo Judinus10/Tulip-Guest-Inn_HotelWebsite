@@ -1332,10 +1332,36 @@ function EditBookingModal({ booking, rooms, bookings, onClose, onSave }) {
 
 function BookingDetailsModal({ booking, rooms, onClose, onConfirm, onRecordPayment }) {
   const [isConfirming, setIsConfirming] = useState(false)
+  const [paymentDetails, setPaymentDetails] = useState(null)
+  const [paymentDetailsLoading, setPaymentDetailsLoading] = useState(false)
+  const [paymentDetailsError, setPaymentDetailsError] = useState('')
   const room = getRoom(booking.room_id, rooms)
   const groupRooms = Array.isArray(booking.group_rooms) ? booking.group_rooms : []
   const isGroupBooking = Boolean(booking.booking_group_id && groupRooms.length > 0)
   const canConfirm = !booking.is_external && booking.booking_status === 'pending'
+
+  useEffect(() => {
+    if (!booking.payment_tracking_eligible) {
+      setPaymentDetails(null)
+      setPaymentDetailsError('')
+      setPaymentDetailsLoading(false)
+      return undefined
+    }
+
+    let active = true
+    setPaymentDetailsLoading(true)
+    setPaymentDetailsError('')
+    fetchBookingPayments(booking.id)
+      .then((details) => { if (active) setPaymentDetails(details) })
+      .catch((error) => { if (active) setPaymentDetailsError(error.message || 'Unable to load payment history.') })
+      .finally(() => { if (active) setPaymentDetailsLoading(false) })
+
+    return () => { active = false }
+  }, [booking.id, booking.payment_tracking_eligible, booking.total_received, booking.balance_due])
+
+  const paymentSummary = paymentDetails?.payment_summary
+  const totalReceived = paymentSummary?.total_received ?? booking.total_received ?? 0
+  const balanceDue = paymentSummary?.balance_due ?? booking.balance_due ?? booking.total_amount
 
   const handleConfirm = async () => {
     if (!canConfirm || isConfirming) return
@@ -1414,6 +1440,12 @@ function BookingDetailsModal({ booking, rooms, onClose, onConfirm, onRecordPayme
                   ))}
                 </div>
                 <div className="mt-4 flex justify-between border-t border-border pt-4"><span className="text-sm text-text-secondary">Group total</span><span className="text-lg font-bold text-text-primary">{formatMoney(booking.total_amount)}</span></div>
+                {booking.payment_tracking_eligible ? (
+                  <div className="mt-3 space-y-2 border-t border-border pt-3 text-sm">
+                    <div className="flex justify-between"><span className="text-text-secondary">Amount received</span><span className="font-semibold">{formatMoney(totalReceived)}</span></div>
+                    <div className="flex justify-between"><span className="text-text-secondary">Balance due</span><span className="font-bold">{formatMoney(balanceDue)}</span></div>
+                  </div>
+                ) : null}
               </>
             ) : (
               <>
@@ -1427,14 +1459,33 @@ function BookingDetailsModal({ booking, rooms, onClose, onConfirm, onRecordPayme
                   <div className="flex justify-between"><span className="text-text-secondary">Total amount</span><span className="text-lg font-bold text-text-primary">{formatMoney(booking.total_amount)}</span></div>
               {booking.payment_tracking_eligible ? (
                 <>
-                  <div className="flex justify-between"><span className="text-text-secondary">Amount received</span><span className="font-semibold">{formatMoney(booking.total_received)}</span></div>
-                  <div className="flex justify-between"><span className="text-text-secondary">Balance due</span><span className="font-bold">{formatMoney(booking.balance_due)}</span></div>
+                  <div className="flex justify-between"><span className="text-text-secondary">Amount received</span><span className="font-semibold">{formatMoney(totalReceived)}</span></div>
+                  <div className="flex justify-between"><span className="text-text-secondary">Balance due</span><span className="font-bold">{formatMoney(balanceDue)}</span></div>
                 </>
               ) : null}
                 </div>
               </>
             )}
           </section>
+
+          {booking.payment_tracking_eligible ? (
+            <section className="rounded-2xl border border-border bg-white p-5">
+              <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-text-secondary">Payment history</h3>
+              {paymentDetailsLoading ? <p className="text-sm text-text-secondary">Loading payment history…</p> : null}
+              {paymentDetailsError ? <p className="text-sm text-red-700">{paymentDetailsError}</p> : null}
+              {!paymentDetailsLoading && !paymentDetailsError && paymentDetails?.payment_history?.length ? (
+                <div className="space-y-2">
+                  {paymentDetails.payment_history.map((item) => (
+                    <div key={item.id} className="flex justify-between gap-3 rounded-lg border border-border p-3 text-sm">
+                      <div><p className="font-semibold text-text-primary">{item.method}</p><p className="text-xs text-text-secondary">{item.created_at}{item.note ? ` · ${item.note}` : ''}</p></div>
+                      <p className="shrink-0 font-bold text-text-primary">{formatMoney(item.amount)}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {!paymentDetailsLoading && !paymentDetailsError && paymentDetails && !paymentDetails.payment_history?.length ? <p className="text-sm text-text-secondary">No payments recorded yet.</p> : null}
+            </section>
+          ) : null}
 
           <section className="rounded-2xl border border-border bg-white p-5">
             <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-text-secondary">Current status</h3>
