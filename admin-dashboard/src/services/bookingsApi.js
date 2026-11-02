@@ -402,3 +402,17 @@ export async function recordBookingPayment(bookingId, amount, method, note = '',
   })
   return readJsonResponse(response)
 }
+
+export async function fetchBookingBackups() {
+  const response = await apiFetch(buildApiUrl('/bookings/backups.php'), { method: 'GET', headers: { Accept: 'application/json' } })
+  const payload = await readJsonResponse(response)
+  return payload.data || { backups: [], limit: 10 }
+}
+
+export async function restoreBookingBackup(backupId) {
+  const response = await apiFetch(buildApiUrl('/bookings/backups.php'), {
+    method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'restore', backup_id: backupId, confirm_restore: true }),
+  })
+  return readJsonResponse(response)
+}

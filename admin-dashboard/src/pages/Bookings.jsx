@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   CreditCard,
   Download,
+  DatabaseBackup,
   Eye,
   Filter,
   Hotel,
@@ -18,15 +19,19 @@ import {
   Phone,
   Pencil,
   Plus,
+  RefreshCw,
+  RotateCcw,
   Search,
   Trash2,
   UserRound,
   WalletCards,
   X,
   XCircle,
+  Loader2,
 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
+import { useAuth } from '@/context/AuthContext'
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -48,6 +53,8 @@ import {
   updatePaymentStatus,
   fetchBookingPayments,
   recordBookingPayment,
+  fetchBookingBackups,
+  restoreBookingBackup,
 } from '@/services/bookingsApi'
 
 const BOOKINGS_PER_PAGE = 6
@@ -1511,6 +1518,8 @@ function Pagination({ page, totalPages, totalItems, startItem, endItem, onPageCh
 }
 
 export default function Bookings() {
+  const { user } = useAuth()
+  const canManageBackups = user?.role === 'super_admin'
   const location = useLocation()
   const navigate = useNavigate()
   const dailyFilter = useMemo(() => {
@@ -1541,6 +1550,11 @@ export default function Bookings() {
   const [deleteTargetBooking, setDeleteTargetBooking] = useState(null)
   const [isAddBookingOpen, setIsAddBookingOpen] = useState(false)
   const [toast, setToast] = useState(null)
+  const [backupPanelOpen, setBackupPanelOpen] = useState(false)
+  const [backups, setBackups] = useState([])
+  const [backupLoading, setBackupLoading] = useState(false)
+  const [backupRestoring, setBackupRestoring] = useState('')
+  const [backupError, setBackupError] = useState('')
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type })
@@ -1566,6 +1580,41 @@ export default function Bookings() {
       showToast(error.message || 'Unable to load bookings.', 'error')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const loadBookingBackups = async () => {
+    setBackupLoading(true)
+    setBackupError('')
+    try {
+      const data = await fetchBookingBackups()
+      setBackups(data.backups || [])
+    } catch (error) {
+      setBackupError(error.message || 'Unable to load booking backups.')
+    } finally {
+      setBackupLoading(false)
+    }
+  }
+
+  const openBackupPanel = () => {
+    setBackupPanelOpen(true)
+    loadBookingBackups()
+  }
+
+  const handleRestoreBookingBackup = async (backup) => {
+    const confirmed = window.confirm(`Restore the ${new Date(backup.created_at).toLocaleString()} snapshot? This replaces the current booking records with the saved booking data. A safety backup of the current data will be created first. Room records, settings, and images are not changed.`)
+    if (!confirmed) return
+    setBackupRestoring(backup.id)
+    setBackupError('')
+    try {
+      const response = await restoreBookingBackup(backup.id)
+      showToast(response.message || 'Booking data restored successfully.')
+      await loadBookings()
+      await loadBookingBackups()
+    } catch (error) {
+      setBackupError(error.message || 'Could not restore this backup.')
+    } finally {
+      setBackupRestoring('')
     }
   }
 
@@ -1822,6 +1871,7 @@ export default function Bookings() {
               </>
             )}
           </Dropdown>
+          {canManageBackups ? <Button type="button" variant="outline" onClick={openBackupPanel}><DatabaseBackup className="h-4 w-4" />Sync from Backup</Button> : null}
           <Button onClick={() => setIsAddBookingOpen(true)}><Plus className="h-4 w-4" />Add Booking</Button>
         </div>
       </PageHeader>
@@ -2009,6 +2059,20 @@ export default function Bookings() {
       {paymentBooking ? <PaymentStatusModal booking={paymentBooking} onClose={() => setPaymentBooking(null)} onSave={handlePaymentSave} /> : null}
       {recordPaymentBooking ? <RecordPaymentModal booking={recordPaymentBooking} onClose={() => setRecordPaymentBooking(null)} onSaved={async () => { const fresh = await fetchBookings(); setBookings(fresh); const updated = fresh.find(item => item.id === recordPaymentBooking.id); if (updated) setSelectedBooking(updated) }} /> : null}
       {deleteTargetBooking ? <DeleteBookingModal booking={deleteTargetBooking} onClose={() => setDeleteTargetBooking(null)} onConfirm={handleDeleteBooking} /> : null}
+      {backupPanelOpen && canManageBackups ? <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/50 p-3 sm:p-6" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !backupRestoring) setBackupPanelOpen(false) }}>
+        <section className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="booking-backups-title">
+          <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-6">
+            <div><h2 id="booking-backups-title" className="text-lg font-bold text-slate-900">Booking Data Backups</h2><p className="mt-1 text-sm text-slate-500">Automatic snapshots of bookings and related payment/history records. The latest 10 are kept.</p></div>
+            <button type="button" aria-label="Close backups" disabled={!!backupRestoring} onClick={() => setBackupPanelOpen(false)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-50"><X className="h-5 w-5" /></button>
+          </header>
+          <div className="max-h-[calc(90vh-150px)] overflow-y-auto p-5 sm:p-6">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900"><span>Restoring replaces current booking data. A safety snapshot is created first. Rooms, images, and settings are left alone.</span><Button type="button" variant="outline" size="sm" disabled={backupLoading || !!backupRestoring} onClick={loadBookingBackups}><RefreshCw className={`h-4 w-4 ${backupLoading ? 'animate-spin' : ''}`} />Refresh</Button></div>
+            {backupError ? <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{backupError}</div> : null}
+            {backupLoading ? <div className="flex items-center justify-center gap-2 py-12 text-sm text-slate-500"><Loader2 className="h-5 w-5 animate-spin" />Loading backups…</div> : backups.length ? <div className="overflow-x-auto rounded-xl border border-slate-200"><table className="w-full min-w-[620px] text-left text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="px-4 py-3 font-semibold">Created</th><th className="px-4 py-3 font-semibold">Snapshot</th><th className="px-4 py-3 font-semibold">Bookings</th><th className="px-4 py-3 font-semibold">Size</th><th className="px-4 py-3 text-right font-semibold">Action</th></tr></thead><tbody>{backups.map(backup => <tr key={backup.id} className="border-t border-slate-100"><td className="px-4 py-3 text-slate-700">{backup.created_at ? new Date(backup.created_at).toLocaleString() : 'Unknown date'}</td><td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${backup.kind === 'pre_restore' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'}`}>{backup.kind === 'pre_restore' ? 'Safety snapshot' : 'Automatic'}</span>{!backup.valid && <span className="ml-2 text-xs text-red-600">Damaged</span>}</td><td className="px-4 py-3 text-slate-700">{Number(backup.booking_count || 0).toLocaleString()}</td><td className="px-4 py-3 text-slate-700">{(Number(backup.size_bytes || 0) / 1024).toFixed(1)} KB</td><td className="px-4 py-3 text-right"><Button type="button" variant="outline" size="sm" disabled={!backup.valid || !!backupRestoring} onClick={() => handleRestoreBookingBackup(backup)}>{backupRestoring === backup.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}Restore</Button></td></tr>)}</tbody></table></div> : <div className="rounded-xl border border-dashed border-slate-300 px-5 py-12 text-center"><DatabaseBackup className="mx-auto h-8 w-8 text-slate-400" /><p className="mt-3 font-semibold text-slate-800">No booking backups yet</p><p className="mt-1 text-sm text-slate-500">The list will populate after the scheduled backup task runs.</p></div>}
+            <p className="mt-4 text-xs text-slate-500">Backups are created by the server schedule. They cannot be deleted from this page; older snapshots are removed automatically when the 10-backup limit is exceeded.</p>
+          </div>
+        </section>
+      </div> : null}
     </div>
   )
 }
