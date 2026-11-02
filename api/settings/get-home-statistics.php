@@ -34,7 +34,7 @@ try {
          ) counted_stays"
     );
     $bookedGuests = max(0, (int) $guestStmt->fetchColumn());
-    $displayGuestCount = 2500 + (intdiv($bookedGuests, 100) * 100);
+    $displayGuestCount = 25000 + (intdiv($bookedGuests, 100) * 100);
 
     $roomStmt = $pdo->query('SELECT COUNT(*) FROM rooms');
     $roomCount = max(0, (int) $roomStmt->fetchColumn());
