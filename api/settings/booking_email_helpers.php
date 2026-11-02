@@ -10,6 +10,11 @@ function booking_email_editor_placeholders(?string $type = null): array
     $booking = ['guest_name' => 'Guest name', 'booking_reference' => 'Booking reference',
         'check_in' => 'Check-in date', 'check_out' => 'Check-out date', 'hotel_name' => 'Hotel name'];
     $payment = ['payment_status'=>'Payment status','payment_amount'=>'Payment amount', 'booking_status'=>'Booking status'];
+    $manualPayment = ['amount_received'=>'Amount received now', 'total_paid'=>'Total paid to date',
+        'balance_due'=>'Balance due at check-in', 'payment_method'=>'Payment method'];
+    if (in_array($type, ['manual_payment_received', 'admin_manual_payment_received'], true)) {
+        return array_merge($booking, $payment, $manualPayment);
+    }
     if ($type !== null && !str_starts_with($type,'contact_')) return array_merge($booking,$payment);
     return $type === null ? array_merge($booking, $contact, $payment, $summary) : $booking;
 }
@@ -20,8 +25,10 @@ function booking_email_editor_default_headings(): array
     return ['received'=>'We received your booking', 'confirmed'=>'Your booking is confirmed',
         'payment_pending'=>'Online payment pending', 'payment_failed'=>'Payment unsuccessful',
         'payment_received'=>'Payment received', 'expired'=>'Your booking hold has expired',
+        'manual_payment_received'=>'Partial payment received',
         'cancelled'=>'Your booking has been cancelled', 'status_updated'=>'Your booking details have changed',
         'admin_new_booking'=>'New booking received', 'admin_payment_received'=>'Payment received',
+        'admin_manual_payment_received'=>'Manual payment recorded',
         'admin_payment_failed'=>'Payment failed', 'admin_payment_pending'=>'Online payment pending',
         'admin_booking_expired'=>'Booking hold expired', 'admin_booking_cancelled'=>'Booking cancelled',
         'contact_customer'=>'We received your message', 'contact_admin'=>'New contact enquiry',
@@ -47,6 +54,8 @@ function booking_email_editor_defaults(): array
         'payment_pending' => ['subject'=>'Payment pending - {booking_reference}','greeting'=>'Hello {guest_name},','introduction_html'=>'<p>Your online payment has not been completed. Your reservation is not confirmed by this message. Please review your booking before the hold expires.</p>','closing_html'=>'<p>Please contact us if you need assistance.</p>','footer_note'=>'Thank you for choosing {hotel_name}.'],
         'payment_failed' => ['subject'=>'Payment failed - {booking_reference}','greeting'=>'Hello {guest_name},','introduction_html'=>'<p>Your payment attempt was unsuccessful. Please review your booking or contact us before trying again. This email does not confirm a reservation.</p>','closing_html'=>'<p>Please contact us if you need assistance.</p>','footer_note'=>'Thank you for choosing {hotel_name}.'],
         'payment_received' => ['subject'=>'Payment received - {booking_reference}','greeting'=>'Hello {guest_name},','introduction_html'=>'<p>We have recorded your payment. Please check the booking status below; a payment receipt alone does not confirm a reservation.</p>','closing_html'=>'<p>Please contact us if you need assistance.</p>','footer_note'=>'Thank you for choosing {hotel_name}.'],
+        'manual_payment_received' => ['subject'=>'Payment received - {booking_reference}','greeting'=>'Hello {guest_name},','introduction_html'=>'<p>We have received {amount_received} for your booking. You have paid {total_paid} so far. Your current balance is {balance_due}.</p>','closing_html'=>'<p>Please contact us if you need assistance with your booking.</p>','footer_note'=>'Thank you for choosing {hotel_name}.'],
+        'admin_manual_payment_received' => ['subject'=>'Manual payment recorded - {booking_reference}','greeting'=>'Hello team,','introduction_html'=>'<p>A payment of {amount_received} was recorded for {guest_name}. Total received is now {total_paid}, with {balance_due} remaining.</p>','closing_html'=>'<p>Open the admin panel to review the booking and payment history.</p>','footer_note'=>'Internal payment notification.'],
         'expired' => ['subject'=>'Booking hold expired - {booking_reference}','greeting'=>'Hello {guest_name},','introduction_html'=>'<p>Your unpaid online booking hold has expired and the room is no longer held. Please check availability before making a new booking.</p>','closing_html'=>'<p>Please contact us if you need assistance.</p>','footer_note'=>'Thank you for choosing {hotel_name}.'],
         'cancelled' => ['subject'=>'Booking cancelled - {booking_reference}','greeting'=>'Hello {guest_name},','introduction_html'=>'<p>Your reservation has been cancelled. Please contact us if you have questions. Any refund must be verified separately.</p>','closing_html'=>'<p>Please contact us if you need assistance.</p>','footer_note'=>'Thank you for choosing {hotel_name}.'],
         'status_updated' => ['subject'=>'Booking details updated - {booking_reference}','greeting'=>'Hello {guest_name},','introduction_html'=>'<p>Your booking or payment details have changed. Please review the current statuses below.</p>','closing_html'=>'<p>Please contact us if you need assistance.</p>','footer_note'=>'Thank you for choosing {hotel_name}.'],

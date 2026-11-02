@@ -45,6 +45,7 @@ const types = { admin_daily_summary: { title: 'Daily stay summary', description:
   payment_pending: { title: 'Payment pending', description: 'Sent to the guest. Your online payment has not been completed. Your reservation is not confirmed by this message. Please review your booking before the hold expires.' },
   payment_failed: { title: 'Payment failed', description: 'Sent to the guest. Your payment attempt was unsuccessful. Please review your booking or contact us before trying again. This email does not confirm a reservation.' },
   payment_received: { title: 'Payment received', description: 'Sent to the guest. We have recorded your payment. Please check the booking status below; a payment receipt alone does not confirm a reservation.' },
+  manual_payment_received: { title: 'Manual payment received', description: 'Sent to the customer after staff records a payment. Includes the amount received, total paid to date, and remaining balance due at check-in.' },
   expired: { title: 'Booking hold expired', description: 'Sent to the guest. Your unpaid online booking hold has expired and the room is no longer held. Please check availability before making a new booking.' },
   cancelled: { title: 'Booking cancelled', description: 'Sent to the guest. Your reservation has been cancelled. Please contact us if you have questions. Any refund must be verified separately.' },
   status_updated: { title: 'Booking details updated', description: 'Sent to the guest. Your booking or payment details have changed. Please review the current statuses below.' },
@@ -56,6 +57,7 @@ const types = { admin_daily_summary: { title: 'Daily stay summary', description:
   contact_admin: { title: 'Admin enquiry notification', description: 'Sent to the hotel with enquiry details. Reply goes to the customer.' },
   admin_new_booking: { title: 'New booking', description: 'Sent to the hotel when a booking is received.' },
   admin_payment_received: { title: 'Payment received', description: 'Sent to the hotel after a successful payment.' },
+  admin_manual_payment_received: { title: 'Manual payment recorded', description: 'Sent to the hotel after staff records a payment. Includes the amount received, total paid to date, and remaining balance.' },
   admin_payment_failed: { title: 'Payment failed', description: 'Sent to the hotel after a failed payment attempt.' } }
 const categoryOf = key => key === 'admin_daily_summary' ? 'daily' : key.startsWith('contact_') ? 'contact' : 'booking'
 const fieldLabels = { subject: 'Subject', heading: 'Email heading', greeting: 'Greeting', introduction_html: 'Introduction', please_note: 'Please note (optional)', closing_html: 'Closing message', footer_note: 'Footer note' }

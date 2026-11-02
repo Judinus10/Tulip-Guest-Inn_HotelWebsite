@@ -17,6 +17,7 @@ function tulip_booking_status_email_key(string $kind, array $booking, array $pay
 
 function tulip_booking_email_event_base(string $type): string
 {
+    if (preg_match('/^(admin_manual_payment_received|manual_payment_received)_entry_[1-9][0-9]*$/D', $type, $manualPayment)) return $manualPayment[1];
     if (preg_match('/^(payment_failed|admin_payment_failed)_attempt_[a-f0-9]{24}$/D', $type, $attempt)) return $attempt[1];
     return preg_match('/^(booking_status_updated|payment_status_updated|combined_status_updated|admin_payment_received|admin_payment_failed|payment_failed)_[a-f0-9]{24}$/D', $type, $match)
         ? $match[1] : $type;
@@ -54,6 +55,8 @@ function tulip_booking_template_event(string $emailType): ?string
         'booking_cancelled' => 'cancelled',
         'payment_status_updated', 'booking_status_updated', 'combined_status_updated' => 'status_updated',
         'admin_payment_received' => 'admin_payment_received',
+        'manual_payment_received' => 'manual_payment_received',
+        'admin_manual_payment_received' => 'admin_manual_payment_received',
         'admin_payment_failed' => 'admin_payment_failed',
         'booking_inquiry_received', 'booking_manual_received',
         'staying_guest_booking_received', 'staying_guest_manual_booking' => 'received',
@@ -80,6 +83,9 @@ function tulip_saved_booking_template(PDO $pdo, string $type): array
 
 function tulip_booking_email_for_queue(PDO $pdo, ?string $relatedType, ?int $bookingId, string $recipient, string $emailType): ?array
 {
+    $queuedEmailType = $emailType;
+    $manualPaymentEntryId = preg_match('/^(?:admin_)?manual_payment_received_entry_([1-9][0-9]*)$/D', $queuedEmailType, $manualPaymentMatch)
+        ? (int) $manualPaymentMatch[1] : 0;
     $emailType = tulip_booking_email_event_base($emailType);
     $event = tulip_booking_template_event($emailType);
     if ($relatedType !== 'booking' || !$bookingId || !$event) return null;
@@ -123,6 +129,25 @@ function tulip_booking_email_for_queue(PDO $pdo, ?string $relatedType, ?int $boo
     $booking['payment_amount'] = $payment['amount'] ?? null;
     $booking['payment_currency'] = $payment['currency'] ?? $booking['currency'] ?? 'LKR';
     $booking['transaction_id'] = trim((string) ($payment['payment_id'] ?? '')) ?: (string) ($payment['order_id'] ?? '');
+    if ($manualPaymentEntryId > 0) {
+        $stmt = $pdo->prepare('SELECT id, amount, currency, method, external_reference, created_at FROM booking_payment_entries WHERE id = ? AND booking_id = ? AND reversed_at IS NULL LIMIT 1');
+        $stmt->execute([$manualPaymentEntryId, $primaryId]);
+        $manualPayment = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$manualPayment) return null;
+        $stmt = $pdo->prepare('SELECT COALESCE(SUM(amount), 0) FROM booking_payment_entries WHERE booking_id = ? AND reversed_at IS NULL');
+        $stmt->execute([$primaryId]);
+        $totalPaid = round((float) $stmt->fetchColumn(), 2);
+        $balanceDue = round(max(0, (float) $booking['amount'] - $totalPaid), 2);
+        $booking['amount_received'] = (float) $manualPayment['amount'];
+        $booking['payment_amount'] = (float) $manualPayment['amount'];
+        $booking['total_paid'] = $totalPaid;
+        $booking['balance_due'] = $balanceDue;
+        $booking['payment_currency'] = $manualPayment['currency'] ?: ($booking['currency'] ?? 'LKR');
+        $booking['payment_method'] = (string) $manualPayment['method'];
+        $booking['payment_status'] = $balanceDue <= 0.005 ? 'Paid' : 'Partially Paid';
+        $paymentState = strtolower(trim($booking['payment_status']));
+        $booking['transaction_id'] = (string) ($manualPayment['external_reference'] ?? '');
+    }
     if (in_array($emailType, ['payment_successful','staying_guest_payment_successful'], true)) {
         if ($paymentState !== 'paid') return null;
         $type = $status === 'confirmed' ? 'confirmed' : 'payment_received';
@@ -173,6 +198,11 @@ function tulip_booking_email_for_queue(PDO $pdo, ?string $relatedType, ?int $boo
     if (!$isAdmin && in_array(strtolower($booking['payment_method']), ['cash','cash on arrival','pay on arrival'], true)
         && in_array($paymentState, ['pending','payment pending'], true)) {
         $booking['payment_notice'] = 'Payment is due on arrival. No online payment is required for this payment method.';
+    }
+    if ($manualPaymentEntryId > 0 && !$isAdmin) {
+        $booking['payment_notice'] = $booking['balance_due'] > 0.005
+            ? 'The remaining balance is due at check-in.'
+            : 'This booking is now fully paid.';
     }
     if (in_array($type, ['expired','admin_booking_expired'], true)) $booking['status'] = 'Expired';
     if ($type === 'payment_received' && $status === 'pending') {

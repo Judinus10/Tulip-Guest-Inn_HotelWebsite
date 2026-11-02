@@ -1307,6 +1307,61 @@ function queue_booking_received_emails(PDO $pdo, array $booking): int
     return (int) $customerQueued + (int) $hotelQueued + (int) $guestQueued;
 }
 
+/** Queue a guest receipt and hotel notification for one admin-recorded payment entry. */
+function queue_manual_payment_receipt_emails(PDO $pdo, int $bookingId, int $paymentEntryId): int
+{
+    if ($bookingId < 1 || $paymentEntryId < 1) return 0;
+
+    $stmt = $pdo->prepare('SELECT * FROM bookings WHERE id = ? LIMIT 1');
+    $stmt->execute([$bookingId]);
+    $booking = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$booking) return 0;
+
+    $stmt = $pdo->prepare('SELECT id, amount, currency, method, external_reference, created_at FROM booking_payment_entries WHERE id = ? AND booking_id = ? AND reversed_at IS NULL LIMIT 1');
+    $stmt->execute([$paymentEntryId, $bookingId]);
+    $entry = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$entry) return 0;
+
+    $booking = booking_with_guest_details($pdo, $booking);
+    $groupId = (int) ($booking['booking_group_id'] ?? 0);
+    if ($groupId > 0) {
+        $stmt = $pdo->prepare('SELECT COALESCE(SUM(amount), 0) FROM bookings WHERE booking_group_id = ?');
+        $stmt->execute([$groupId]);
+        $booking['amount'] = (float) $stmt->fetchColumn();
+    }
+    $stmt = $pdo->prepare('SELECT COALESCE(SUM(amount), 0) FROM booking_payment_entries WHERE booking_id = ? AND reversed_at IS NULL');
+    $stmt->execute([$bookingId]);
+    $totalPaid = round((float) $stmt->fetchColumn(), 2);
+    $balanceDue = round(max(0, (float) ($booking['amount'] ?? 0) - $totalPaid), 2);
+    $currency = (string) ($entry['currency'] ?: ($booking['currency'] ?? 'LKR'));
+    $booking['payment_amount'] = (float) $entry['amount'];
+    $booking['payment_currency'] = $currency;
+    $booking['payment_method'] = (string) $entry['method'];
+    $booking['payment_status'] = $balanceDue <= 0.005 ? 'Paid' : 'Partially Paid';
+    $booking['total_paid'] = $totalPaid;
+    $booking['balance_due'] = $balanceDue;
+    $booking['payment_notice'] = $balanceDue > 0.005
+        ? 'The remaining balance is due at check-in.'
+        : 'Your booking is fully paid.';
+    $booking['transaction_id'] = (string) ($entry['external_reference'] ?? '');
+    $reference = $groupId > 0 ? 'MB-' . str_pad((string) $groupId, 6, '0', STR_PAD_LEFT)
+        : 'BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT);
+    $format = static fn(float $amount): string => htmlspecialchars($currency . ' ' . number_format($amount, 2), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $fallbackBody = '<p>We received ' . $format((float) $entry['amount']) . ' for booking ' . htmlspecialchars($reference, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '.</p>'
+        . '<p>Total paid to date: ' . $format($totalPaid) . '<br>Balance due at check-in: ' . $format($balanceDue) . '</p>';
+
+    $entrySuffix = '_entry_' . $paymentEntryId;
+    $customerQueued = enqueue_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''),
+        'Payment received - Tulip Guest Inn ' . $reference, $fallbackBody,
+        'manual_payment_received' . $entrySuffix, null, 3, booking_from_email(), booking_from_name());
+    $hotelQueued = enqueue_email($pdo, 'booking', $bookingId, booking_admin_email(),
+        'Manual payment recorded - Tulip Guest Inn ' . $reference, $fallbackBody,
+        'admin_manual_payment_received' . $entrySuffix, $booking['email'] ?? null, 3, booking_from_email(), booking_from_name());
+
+    if ($customerQueued || $hotelQueued) update_booking_email_status($pdo, $bookingId, 'Payment Email Queued');
+    return (int) $customerQueued + (int) $hotelQueued;
+}
+
 function send_booking_received_emails(PDO $pdo, array $booking): void
 {
     $booking = booking_with_guest_details($pdo, $booking);

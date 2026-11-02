@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../mail/email-helper.php';
 require_once __DIR__ . '/booking-payment-ledger.php';
 apply_cors_headers();
 if ($_SERVER['REQUEST_METHOD']==='OPTIONS') { http_response_code(204); exit; }
@@ -8,6 +9,7 @@ require_admin_auth();
 if (!in_array($_SERVER['REQUEST_METHOD']??'', ['GET','POST'],true)) json_response(false,'Method not allowed.',405);
 try {
     $pdo=get_db_connection(); ensure_booking_payment_ledger($pdo);
+    $recordedPaymentEntryId=0;
     $input=$_SERVER['REQUEST_METHOD']==='POST'?read_request_data():$_GET;
     $bookingId=filter_var($input['booking_id']??null,FILTER_VALIDATE_INT);
     if (!$bookingId || $bookingId<1) json_response(false,'Valid booking_id required.',422);
@@ -28,12 +30,18 @@ try {
         $ref='ADMIN-'.date('YmdHis').'-'.$bookingId.'-'.bin2hex(random_bytes(3));
         $q=$pdo->prepare("INSERT INTO booking_payment_entries (booking_id,amount,currency,method,source,external_reference,note,recorded_by) VALUES (?,?,?,?,?,?,?,'admin')");
         $q->execute([$bookingId,$amount,$context['currency'] ?: 'LKR',$method,'admin',$ref,$note?:null]);
+        $recordedPaymentEntryId=(int)$pdo->lastInsertId();
         $totals=booking_payment_totals($pdo,$bookingId,(float)$context['tracking_total']);
         $dbStatus=$totals['balance_due']<=0.005?'Paid':'Payment Pending';
         if ((int)($context['booking_group_id']??0)>0) {
             $q=$pdo->prepare("UPDATE bookings SET payment_status=?, updated_at=NOW() WHERE booking_group_id=?"); $q->execute([$dbStatus,(int)$context['booking_group_id']]);
         } else { $q=$pdo->prepare("UPDATE bookings SET payment_status=?, updated_at=NOW() WHERE id=?"); $q->execute([$dbStatus,$bookingId]); }
         $pdo->commit();
+        try {
+            queue_manual_payment_receipt_emails($pdo,$bookingId,$recordedPaymentEntryId);
+        } catch (Throwable $emailError) {
+            error_log('Manual booking payment receipt email queue error: '.$emailError->getMessage());
+        }
     }
     $context=booking_payment_context($pdo,$bookingId,false); booking_payment_seed_legacy($pdo,$context);
     $totals=booking_payment_totals($pdo,$bookingId,(float)$context['tracking_total']);

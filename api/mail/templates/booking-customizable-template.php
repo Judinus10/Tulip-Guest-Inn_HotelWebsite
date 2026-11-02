@@ -67,12 +67,18 @@ function tulip_booking_email_brand(PDO $pdo, bool $inlineLogo = true): array
 
 function tulip_booking_email_tokens(array $booking, array $brand): array
 {
+    $currency = (string) ($booking['payment_currency'] ?? $booking['currency'] ?? 'LKR');
+    $money = static fn(mixed $value): string => $currency . ' ' . number_format((float) $value, 2);
     return ['guest_name' => (string) ($booking['full_name'] ?? 'Guest'),
         'booking_reference' => (string) ($booking['booking_no'] ?? ''),
         'check_in' => tulip_booking_email_date((string) ($booking['check_in_date'] ?? '')),
         'check_out' => tulip_booking_email_date((string) ($booking['check_out_date'] ?? '')),
         'hotel_name' => (string) $brand['name'], 'booking_status' => (string) ($booking['status'] ?? 'Not available'), 'payment_status' => (string) ($booking['payment_status'] ?? 'Not available'),
-        'payment_amount' => isset($booking['payment_amount']) ? (string) ($booking['payment_currency'] ?? $booking['currency'] ?? 'LKR') . ' ' . number_format((float) $booking['payment_amount'], 2) : 'Not available'];
+        'payment_amount' => isset($booking['payment_amount']) ? $money($booking['payment_amount']) : 'Not available',
+        'amount_received' => isset($booking['amount_received']) ? $money($booking['amount_received']) : 'Not available',
+        'total_paid' => isset($booking['total_paid']) ? $money($booking['total_paid']) : 'Not available',
+        'balance_due' => isset($booking['balance_due']) ? $money($booking['balance_due']) : 'Not available',
+        'payment_method' => (string) ($booking['payment_method'] ?? 'Not available')];
 }
 
 /** Use only the configured international WhatsApp number, with no fallback to other contacts. */
@@ -147,13 +153,13 @@ function tulip_render_booking_email(string $type, array $content, array $booking
         'received'=>'Awaiting confirmation', 'confirmed'=>'Confirmed',
         'payment_pending','admin_payment_pending'=>'Payment pending',
         'payment_failed','admin_payment_failed'=>'Payment failed',
-        'payment_received','admin_payment_received'=>'Payment received',
+        'payment_received','admin_payment_received','manual_payment_received','admin_manual_payment_received'=>'Payment received',
         'expired','admin_booking_expired'=>'Hold expired',
         'cancelled','admin_booking_cancelled'=>'Cancelled',
         'admin_new_booking'=>'New booking', default=>'Status updated',
     };
     $badgeStyle = in_array($type, ['payment_failed','admin_payment_failed','expired','admin_booking_expired','cancelled','admin_booking_cancelled'], true)
-        ? '#fff0ee;color:#a52b24' : (in_array($type, ['confirmed','payment_received','admin_payment_received'], true) ? '#edf6ee;color:#245d35' : '#fff5df;color:#865d1c');
+        ? '#fff0ee;color:#a52b24' : (in_array($type, ['confirmed','payment_received','admin_payment_received','manual_payment_received','admin_manual_payment_received'], true) ? '#edf6ee;color:#245d35' : '#fff5df;color:#865d1c');
     $greeting = $e(tulip_booking_email_plain_text($content['greeting'], $tokens));
     $intro = tulip_booking_email_rich_text($content['introduction_html'], $tokens);
     $closing = tulip_booking_email_rich_text($content['closing_html'], $tokens);
@@ -203,10 +209,15 @@ function tulip_render_booking_email(string $type, array $content, array $booking
         foreach ($fields as $label=>$value) if (trim((string)$value)!=='') $customerDetails .= '<tr><td style="padding:8px 12px;color:#647067;vertical-align:top;">'.$e($label).'</td><td style="padding:8px 12px;font-weight:bold;">'.$e($value).'</td></tr>';
         $customerDetails .= '</table></td></tr>';
         if (isset($booking['payment_amount'])) {
-            $label = $type === 'admin_payment_received' ? 'Received amount' : ($type === 'admin_payment_failed' ? 'Attempted amount' : 'Payment record amount');
+            $label = in_array($type, ['admin_payment_received', 'admin_manual_payment_received'], true) ? 'Received amount' : ($type === 'admin_payment_failed' ? 'Attempted amount' : 'Payment record amount');
             $paymentExtra .= '<tr><td style="padding:8px 0;">'.$label.'</td><td align="right" style="padding:8px 0;font-weight:bold;">'.$e($tokens['payment_amount']).'</td></tr>';
         }
         if (!empty($booking['transaction_id'])) $paymentExtra .= '<tr><td style="padding:8px 0;vertical-align:top;">Transaction / order ID</td><td align="right" style="padding:8px 0;word-break:break-all;">'.$e($booking['transaction_id']).'</td></tr>';
+    }
+    if (in_array($type, ['manual_payment_received', 'admin_manual_payment_received'], true)) {
+        if (!$isAdmin) $paymentExtra .= '<tr><td style="padding:8px 0;">Amount received now</td><td align="right" style="padding:8px 0;font-weight:bold;">'.$e($tokens['amount_received']).'</td></tr>';
+        $paymentExtra .= '<tr><td style="padding:8px 0;border-top:1px solid #e8e3da;">Total paid to date</td><td align="right" style="padding:8px 0;border-top:1px solid #e8e3da;font-weight:bold;">'.$e($tokens['total_paid']).'</td></tr>';
+        $paymentExtra .= '<tr><td style="padding:8px 0;">Balance due at check-in</td><td align="right" style="padding:8px 0;font-weight:bold;">'.$e($tokens['balance_due']).'</td></tr>';
     }
     $actionLabel = $isAdmin ? 'Open booking in admin' : 'View booking & bill';
     $action = '';

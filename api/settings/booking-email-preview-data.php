@@ -24,8 +24,8 @@ function booking_email_admin_preview_data(string $type, string $scenario): array
 {
     $booking = booking_email_preview_data($scenario);
     $booking['email'] = 'guest@example.test'; $booking['phone'] = '+94 77 000 0000';
-    $booking['status'] = $type === 'admin_payment_received' ? 'Confirmed' : 'Pending';
-    $booking['payment_status'] = match($type) { 'admin_payment_received'=>'Paid', 'admin_payment_failed'=>'Failed', default=>'Payment Pending' };
+    $booking['status'] = in_array($type, ['admin_payment_received', 'admin_manual_payment_received'], true) ? 'Confirmed' : 'Pending';
+    $booking['payment_status'] = match($type) { 'admin_payment_received'=>'Paid', 'admin_manual_payment_received'=>'Partially Paid', 'admin_payment_failed'=>'Failed', default=>'Payment Pending' };
     $booking['payment_method'] = $type === 'admin_new_booking' ? 'Cash on arrival' : 'PayHere';
     $booking['payment_amount'] = $booking['amount']; $booking['payment_currency'] = $booking['currency'];
     $booking['transaction_id'] = 'SAMPLE-TRANSACTION';
@@ -49,11 +49,21 @@ function booking_email_event_preview_data(string $type, string $scenario): array
             'expired','admin_booking_expired'=>'Cancelled', default=>'Payment Pending',
         };
     }
+    if (in_array($type, ['manual_payment_received', 'admin_manual_payment_received'], true)) {
+        $booking['payment_method'] = 'Bank Transfer';
+        $booking['payment_status'] = 'Partially Paid';
+        $booking['payment_amount'] = 5000;
+        $booking['payment_currency'] = $booking['currency'];
+        $booking['amount_received'] = 5000;
+        $booking['total_paid'] = 5000;
+        $booking['balance_due'] = max(0, (float) $booking['amount'] - 5000);
+    }
     if (in_array($type, ['expired','admin_booking_expired'], true)) $booking['status'] = 'Expired';
     if (in_array($type, ['cancelled','admin_booking_cancelled'], true)) $booking['status'] = 'Cancelled';
-    if ($type === 'admin_payment_received') $booking['status'] = 'Confirmed';
+    if (in_array($type, ['admin_payment_received', 'admin_manual_payment_received'], true)) $booking['status'] = 'Confirmed';
     if ($type === 'payment_received') $booking['payment_notice'] = 'Your payment has been recorded. Your reservation is awaiting confirmation.';
     if ($type === 'confirmed' && !$online) $booking['payment_notice'] = 'Payment is due on arrival. No online payment is required for this payment method.';
     $booking['payment_amount'] = $booking['amount']; $booking['payment_currency'] = $booking['currency'];
+    if (in_array($type, ['manual_payment_received', 'admin_manual_payment_received'], true)) $booking['payment_amount'] = 5000;
     return $booking;
 }

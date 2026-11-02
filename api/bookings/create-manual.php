@@ -212,10 +212,12 @@ try {
         ], JSON_UNESCAPED_SLASHES),
     ]);
 
+    $initialPaymentEntryId = 0;
     if ($isAdvance || $paymentStatus === 'Paid') {
         $receivedAmount = $isAdvance ? round($advanceAmount, 2) : round($amount, 2);
         $ledger = $pdo->prepare('INSERT INTO booking_payment_entries (booking_id, amount, currency, method, source, external_reference, note, recorded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
         $ledger->execute([$bookingId, $receivedAmount, PAYMENT_CURRENCY, $paymentMethod === '' ? 'Cash' : $paymentMethod, 'initial_manual', 'manual-booking-' . $bookingId, $isAdvance ? 'Advance recorded when manual reservation was created' : 'Full payment recorded when manual reservation was created', 'admin']);
+        $initialPaymentEntryId = (int) $pdo->lastInsertId();
     }
 
     $pdo->commit();
@@ -248,6 +250,13 @@ try {
         queue_booking_received_emails($pdo, $emailBooking);
     } catch (Throwable $emailError) {
         error_log('Manual booking email queue error: ' . $emailError->getMessage());
+    }
+    if ($initialPaymentEntryId > 0) {
+        try {
+            queue_manual_payment_receipt_emails($pdo, $bookingId, $initialPaymentEntryId);
+        } catch (Throwable $emailError) {
+            error_log('Initial manual payment receipt email queue error: ' . $emailError->getMessage());
+        }
     }
 
     json_response(true, 'Manual booking created successfully.', 201, [
